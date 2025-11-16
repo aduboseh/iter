@@ -1,6 +1,9 @@
 mod types;
 mod scg_core;
 mod mcp_handler;
+mod fault;
+mod telemetry;
+mod lineage;
 
 use crate::mcp_handler::handle_rpc;
 use crate::scg_core::ScgRuntime;
