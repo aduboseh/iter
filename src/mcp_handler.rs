@@ -88,7 +88,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "node.create",
                             "description": "Create SCG node with belief and energy values",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": ["state_mutation", "energy_allocation", "lineage_append"],
+                            "dependencies": [],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -101,7 +103,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "node.mutate",
                             "description": "Mutate node belief by delta",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": ["state_mutation", "esv_validation", "lineage_append"],
+                            "dependencies": ["node.query"],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -114,7 +118,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "node.query",
                             "description": "Query node state by ID",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": [],
+                            "dependencies": [],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -126,7 +132,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "edge.bind",
                             "description": "Bind edge between two nodes",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": ["state_mutation", "topology_change", "lineage_append"],
+                            "dependencies": ["node.query"],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -140,7 +148,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "edge.propagate",
                             "description": "Propagate belief along edge",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": ["state_mutation", "energy_transfer", "lineage_append"],
+                            "dependencies": ["node.query"],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -152,7 +162,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "governor.status",
                             "description": "Query governor drift and coherence status",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": [],
+                            "dependencies": [],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {}
@@ -161,7 +173,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "esv.audit",
                             "description": "Audit node ethical state vector",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": ["esv_validation"],
+                            "dependencies": ["node.query"],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -173,7 +187,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "lineage.replay",
                             "description": "Replay lineage checksum history",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": [],
+                            "dependencies": [],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {}
@@ -182,7 +198,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                         {
                             "name": "lineage.export",
                             "description": "Export lineage log to file and return checksum",
-                            "version": "0.1",
+                            "version": "0.1.0",
+                            "sideEffects": ["filesystem_write"],
+                            "dependencies": [],
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
