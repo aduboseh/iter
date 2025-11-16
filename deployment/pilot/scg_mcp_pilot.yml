@@ -1,0 +1,210 @@
+# SCG MCP Server - Pilot Deployment Configuration
+# 
+# Compatible with: Warp, Cursor, Cline, VSCode, Windsurf, Zed
+# Purpose: Field trial deployment with observability and drift monitoring
+
+name: scg-mcp-server
+version: 0.1.0
+
+# Server configuration
+server:
+  # Transport mode: stdio for MCP protocol
+  transport: stdio
+  
+  # Cluster identifier for telemetry
+  cluster_id: SCG-PILOT-01
+  
+  # Restart policy
+  restart_policy:
+    on_failure: true
+    max_retries: 3
+    backoff_seconds: 5
+  
+  # Health check configuration
+  health:
+    enabled: true
+    check_interval_seconds: 30
+    timeout_seconds: 5
+  
+  # Logging configuration
+  logging:
+    level: info # debug, info, warn, error
+    format: json # json or text
+    output: stderr
+    include_timestamps: true
+    include_lineage_events: true
+
+# Operational thresholds (SCG substrate invariants)
+thresholds:
+  # Energy drift tolerance: ΔE_total ≤ 1e-10
+  energy_drift_max: 1.0e-10
+  
+  # Coherence minimum: C(t) ≥ 0.97
+  coherence_min: 0.97
+  
+  # ESV validation ratio: must be 1.0 (100%)
+  esv_valid_ratio_min: 1.0
+  
+  # Maximum entropy index (lower is better)
+  entropy_index_max: 0.001
+
+# Telemetry configuration
+telemetry:
+  enabled: true
+  
+  # Emission interval (seconds)
+  emit_interval_seconds: 1
+  
+  # Export format: json, opentelemetry, prometheus
+  format: json
+  
+  # Export targets
+  targets:
+    - type: stderr
+      enabled: true
+    - type: file
+      enabled: true
+      path: ./telemetry/scg_pilot.jsonl
+      rotation: daily
+    # Uncomment for Azure Monitor integration
+    # - type: azure_monitor
+    #   enabled: false
+    #   connection_string: ${AZURE_MONITOR_CONNECTION_STRING}
+    # Uncomment for Prometheus pushgateway
+    # - type: prometheus
+    #   enabled: false
+    #   pushgateway_url: http://localhost:9091
+
+# Fault handling configuration
+fault_handling:
+  # Enable automatic rollback on errors
+  auto_rollback: true
+  
+  # Checkpoint frequency (number of operations)
+  checkpoint_frequency: 100
+  
+  # Quarantine mode triggers
+  quarantine_triggers:
+    - energy_drift_exceeded
+    - esv_violation
+    - lineage_corruption
+  
+  # Quarantine notification webhook (optional)
+  # quarantine_webhook: ${QUARANTINE_WEBHOOK_URL}
+
+# Lineage management
+lineage:
+  # Enable lineage tracking
+  enabled: true
+  
+  # Snapshot frequency (number of operations)
+  snapshot_frequency: 500
+  
+  # Snapshot export path
+  snapshot_path: ./snapshots
+  
+  # Enable deterministic replay validation
+  replay_validation: true
+  
+  # Replay tolerance: ε ≤ 1e-10
+  replay_tolerance: 1.0e-10
+
+# Resource limits
+resources:
+  # Maximum graph size (nodes)
+  max_nodes: 10000
+  
+  # Maximum graph size (edges)
+  max_edges: 50000
+  
+  # Maximum lineage depth before compression
+  max_lineage_depth: 10000
+  
+  # Memory limit (MB)
+  memory_limit_mb: 2048
+
+# MCP client compatibility
+mcp_clients:
+  # Warp AI Terminal
+  warp:
+    enabled: true
+    config_path: ~/.warp/mcp/scg-mcp.json
+  
+  # Cursor
+  cursor:
+    enabled: true
+    config_path: ~/.cursor/mcp/scg-mcp.json
+  
+  # Cline (VSCode extension)
+  cline:
+    enabled: true
+    config_path: ~/.vscode/extensions/cline/mcp/scg-mcp.json
+  
+  # Windsurf
+  windsurf:
+    enabled: true
+    config_path: ~/.windsurf/mcp/scg-mcp.json
+  
+  # Zed
+  zed:
+    enabled: true
+    config_path: ~/.config/zed/mcp/scg-mcp.json
+
+# Pilot trial configuration
+pilot:
+  # Trial duration (days)
+  duration_days: 7
+  
+  # Expected load (requests per second)
+  expected_rps: 10
+  
+  # Monitoring objectives
+  objectives:
+    - Zero drift faults (energy_drift ≤ 1e-10)
+    - Zero lineage mismatches
+    - Zero ESV violations
+    - Coherence C(t) ≥ 0.97 under load
+    - Zero catastrophic failures
+  
+  # Success criteria
+  success_criteria:
+    min_uptime_percent: 99.9
+    max_error_rate_percent: 0.01
+    max_p99_latency_ms: 100
+
+# Observability endpoints (for monitoring dashboards)
+observability:
+  # Expose metrics endpoint (HTTP)
+  # metrics_port: 9090
+  # metrics_path: /metrics
+  
+  # Export trace data
+  tracing:
+    enabled: false
+    # exporter: otlp
+    # endpoint: http://localhost:4317
+
+# Notes for deployment
+notes: |
+  This configuration is designed for pilot deployment into real-world
+  MCP client environments. It enforces SCG substrate invariants while
+  providing comprehensive observability for validation.
+  
+  Before deployment:
+  1. Ensure Rust toolchain installed (1.70+)
+  2. Build: cargo build --release
+  3. Configure MCP client to use stdio transport
+  4. Set environment variables for sensitive config (webhooks, connection strings)
+  5. Monitor telemetry output for threshold violations
+  
+  During pilot:
+  - Monitor telemetry for invariant violations
+  - Review lineage snapshots for replay integrity
+  - Observe fault handling under real workloads
+  - Collect field logs from all client environments
+  
+  Success signals:
+  - Zero energy drift violations over 7 days
+  - Zero lineage mismatches across replays
+  - Predictable governor behavior under load
+  - No catastrophic failures requiring quarantine

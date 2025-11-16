@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "scg-mcp": {
+      "command": "cargo",
+      "args": ["run", "--release", "--manifest-path", "C:\\Users\\adubo\\scg_mcp_server\\Cargo.toml"],
+      "env": {
+        "SCG_CLUSTER_ID": "SCG-PILOT-01",
+        "SCG_LOG_LEVEL": "info",
+        "RUST_BACKTRACE": "1"
+      },
+      "description": "SCG MCP Server - Pilot Deployment",
+      "metadata": {
+        "version": "0.1.0",
+        "transport": "stdio",
+        "capabilities": [
+          "tools",
+          "lineage_tracking",
+          "energy_conservation",
+          "esv_validation"
+        ]
+      }
+    }
+  }
+}
