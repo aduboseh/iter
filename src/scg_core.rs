@@ -1,4 +1,7 @@
 use crate::types::{EdgeState, GovernorStatus, LineageEntry, NodeState};
+use crate::telemetry::TelemetryEmitter;
+use crate::fault::{QuarantineController, QuarantineReason, error_codes};
+use crate::lineage::LineageBuilder;
 use parking_lot::RwLock;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -10,7 +13,9 @@ pub struct ScgRuntimeInner {
     pub edges: HashMap<Uuid, EdgeState>,
     pub lineage: Vec<LineageEntry>,
     pub total_energy: f64,
+    pub initial_energy: f64,
     pub esv_threshold: f64,
+    pub operation_count: usize,
 }
 
 impl Default for ScgRuntimeInner {
@@ -20,21 +25,95 @@ impl Default for ScgRuntimeInner {
             edges: HashMap::new(),
             lineage: Vec::new(),
             total_energy: 0.0,
+            initial_energy: 0.0,
             esv_threshold: 1.0, // default ESV threshold
+            operation_count: 0,
         }
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ScgRuntime {
     inner: Arc<RwLock<ScgRuntimeInner>>,
+    telemetry: Arc<TelemetryEmitter>,
+    quarantine: Arc<QuarantineController>,
+}
+
+impl Default for ScgRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ScgRuntime {
     pub const DRIFT_THRESHOLD: f64 = 1e-10;
+    pub const COHERENCE_THRESHOLD: f64 = 0.97;
 
     pub fn new() -> Self {
-        Self::default()
+        let cluster_id = std::env::var("SCG_CLUSTER_ID").unwrap_or_else(|_| "SCG-RUNTIME-01".to_string());
+        
+        Self {
+            inner: Arc::new(RwLock::new(ScgRuntimeInner::default())),
+            telemetry: Arc::new(TelemetryEmitter::new(cluster_id)),
+            quarantine: Arc::new(QuarantineController::new()),
+        }
+    }
+    
+    /// Checks if system is quarantined
+    pub fn is_quarantined(&self) -> bool {
+        self.quarantine.is_quarantined()
+    }
+    
+    /// Computes current energy drift
+    fn compute_energy_drift(&self, inner: &ScgRuntimeInner) -> f64 {
+        if inner.initial_energy == 0.0 {
+            return 0.0;
+        }
+        (inner.total_energy - inner.initial_energy).abs()
+    }
+    
+    /// Computes coherence index
+    fn compute_coherence(&self, inner: &ScgRuntimeInner) -> f64 {
+        if inner.nodes.is_empty() {
+            return 1.0;
+        }
+        
+        // Coherence = ratio of ESV-valid nodes
+        let valid_count = inner.nodes.values().filter(|n| n.esv_valid).count();
+        valid_count as f64 / inner.nodes.len() as f64
+    }
+    
+    /// Emits telemetry and checks for violations
+    fn emit_telemetry_and_check(&self, inner: &ScgRuntimeInner) {
+        let drift = self.compute_energy_drift(inner);
+        let coherence = self.compute_coherence(inner);
+        let esv_valid_ratio = coherence; // Same calculation for now
+        let entropy_index = drift; // Simplified: use drift as entropy proxy
+        
+        self.telemetry.emit(drift, coherence, esv_valid_ratio, entropy_index);
+        
+        // Check for violations and trigger quarantine
+        if drift > Self::DRIFT_THRESHOLD {
+            eprintln!("[SCG] CRITICAL: Energy drift exceeded: {} > {}", drift, Self::DRIFT_THRESHOLD);
+            self.quarantine.enter_quarantine(
+                QuarantineReason::EnergyDriftExceeded {
+                    drift,
+                    threshold: Self::DRIFT_THRESHOLD,
+                },
+                None,
+            );
+        }
+        
+        if coherence < Self::COHERENCE_THRESHOLD {
+            eprintln!("[SCG] CRITICAL: Coherence below threshold: {} < {}", coherence, Self::COHERENCE_THRESHOLD);
+            self.quarantine.enter_quarantine(
+                QuarantineReason::EsvViolation {
+                    node_id: Uuid::nil(),
+                    checksum_mismatch: format!("Coherence: {}", coherence),
+                },
+                None,
+            );
+        }
     }
 
     // ESV threshold API
@@ -72,7 +151,24 @@ impl ScgRuntime {
     }
 
     pub fn node_create(&self, belief: f64, energy: f64) -> NodeState {
+        // Check quarantine
+        if self.is_quarantined() {
+            eprintln!("[SCG] Operation blocked: System is quarantined");
+            return NodeState {
+                id: Uuid::nil(),
+                belief: 0.0,
+                energy: 0.0,
+                esv_valid: false,
+            };
+        }
+        
         let mut inner = self.inner.write();
+        
+        // Set initial energy on first node
+        if inner.nodes.is_empty() {
+            inner.initial_energy = energy;
+        }
+        
         let id = Uuid::new_v4();
         let node = NodeState {
             id,
@@ -82,11 +178,21 @@ impl ScgRuntime {
         };
         inner.total_energy += energy;
         inner.nodes.insert(id, node.clone());
+        inner.operation_count += 1;
         Self::append_lineage(&mut inner, &format!("node.create:{}", id));
+        
+        // Emit telemetry and check invariants
+        self.emit_telemetry_and_check(&inner);
+        
         node
     }
 
     pub fn node_mutate(&self, id: Uuid, delta: f64) -> Result<NodeState, String> {
+        // Check quarantine
+        if self.is_quarantined() {
+            return Err("System is quarantined".to_string());
+        }
+        
         let mut inner = self.inner.write();
 
         // First mutable borrow
@@ -97,7 +203,11 @@ impl ScgRuntime {
         let out = entry.clone();
 
         // Now safe to borrow `inner` mutably again
+        inner.operation_count += 1;
         Self::append_lineage(&mut inner, &format!("node.mutate:{}", id));
+        
+        // Emit telemetry and check invariants
+        self.emit_telemetry_and_check(&inner);
 
         Ok(out)
     }
@@ -108,6 +218,11 @@ impl ScgRuntime {
     }
 
     pub fn edge_bind(&self, src: Uuid, dst: Uuid, weight: f64) -> Result<EdgeState, String> {
+        // Check quarantine
+        if self.is_quarantined() {
+            return Err("System is quarantined".to_string());
+        }
+        
         let mut inner = self.inner.write();
         if !inner.nodes.contains_key(&src) || !inner.nodes.contains_key(&dst) {
             return Err("Source or destination not found".into());
@@ -115,11 +230,21 @@ impl ScgRuntime {
         let id = Uuid::new_v4();
         let edge = EdgeState { id, src, dst, weight };
         inner.edges.insert(id, edge.clone());
+        inner.operation_count += 1;
         Self::append_lineage(&mut inner, &format!("edge.bind:{}", id));
+        
+        // Emit telemetry
+        self.emit_telemetry_and_check(&inner);
+        
         Ok(edge)
     }
 
     pub fn edge_propagate(&self, edge_id: Uuid) -> Result<(), String> {
+        // Check quarantine
+        if self.is_quarantined() {
+            return Err("System is quarantined".to_string());
+        }
+        
         let mut inner = self.inner.write();
 
         // First borrow
@@ -132,15 +257,23 @@ impl ScgRuntime {
         }
 
         // Safe to mutate lineage now
+        inner.operation_count += 1;
         Self::append_lineage(&mut inner, &format!("edge.propagate:{}", edge_id));
+        
+        // Emit telemetry and check invariants
+        self.emit_telemetry_and_check(&inner);
+        
         Ok(())
     }
 
     pub fn governor_status(&self) -> GovernorStatus {
         let inner = self.inner.read();
+        let drift = self.compute_energy_drift(&inner);
+        let coherence = self.compute_coherence(&inner);
+        
         GovernorStatus {
-            energy_drift: 0.0,
-            coherence: 1.0,
+            energy_drift: drift,
+            coherence,
             node_count: inner.nodes.len(),
             edge_count: inner.edges.len(),
         }
