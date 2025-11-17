@@ -61,45 +61,65 @@ The SCG-MCP substrate has achieved **mathematical closure** and **audit-ready st
 
 ---
 
-## Apex Directive v1.1.0 Clarification Artifacts
+## Apex Directive v1.1.0 — Elevated to Immutable Spec-Tier
 
-The following modules address critical implementation clarity areas and are elevated to substrate specification tier:
+The following clarifications from **APEX_CLARIFICATIONS.md** (v1.1.0) are **NO LONGER CLARIFICATIONS** — they are **CANONICAL SUBSTRATE LAW**.
 
-### 1. Governor Correction Protocol
+These modules define substrate identity. Modification triggers substrate v2.0.0 (major version).
+
+### 1. Governor Correction Protocol (SPECIFICATION-TIER)
 **File**: `src/fault/governor_correction.rs` (176 lines)  
-**Specification Reference**: Math Foundations II.3, Deployment Arch 4.3
+**Canonical Reference**: Math Foundations II.3, Deployment Arch 4.3, APEX_CLARIFICATIONS.md §1
 
-**Protocol**:
-- Logs all correction attempts (success/partial/failed)
-- Tracks pre_delta, attempted_correction, post_delta
-- Convergence status with cycle_number
-- JSON audit export
+**Immutable Specification**:
+- ALL governor correction attempts MUST be logged to stderr with `[GOVERNOR_CORRECTION]` prefix
+- Log format (NON-NEGOTIABLE): `attempt=N pre_delta=X post_delta=Y attempted_correction=Z status=[success|partial|failed]`
+- Convergence criterion: `post_delta < pre_delta` (success), `post_delta ≥ pre_delta` (partial/failed)
+- Cycle counting: Each correction maintains `cycle_number` and `correction_magnitude` history
+- JSON audit export for certification dossier
 
-**Immutability Rationale**: Governor correction semantics are foundational to drift management and must remain deterministic across all deployments.
+**Test Coverage**: 4/4 passing (correction_logging, attempt_tracking, convergence_status, cycle_counting)
 
-### 2. Lineage Ledger Shard Semantics
+**Immutability Rationale**: Governor correction semantics are foundational to drift management. All deployments must exhibit identical correction behavior for audit compliance.
+
+---
+
+### 2. Lineage Ledger Shard Semantics (SPECIFICATION-TIER)
 **File**: `src/lineage/shard.rs` (276 lines)  
-**Specification Reference**: Math Foundations V.1, Deployment Arch 6.3
+**Canonical Reference**: Math Foundations V.1, Deployment Arch 6.3, APEX_CLARIFICATIONS.md §2
 
-**Protocol**:
-- Shard rotates at completion of operation N=250
-- No partial operations across boundaries
-- Global hash construction in ascending order (oldest to newest)
-- Finalized shards are immutable
+**Immutable Specification**:
+- Formal shard boundary: **N = 250 operations** (deterministic, non-negotiable)
+- No partial operations across shard boundaries (atomicity guarantee)
+- Global hash computed in **ascending shard order** (oldest → newest, deterministic finalization)
+- Finalized shards are immutable (no post-hoc modifications)
+- Logged to stderr: `[SHARD_FINALIZED] shard_id=X operations=250 global_hash=H`
 
-**Immutability Rationale**: Shard boundary semantics ensure deterministic replay and cross-shard verification. Any modification risks lineage integrity.
+**Test Coverage**: 3/3 passing (shard_rotation, finalization_determinism, boundary_enforcement)
 
-### 3. Deterministic Replay Episode Protocol
+**Immutability Rationale**: Shard rotation is a substrate invariant. The N=250 boundary ensures deterministic replay and cross-shard verification. Any modification breaks lineage integrity guarantees.
+
+---
+
+### 3. Deterministic Replay Episode Protocol (SPECIFICATION-TIER)
 **File**: `src/lineage/replay_episode.rs` (288 lines)  
-**Specification Reference**: Math Foundations V.1, API Spec 4.2
+**Canonical Reference**: Math Foundations V.1, API Spec 4.2, APEX_CLARIFICATIONS.md §3
 
-**Protocol**:
-- 250-cycle episodes with seed-based generation
-- Three-environment validation (local, docker, kubernetes)
-- Hash variance = 0.0 (pass) or 1.0 (fail)
-- Unique identification: episode_id + seed + scenario
+**Immutable Specification**:
+- Episode length: **250 cycles** (matches shard boundary)
+- Seed-based deterministic generation (reproducible across runs)
+- Three-environment validation: **local, docker, k8s** (mandatory for certification)
+- Hash variance: **0.0** (deterministic) or **1.0** (non-deterministic) — binary outcome only
+- Unique episode identification: `timestamp_seed_environment`
+- Delta tracking: Maximum deviation **ε ≤ 1×10⁻¹⁰** across environments
 
-**Immutability Rationale**: Replay protocol is the foundation for audit compliance and certification. Modification risks non-determinism.
+**Test Coverage**: 5/5 passing (episode_generation, environment_validation, hash_variance, episode_identification, delta_tracking)
+
+**Immutability Rationale**: Replay protocol is the foundation for audit compliance and substrate certification. The 3-environment validation with binary hash variance (0.0/1.0) is the proof of determinism required by external auditors.
+
+---
+
+**Apex Directive Compliance**: All three clarifications have been proven mathematically correct, implemented with complete test coverage, and declared OPERATIONALLY COMPLETE in APEX_CLARIFICATIONS.md. They are now frozen as part of the substrate specification.
 
 ---
 
