@@ -1,0 +1,23 @@
+{
+  "directive": "SG-SCG-PILOT-ACT-04 v1.0.0 §6",
+  "timestamp": "TBD",
+  "requirement": "NTP/PTP skew ≤50ms across all cluster nodes",
+  
+  "nodes": [
+    {
+      "name": "TBD",
+      "ntp_offset_ms": "TBD",
+      "stratum": "TBD",
+      "compliant": "TBD"
+    }
+  ],
+  
+  "summary": {
+    "total_nodes": 3,
+    "nodes_checked": 0,
+    "max_skew_ms": "TBD",
+    "compliant": false
+  },
+  
+  "notes": "Awaiting DaemonSet deployment and validation execution"
+}

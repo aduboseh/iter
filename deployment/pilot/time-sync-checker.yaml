@@ -1,0 +1,188 @@
+# SCG-PILOT-01 Time Synchronization Validation DaemonSet
+# Directive: SG-SCG-PILOT-ACT-04 v1.0.0 §6
+# 
+# Validates NTP/PTP skew ≤50ms across all cluster nodes
+# Runs on hostNetwork to access node-level time services
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: time-sync-checker
+  namespace: scg-pilot-01
+  labels:
+    app: time-sync-checker
+    directive: SG-SCG-PILOT-ACT-04
+spec:
+  selector:
+    matchLabels:
+      app: time-sync-checker
+  template:
+    metadata:
+      labels:
+        app: time-sync-checker
+    spec:
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: time-checker
+        image: debian:bookworm-slim
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          set -e
+          echo "[TIME-SYNC-CHECKER] Starting time synchronization validation..."
+          echo "[TIME-SYNC-CHECKER] Directive: SG-SCG-PILOT-ACT-04 v1.0.0 §6"
+          echo "[TIME-SYNC-CHECKER] Requirement: NTP/PTP skew ≤50ms"
+          echo ""
+          
+          # Install time synchronization tools
+          apt-get update -qq > /dev/null 2>&1
+          apt-get install -y -qq chrony ntpdate jq > /dev/null 2>&1
+          
+          while true; do
+            TIMESTAMP=$(date -Iseconds)
+            NODE=$(hostname)
+            
+            echo "[$TIMESTAMP] Node: $NODE"
+            
+            # Try chrony first (preferred for AKS)
+            if command -v chronyc &> /dev/null; then
+              TRACKING=$(chronyc tracking 2>/dev/null || echo "chrony_unavailable")
+              if [[ "$TRACKING" != "chrony_unavailable" ]]; then
+                OFFSET=$(echo "$TRACKING" | grep "System time" | awk '{print $4}')
+                OFFSET_MS=$(echo "$OFFSET * 1000" | bc 2>/dev/null || echo "0")
+                STRATUM=$(echo "$TRACKING" | grep "Stratum" | awk '{print $3}')
+                
+                echo "  chronyc tracking:"
+                echo "$TRACKING" | head -5
+                echo "  Offset: ${OFFSET_MS}ms (Stratum: $STRATUM)"
+                
+                # Check compliance
+                COMPLIANT="false"
+                ABS_OFFSET=$(echo "$OFFSET_MS" | awk '{if ($1<0) print -$1; else print $1}')
+                if (( $(echo "$ABS_OFFSET <= 50" | bc -l) )); then
+                  COMPLIANT="true"
+                  echo "  ✅ COMPLIANT (≤50ms)"
+                else
+                  echo "  ❌ NON-COMPLIANT (>50ms)"
+                fi
+                
+                # Output JSON for collection
+                cat <<EOF | tee /var/log/time-sync-result.json
+{
+  "timestamp": "$TIMESTAMP",
+  "node": "$NODE",
+  "method": "chrony",
+  "offset_ms": $OFFSET_MS,
+  "stratum": $STRATUM,
+  "compliant": $COMPLIANT,
+  "threshold_ms": 50
+}
+EOF
+              fi
+            fi
+            
+            # Fallback to ntpdate if chrony unavailable
+            if [[ "$TRACKING" == "chrony_unavailable" ]]; then
+              echo "  chrony unavailable, trying ntpdate..."
+              NTPDATE_OUTPUT=$(ntpdate -q time.windows.com 2>&1 || echo "ntpdate_failed")
+              if [[ "$NTPDATE_OUTPUT" != "ntpdate_failed" ]]; then
+                OFFSET=$(echo "$NTPDATE_OUTPUT" | grep "offset" | awk '{print $6}')
+                OFFSET_MS=$(echo "$OFFSET * 1000" | bc 2>/dev/null || echo "0")
+                
+                echo "  ntpdate -q time.windows.com:"
+                echo "$NTPDATE_OUTPUT"
+                echo "  Offset: ${OFFSET_MS}ms"
+                
+                COMPLIANT="false"
+                ABS_OFFSET=$(echo "$OFFSET_MS" | awk '{if ($1<0) print -$1; else print $1}')
+                if (( $(echo "$ABS_OFFSET <= 50" | bc -l) )); then
+                  COMPLIANT="true"
+                  echo "  ✅ COMPLIANT (≤50ms)"
+                else
+                  echo "  ❌ NON-COMPLIANT (>50ms)"
+                fi
+                
+                cat <<EOF | tee /var/log/time-sync-result.json
+{
+  "timestamp": "$TIMESTAMP",
+  "node": "$NODE",
+  "method": "ntpdate",
+  "offset_ms": $OFFSET_MS,
+  "stratum": "unknown",
+  "compliant": $COMPLIANT,
+  "threshold_ms": 50
+}
+EOF
+              else
+                echo "  ❌ Both chrony and ntpdate failed"
+                cat <<EOF | tee /var/log/time-sync-result.json
+{
+  "timestamp": "$TIMESTAMP",
+  "node": "$NODE",
+  "method": "none",
+  "error": "time_sync_unavailable",
+  "compliant": false
+}
+EOF
+              fi
+            fi
+            
+            echo ""
+            echo "Sleeping 300s (5 minutes)..."
+            sleep 300
+          done
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: log-volume
+          mountPath: /var/log
+      volumes:
+      - name: log-volume
+        emptyDir: {}
+---
+# ConfigMap for aggregation script (optional, run separately)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: time-sync-aggregator
+  namespace: scg-pilot-01
+data:
+  aggregate.sh: |
+    #!/bin/bash
+    # Collects time-sync results from all DaemonSet pods
+    # Usage: kubectl exec -it <any-pod> -- /scripts/aggregate.sh
+    
+    echo "Collecting time sync results from all nodes..."
+    
+    PODS=$(kubectl get pods -n scg-pilot-01 -l app=time-sync-checker -o name)
+    
+    echo "{"
+    echo "  \"directive\": \"SG-SCG-PILOT-ACT-04 v1.0.0 §6\","
+    echo "  \"timestamp\": \"$(date -Iseconds)\","
+    echo "  \"nodes\": ["
+    
+    FIRST=true
+    for POD in $PODS; do
+      RESULT=$(kubectl exec -n scg-pilot-01 $POD -- cat /var/log/time-sync-result.json 2>/dev/null || echo "{}")
+      if [[ "$RESULT" != "{}" ]]; then
+        if [[ "$FIRST" == "false" ]]; then
+          echo ","
+        fi
+        echo "    $RESULT"
+        FIRST=false
+      fi
+    done
+    
+    echo "  ]"
+    echo "}"
