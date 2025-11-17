@@ -110,29 +110,83 @@ spec:
         image: scgpilotacr.azurecr.io/scg-mcp:v1.0.0-substrate
         imagePullPolicy: Always
         
-        # Keep process alive for monitoring (STDIO mode needs input)
-        # In production, this would be replaced with HTTP transport or job-based execution
+        # Activate substrate with synthetic request stream (Directive SG-SCG-PILOT-ACT-01 v1.0.0 §2.1)
+        # Generates continuous MCP requests to drive processing and enable telemetry emission
         command: ["/bin/sh", "-c"]
         args:
         - |
-          echo "SCG-PILOT-01 Field Validation Starting..."
-          echo "Directive: SG-SCG-PILOT-AUTH-01 v1.2.0"
+          echo "================================================"
+          echo "SCG-PILOT-01 Field Validation - ACTIVE MODE"
+          echo "Directive: SG-SCG-PILOT-ACT-01 v1.0.0"
           echo "Substrate Version: v1.0.0-substrate"
-          echo "Mission: 7-day continuous operation"
-          echo "Keeping process alive for monitoring..."
-          # Keep container running for substrate monitoring
-          tail -f /dev/null
+          echo "Mission: 7-day continuous operation with telemetry"
+          echo "OTEL Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}"
+          echo "================================================"
+          echo ""
+          
+          # Generate continuous synthetic requests to drive substrate
+          generate_requests() {
+              local request_id=1
+              local cycle=0
+              
+              # Fixed UUIDs for stable testing
+              local NODE1="00000000-0000-0000-0000-000000000001"
+              local NODE2="00000000-0000-0000-0000-000000000002"
+              local EDGE1="00000000-0000-0000-0000-000000000003"
+              
+              while true; do
+                  cycle=$((cycle + 1))
+                  
+                  # Cycle through valid RPC methods with correct parameters
+                  case $((cycle % 6)) in
+                      0) 
+                          # Create node with minimal energy to avoid drift
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.create\",\"params\":{\"belief\":0.1,\"energy\":0.01}}"
+                          ;;
+                      1) 
+                          # Query governor status (read-only)
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
+                          ;;
+                      2) 
+                          # Replay lineage (read-only)
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"lineage.replay\",\"params\":{}}"
+                          ;;
+                      3) 
+                          # Query a node (read-only, using well-known UUID)
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.query\",\"params\":{\"node_id\":\"${NODE1}\"}}"
+                          ;;
+                      4) 
+                          # Another node creation with low energy
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.create\",\"params\":{\"belief\":0.05,\"energy\":0.01}}"
+                          ;;
+                      5) 
+                          # Governor status check
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
+                          ;;
+                  esac
+                  
+                  request_id=$((request_id + 1))
+                  sleep 0.05  # ~20 RPS (very conservative to avoid quarantine)
+              done
+          }
+          
+          echo "[ACTIVATION] Launching substrate with synthetic request stream..."
+          echo "[ACTIVATION] Target RPS: ~100 (well below 7500 limit)"
+          echo ""
+          
+          # Start substrate with request generator
+          generate_requests | /app/scg_mcp_server
         
         # Resource limits adjusted for cluster capacity
-        # Note: Directive §2.3 specifies 2-6 CPU, 4-12GB, but cluster has 2-CPU nodes
-        # Using lower requests for scheduling, high limits for burst
+        # Directive SG-SCG-PILOT-ACT-01 §8: Max 4 cores per substrate
+        # Quota: 6 CPU / 12GB total (shared with OTEL collector: 500m / 256Mi)
         resources:
           requests:
-            cpu: "1"  # Reduced to fit 2-CPU nodes (77% utilized)
-            memory: "2Gi"  # Reduced to fit available memory
+            cpu: "1"  # Scheduling on 2-CPU nodes
+            memory: "2Gi"  # Scheduling with available memory
           limits:
-            cpu: "6"  # Directive §2.3: 6 cores burst max (overcommit)
-            memory: "12Gi"  # Directive §2.3: 12GB burst max (overcommit)
+            cpu: "4"  # Directive ACT-01 §8: 4 cores max per substrate
+            memory: "10Gi"  # Fits within 12GB namespace quota (with OTEL overhead)
         
         # Environment variables from ConfigMap
         envFrom:
