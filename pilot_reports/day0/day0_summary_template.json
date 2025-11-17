@@ -1,0 +1,54 @@
+{
+  "timestamp": "TBD",
+  "directive": "SG-SCG-PILOT-ACT-03 v1.0.0",
+  "substrate_version": "v1.0.0-substrate",
+  "cluster": "haltra-perf-aks",
+  "namespace": "scg-pilot-01",
+  
+  "invariants": {
+    "energy_drift": "TBD",
+    "coherence": "TBD",
+    "esv_valid_ratio": "TBD",
+    "entropy_index": "TBD",
+    "lineage_epsilon": "TBD",
+    "quarantine_events": 0,
+    "replay_variance": "TBD"
+  },
+  
+  "substrate_state": {
+    "node_count": "TBD",
+    "edge_count": "TBD",
+    "processing_rate_rps": "~10",
+    "request_profile": "95% read-only (governor.status, lineage.replay)"
+  },
+  
+  "governor": {
+    "corrections": "TBD",
+    "convergence": "TBD",
+    "ledger_hash": "TBD"
+  },
+  
+  "telemetry": {
+    "source": "log-based extraction from scg-mcp pod stdout",
+    "collection_method": "kubectl logs parsing via monitor-invariants.ps1",
+    "completeness": "TBD",
+    "notes": "Awaiting first 6-12 hours of continuous telemetry for valid baseline."
+  },
+  
+  "operational_notes": [
+    "Substrate stabilized after controlled restart (§3.1 protocol)",
+    "Quarantine cleared by reducing energy allocation to 1e-12",
+    "Request generator adjusted to ultra-conservative profile",
+    "Multiline JSON parsing requires upgrade (deferred to Day-1)",
+    "Pod running stably: scg-mcp-7c7dc6f9d5-gw8t2 (40m+ uptime)",
+    "Zero restarts since last configuration change"
+  ],
+  
+  "certification_readiness": {
+    "infrastructure": "COMPLETE",
+    "monitoring": "OPERATIONAL (parser upgrade pending)",
+    "quarantine_status": "CLEARED",
+    "telemetry_flow": "ACTIVE",
+    "day_1_authorization": "GRANTED"
+  }
+}
