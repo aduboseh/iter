@@ -1,0 +1,214 @@
+---
+# OpenTelemetry Collector for SCG-PILOT-01
+# Directive: SG-SCG-PILOT-AUTH-02 v2.1.0 §2.1
+#
+# Receives OTLP telemetry from SCG-MCP substrate
+# Exports to logs and persistent storage for certification dossier
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: otel-collector-storage
+  namespace: scg-pilot-01
+  labels:
+    app: otel-collector
+    scg-mission: pilot-01
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-premium
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: scg-pilot-01
+  labels:
+    app: otel-collector
+    scg-mission: pilot-01
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        timeout: 5s
+        send_batch_size: 1024
+        send_batch_max_size: 2048
+      
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 200
+        spike_limit_mib: 50
+
+    exporters:
+      logging:
+        loglevel: info
+        sampling_initial: 10
+        sampling_thereafter: 10
+      
+      file:
+        path: /var/log/scg/telemetry.jsonl
+        rotation:
+          max_megabytes: 100
+          max_days: 7
+          max_backups: 30
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [logging, file]
+        
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [logging, file]
+        
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [logging, file]
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: scg-pilot-01
+  labels:
+    app: otel-collector
+    scg-mission: pilot-01
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+        scg-mission: pilot-01
+    spec:
+      serviceAccountName: scg-mcp-sa
+      priorityClassName: scg-substrate-priority
+      
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      containers:
+      - name: otel-collector
+        image: otel/opentelemetry-collector-contrib:0.91.0
+        imagePullPolicy: IfNotPresent
+        
+        args:
+        - "--config=/conf/otel-collector-config.yaml"
+        
+        ports:
+        - name: otlp-grpc
+          containerPort: 4317
+          protocol: TCP
+        - name: otlp-http
+          containerPort: 4318
+          protocol: TCP
+        - name: metrics
+          containerPort: 8888
+          protocol: TCP
+        
+        env:
+        - name: GOGC
+          value: "80"
+        - name: GOMEMLIMIT
+          value: "220MiB"
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        
+        volumeMounts:
+        - name: otel-collector-config
+          mountPath: /conf
+        - name: telemetry-storage
+          mountPath: /var/log/scg
+        
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 8888
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 8888
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      
+      volumes:
+      - name: otel-collector-config
+        configMap:
+          name: otel-collector-config
+          items:
+          - key: otel-collector-config.yaml
+            path: otel-collector-config.yaml
+      - name: telemetry-storage
+        persistentVolumeClaim:
+          claimName: otel-collector-storage
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: scg-pilot-01
+  labels:
+    app: otel-collector
+    scg-mission: pilot-01
+spec:
+  type: ClusterIP
+  selector:
+    app: otel-collector
+  ports:
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+    protocol: TCP
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+    protocol: TCP
+  - name: metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
