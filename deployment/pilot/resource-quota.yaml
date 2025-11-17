@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: scg-pilot-resources
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: resource-management
+spec:
+  hard:
+    # CPU limits per Directive §2.3
+    requests.cpu: "2"      # 2 cores guaranteed
+    limits.cpu: "6"        # 6 cores burst max
+    
+    # Memory limits per Directive §2.3
+    requests.memory: "4Gi"   # 4GB guaranteed
+    limits.memory: "12Gi"    # 12GB burst max
+    
+    # Pod limits
+    pods: "10"
+    
+    # Persistent volume claims
+    persistentvolumeclaims: "5"
+    requests.storage: "50Gi"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: scg-pilot-limits
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: resource-management
+spec:
+  limits:
+    # Container defaults (aligned with Directive §2.3)
+    - type: Container
+      default:
+        cpu: "2"
+        memory: "4Gi"
+      defaultRequest:
+        cpu: "1"
+        memory: "2Gi"
+      max:
+        cpu: "6"  # Directive §2.3: 6 cores burst max
+        memory: "12Gi"  # Directive §2.3: 12GB burst max
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+    
+    # Pod limits
+    - type: Pod
+      max:
+        cpu: "6"
+        memory: "12Gi"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: scg-substrate-priority
+  labels:
+    scg-mission: pilot-01
+value: 1000
+globalDefault: false
+description: "High priority for SCG substrate - prevents noisy neighbor interference"
