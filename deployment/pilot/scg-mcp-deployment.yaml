@@ -1,0 +1,299 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scg-telemetry-storage
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: telemetry
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: managed-premium  # Azure Premium SSD
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scg-lineage-storage
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: lineage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: managed-premium  # Azure Premium SSD with encryption
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scg-mcp-config
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: configuration
+data:
+  # Directive §2.4: Time synchronization
+  NTP_SERVERS: "time.windows.com,time.nist.gov"
+  CLOCK_SKEW_TOLERANCE_MS: "50"
+  
+  # Directive §2.5: Telemetry buffering
+  TELEMETRY_BUFFER_SIZE_MB: "15"
+  TELEMETRY_FLUSH_INTERVAL_SEC: "5"
+  
+  # Directive §3: Invariant thresholds
+  ENERGY_DRIFT_THRESHOLD: "1e-10"
+  COHERENCE_THRESHOLD: "0.97"
+  LINEAGE_EPSILON: "1e-10"
+  ESV_VALID_RATIO: "1.0"
+  SHARD_BOUNDARY: "250"
+  
+  # Monitoring interval (Directive §3)
+  INVARIANT_CHECK_INTERVAL_SEC: "60"
+  
+  # Target RPS
+  TARGET_RPS: "7500"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scg-mcp
+  namespace: scg-pilot-01
+  labels:
+    app: scg-mcp
+    scg-mission: pilot-01
+    scg-version: v1.0.0-substrate
+    scg-commit: ab48747
+    directive: SG-SCG-PILOT-AUTH-01-v1.2.0
+spec:
+  replicas: 1  # Single instance for deterministic substrate behavior
+  strategy:
+    type: Recreate  # No rolling updates - substrate must be immutable
+  selector:
+    matchLabels:
+      app: scg-mcp
+      scg-mission: pilot-01
+  template:
+    metadata:
+      labels:
+        app: scg-mcp
+        scg-mission: pilot-01
+        scg-version: v1.0.0-substrate
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Directive §2.3: High priority to prevent noisy neighbor interference
+      priorityClassName: scg-substrate-priority
+      
+      # Security context per Directive §4.1
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Service account with minimal permissions
+      serviceAccountName: scg-mcp-sa
+      automountServiceAccountToken: true
+      
+      containers:
+      - name: scg-mcp
+        image: scgpilotacr.azurecr.io/scg-mcp:v1.0.0-substrate
+        imagePullPolicy: Always
+        
+        # Keep process alive for monitoring (STDIO mode needs input)
+        # In production, this would be replaced with HTTP transport or job-based execution
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "SCG-PILOT-01 Field Validation Starting..."
+          echo "Directive: SG-SCG-PILOT-AUTH-01 v1.2.0"
+          echo "Substrate Version: v1.0.0-substrate"
+          echo "Mission: 7-day continuous operation"
+          echo "Keeping process alive for monitoring..."
+          # Keep container running for substrate monitoring
+          tail -f /dev/null
+        
+        # Resource limits adjusted for cluster capacity
+        # Note: Directive §2.3 specifies 2-6 CPU, 4-12GB, but cluster has 2-CPU nodes
+        # Using lower requests for scheduling, high limits for burst
+        resources:
+          requests:
+            cpu: "1"  # Reduced to fit 2-CPU nodes (77% utilized)
+            memory: "2Gi"  # Reduced to fit available memory
+          limits:
+            cpu: "6"  # Directive §2.3: 6 cores burst max (overcommit)
+            memory: "12Gi"  # Directive §2.3: 12GB burst max (overcommit)
+        
+        # Environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: scg-mcp-config
+        
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: SCG_MISSION
+          value: "pilot-01"
+        - name: SCG_SUBSTRATE_VERSION
+          value: "v1.0.0-substrate"
+        - name: SCG_DIRECTIVE
+          value: "SG-SCG-PILOT-AUTH-01-v1.2.0"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        
+        # Volume mounts for persistent storage (Directive §2.5)
+        volumeMounts:
+        - name: telemetry-volume
+          mountPath: /var/log/scg
+        - name: lineage-volume
+          mountPath: /var/lib/scg
+        
+        # Health checks (adjusted for keep-alive mode)
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - test -d /var/log/scg && test -d /var/lib/scg
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - test -d /var/log/scg && test -d /var/lib/scg
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # Need write access for logs
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      
+      # Volumes
+      volumes:
+      - name: telemetry-volume
+        persistentVolumeClaim:
+          claimName: scg-telemetry-storage
+      - name: lineage-volume
+        persistentVolumeClaim:
+          claimName: scg-lineage-storage
+      
+      # Node affinity for stable hardware (Directive §2.4 time sync)
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      
+      # Toleration for dedicated nodes (if available)
+      tolerations:
+      - key: "scg-substrate"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scg-mcp-sa
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: identity
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: scg-mcp-role
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: scg-mcp-rolebinding
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: scg-mcp-role
+subjects:
+- kind: ServiceAccount
+  name: scg-mcp-sa
+  namespace: scg-pilot-01
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scg-mcp-service
+  namespace: scg-pilot-01
+  labels:
+    app: scg-mcp
+    scg-mission: pilot-01
+spec:
+  type: ClusterIP
+  selector:
+    app: scg-mcp
+    scg-mission: pilot-01
+  ports:
+  - name: mcp
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP

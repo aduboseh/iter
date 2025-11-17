@@ -1,0 +1,70 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scg-pilot-isolation
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: network-security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # INGRESS: Block all external ingress by default
+  ingress:
+    - from:
+        - podSelector: {}  # Only allow from pods within scg-pilot-01 namespace
+  
+  # EGRESS: Restrictive outbound
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # Allow internal pod-to-pod communication
+    - to:
+        - podSelector: {}
+    
+    # Allow telemetry to approved collectors (placeholder - update with actual IPs)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: telemetry-collector
+      ports:
+        - protocol: TCP
+          port: 4317  # OpenTelemetry OTLP
+        - protocol: TCP
+          port: 4318  # OpenTelemetry OTLP HTTP
+    
+    # Block all other egress by default
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scg-pilot-telemetry-egress
+  namespace: scg-pilot-01
+  labels:
+    scg-mission: pilot-01
+    component: telemetry
+spec:
+  podSelector:
+    matchLabels:
+      app: scg-mcp
+  policyTypes:
+    - Egress
+  egress:
+    # Allow telemetry export
+    - ports:
+        - protocol: TCP
+          port: 4317  # OTLP gRPC
+        - protocol: TCP
+          port: 4318  # OTLP HTTP
+        - protocol: TCP
+          port: 9090  # Prometheus (if used)
