@@ -4,9 +4,11 @@
 /// - Rollback-to-last-stable-state
 /// - Quarantine mode for catastrophic failures
 /// - Immutable fault traces for audit
+/// - Governor correction cycle logging
 
 pub mod rollback;
 pub mod quarantine;
+pub mod governor_correction;
 
 pub use rollback::{
     Checkpoint, 
@@ -24,4 +26,10 @@ pub use quarantine::{
     QuarantineState,
     QuarantineController,
     error_codes,
+};
+
+pub use governor_correction::{
+    CorrectionStatus,
+    CorrectionAttempt,
+    GovernorCorrectionLogger,
 };
