@@ -1,0 +1,84 @@
+name: Substrate Integrity Guard
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  check_frozen_modules:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Verify no substrate modifications without override
+        run: |
+          echo "Checking for substrate module modifications..."
+          
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check if any frozen substrate modules were modified
+          FROZEN_PATTERNS=(
+            "src/scg_core.rs"
+            "src/types.rs"
+            "src/mcp_handler.rs"
+            "src/lib.rs"
+            "src/main.rs"
+            "src/fault/"
+            "src/telemetry/"
+            "src/lineage/"
+          )
+          
+          SUBSTRATE_MODIFIED=false
+          for pattern in "${FROZEN_PATTERNS[@]}"; do
+            if echo "$CHANGED_FILES" | grep -q "$pattern"; then
+              echo "WARNING: Substrate module modified: $pattern"
+              SUBSTRATE_MODIFIED=true
+            fi
+          done
+          
+          # If substrate was modified, check for SUBSTRATE_OVERRIDE
+          if [ "$SUBSTRATE_MODIFIED" = true ]; then
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            echo "Checking commit message for SUBSTRATE_OVERRIDE..."
+            echo "Commit message: $COMMIT_MSG"
+            
+            if echo "$COMMIT_MSG" | grep -q "SUBSTRATE_OVERRIDE"; then
+              echo "✅ SUBSTRATE_OVERRIDE found - modification approved"
+              exit 0
+            else
+              echo "❌ ERROR: Substrate modification requires SUBSTRATE_OVERRIDE approval"
+              echo ""
+              echo "Frozen substrate modules were modified without SUBSTRATE_OVERRIDE."
+              echo "To override, include 'SUBSTRATE_OVERRIDE' in your commit message."
+              echo ""
+              echo "Modified substrate files:"
+              echo "$CHANGED_FILES" | grep -E "$(IFS=\|; echo "${FROZEN_PATTERNS[*]}")"
+              echo ""
+              echo "See SUBSTRATE_FREEZE.md for modification policy."
+              exit 1
+            fi
+          else
+            echo "✅ No substrate modules modified - check passed"
+          fi
+      
+      - name: Verify test coverage maintained
+        run: |
+          echo "Verifying minimum test coverage..."
+          
+          # This is a placeholder - in production, use actual coverage tool
+          echo "Expected: 46 tests (24 unit + 22 integration)"
+          echo "✅ Test coverage check placeholder - implement with coverage tool"
