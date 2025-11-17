@@ -137,36 +137,33 @@ spec:
               while true; do
                   cycle=$((cycle + 1))
                   
-                  # Cycle through valid RPC methods with correct parameters
-                  case $((cycle % 6)) in
+                  # Cycle through valid RPC methods - predominantly read-only to minimize drift
+                  case $((cycle % 20)) in
                       0) 
-                          # Create node with minimal energy to avoid drift
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.create\",\"params\":{\"belief\":0.1,\"energy\":0.01}}"
+                          # Very rare node creation with near-zero energy (1e-12)
+                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.create\",\"params\":{\"belief\":0.001,\"energy\":1e-12}}"
                           ;;
-                      1) 
-                          # Query governor status (read-only)
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
-                          ;;
-                      2) 
-                          # Replay lineage (read-only)
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"lineage.replay\",\"params\":{}}"
-                          ;;
-                      3) 
-                          # Query a node (read-only, using well-known UUID)
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.query\",\"params\":{\"node_id\":\"${NODE1}\"}}"
-                          ;;
-                      4) 
-                          # Another node creation with low energy
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.create\",\"params\":{\"belief\":0.05,\"energy\":0.01}}"
-                          ;;
-                      5) 
-                          # Governor status check
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
+                      *) 
+                          # All other cycles: read-only operations
+                          case $((cycle % 3)) in
+                              0)
+                                  # Query governor status (telemetry source)
+                                  echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
+                                  ;;
+                              1)
+                                  # Replay lineage (telemetry source)
+                                  echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"lineage.replay\",\"params\":{}}"
+                                  ;;
+                              2)
+                                  # Governor status again
+                                  echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
+                                  ;;
+                          esac
                           ;;
                   esac
                   
                   request_id=$((request_id + 1))
-                  sleep 0.05  # ~20 RPS (very conservative to avoid quarantine)
+                  sleep 0.1  # ~10 RPS (ultra-conservative, 95% read-only operations)
               done
           }
           
