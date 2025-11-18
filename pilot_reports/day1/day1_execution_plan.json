@@ -1,0 +1,38 @@
+{
+  "T0_unix": 1763507679,
+  "execution_instructions": {
+    "step_1": "Execute monitoring command in persistent PowerShell window",
+    "step_3": "After 24h completes, resume with ACT-07 §2-5 execution",
+    "step_4": "Validate ~1,440 samples collected before proceeding to aggregation",
+    "step_2": "Monitor for interruptions, log any failures to pilot_reports/day1/interruptions.json"
+  },
+  "target_completion": "2025-11-19T18:14:39Z",
+  "T0_scheduled": "2025-11-18T18:14:39Z",
+  "section_1": {
+    "note": "This command must run for 24 hours continuously. Execute in persistent PowerShell session or as background job.",
+    "command": ".\\deployment\\pilot\\monitor-invariants.ps1 -Namespace scg-pilot-01 -IntervalSeconds 60 -OutputPath \".\\pilot-monitoring\\day1\"",
+    "output_location": ".\\pilot-monitoring\\day1",
+    "execution_mode": "BACKGROUND_REQUIRED",
+    "target_samples": 1440,
+    "status": "READY_TO_INITIATE",
+    "duration_hours": 24
+  },
+  "section_2_5": {
+    "resume_actions": [
+      "§2: Run aggregate-day1.ps1",
+      "§3: Update CERTIFICATION_DOSSIER.md with final metrics",
+      "§4: Commit and tag DAY1_COMPLETE",
+      "§5: Update STATUS.md closure"
+    ],
+    "resume_after": "24 hours from T0",
+    "status": "BLOCKED_BY_SECTION_1"
+  },
+  "phase": "24H_TELEMETRY_INITIATION",
+  "directive": "SG-SCG-PILOT-ACT-07 v1.0.1",
+  "pre_flight_checks": {
+    "tooling_ready": "VERIFIED (all scripts present)",
+    "governance_compliance": "ACTIVE (COHERENCE-01 protocols applied)",
+    "substrate_health": "PASS (scg-mcp: 1/1 Ready, 0 restarts)",
+    "telemetry_active": "VERIFIED (node_count=102, active flow)"
+  }
+}
