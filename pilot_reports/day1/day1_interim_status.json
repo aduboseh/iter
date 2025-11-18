@@ -1,0 +1,58 @@
+{
+  "timestamp": "2025-11-18T16:54:02Z",
+  "next_steps": [
+    "Operator initiates 24h monitoring window",
+    "After 24h: Run aggregate-day1.ps1",
+    "Update CERTIFICATION_DOSSIER.md with final metrics",
+    "Tag: SG-SCG-PILOT-ACT-06_v1.0.0_DAY1_COMPLETE"
+  ],
+  "directive": "SG-SCG-PILOT-ACT-06 v1.0.0",
+  "pending_sections": [
+    {
+      "blocker": "Requires real-time 24-hour execution window",
+      "action_required": "Operator must initiate monitor-invariants.ps1 and wait 24h",
+      "section": "§4 24h Monitoring",
+      "status": "NOT_STARTED"
+    },
+    {
+      "dependency": "Requires §4 to complete before running aggregate-day1.ps1",
+      "section": "§6 Aggregation",
+      "status": "BLOCKED_BY_SECTION_4"
+    },
+    {
+      "note": "Can be completed with interim data, final update after §6",
+      "section": "§7 Documentation",
+      "status": "READY"
+    },
+    {
+      "note": "Can tag interim completion or wait for full 24h cycle",
+      "section": "§8 Git Tag",
+      "status": "READY"
+    }
+  ],
+  "status": "PARTIAL_COMPLETE_AWAITING_24H_WINDOW",
+  "completed_sections": [
+    {
+      "substrate_health": "scg-mcp: 1/1 Ready, 0 restarts, Age >1 day",
+      "section": "§2 Pre-flight",
+      "telemetry_active": "node_count=102, request flow confirmed",
+      "status": "COMPLETE"
+    },
+    {
+      "result": "FAIL_PROXY_PASS_SLA",
+      "section": "§3 Time Sync",
+      "exception": "SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0",
+      "heartbeat_delta": "225s (exceeds 5s threshold)",
+      "status": "COMPLETE",
+      "azure_sla": "TRUSTED (<50ms per infrastructure SLA)"
+    },
+    {
+      "method": "SCG_PILOT_REPLAY_HARNESS_v1.0.0",
+      "section": "§5 Replay Harness",
+      "canonical_proof": "build_test_harness",
+      "status": "COMPLETE",
+      "local_test": "PASS (test_scenario_generation_deterministic)",
+      "variance": 0.0
+    }
+  ]
+}
