@@ -110,69 +110,30 @@ spec:
         image: scgpilotacr.azurecr.io/scg-mcp:v1.0.0-substrate
         imagePullPolicy: Always
         
-        # Activate substrate with synthetic request stream (Directive SG-SCG-PILOT-ACT-01 v1.0.0 §2.1)
-        # Generates continuous MCP requests to drive processing and enable telemetry emission
+        # LOAD-BALANCE-01 stimulus pattern (Directive SG-SCG-LOAD-BALANCE-01 v1.0.0)
+        # Provides controlled, certification-grade synthetic load for Day-1A
         command: ["/bin/sh", "-c"]
         args:
         - |
           echo "================================================"
-          echo "SCG-PILOT-01 Field Validation - ACTIVE MODE"
-          echo "Directive: SG-SCG-PILOT-ACT-01 v1.0.0"
+          echo "SCG-PILOT-01 Day-1A - LOAD-BALANCE-01 ACTIVE"
+          echo "Directive: SG-SCG-LOAD-BALANCE-01 v1.0.0"
           echo "Substrate Version: v1.0.0-substrate"
-          echo "Mission: 7-day continuous operation with telemetry"
-          echo "OTEL Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}"
+          echo "Load Pattern: governor.status → node.create → lineage.replay"
+          echo "Cycle Interval: 0.9 seconds"
+          echo "Expected Rate: ~3.33 ops/second (~200 ops/minute)"
           echo "================================================"
           echo ""
-          
-          # Generate continuous synthetic requests to drive substrate
-          generate_requests() {
-              local request_id=1
-              local cycle=0
-              
-              # Fixed UUIDs for stable testing
-              local NODE1="00000000-0000-0000-0000-000000000001"
-              local NODE2="00000000-0000-0000-0000-000000000002"
-              local EDGE1="00000000-0000-0000-0000-000000000003"
-              
-              while true; do
-                  cycle=$((cycle + 1))
-                  
-                  # Cycle through valid RPC methods - predominantly read-only to minimize drift
-                  case $((cycle % 20)) in
-                      0) 
-                          # Very rare node creation with near-zero energy (1e-12)
-                          echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"node.create\",\"params\":{\"belief\":0.001,\"energy\":1e-12}}"
-                          ;;
-                      *) 
-                          # All other cycles: read-only operations
-                          case $((cycle % 3)) in
-                              0)
-                                  # Query governor status (telemetry source)
-                                  echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
-                                  ;;
-                              1)
-                                  # Replay lineage (telemetry source)
-                                  echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"lineage.replay\",\"params\":{}}"
-                                  ;;
-                              2)
-                                  # Governor status again
-                                  echo "{\"jsonrpc\":\"2.0\",\"id\":${request_id},\"method\":\"governor.status\",\"params\":{}}"
-                                  ;;
-                          esac
-                          ;;
-                  esac
-                  
-                  request_id=$((request_id + 1))
-                  sleep 0.1  # ~10 RPS (ultra-conservative, 95% read-only operations)
-              done
-          }
-          
-          echo "[ACTIVATION] Launching substrate with synthetic request stream..."
-          echo "[ACTIVATION] Target RPS: ~100 (well below 7500 limit)"
+          echo "[SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
           echo ""
           
-          # Start substrate with request generator
-          generate_requests | /app/scg_mcp_server
+          # LOAD-BALANCE-01 3-operation cycle (energy corrected to 1e-12)
+          while true; do
+            printf '{"jsonrpc":"2.0","id":"1","method":"governor.status","params":{}}\n'
+            printf '{"jsonrpc":"2.0","id":"2","method":"node.create","params":{"belief":0.01,"energy":1e-12}}\n'
+            printf '{"jsonrpc":"2.0","id":"3","method":"lineage.replay","params":{"limit":1}}\n'
+            sleep 0.9
+          done | /app/scg_mcp_server
         
         # Resource limits adjusted for cluster capacity
         # Directive SG-SCG-PILOT-ACT-01 §8: Max 4 cores per substrate
