@@ -1,4 +1,4 @@
-# Warp Execution Report: Hardened SCG-MCP Core Deployment
+# Execution Report: Hardened SCG-MCP Core Deployment
 
 **Status**: ✅ **OPERATIONAL** — Phase 2 Complete  
 **Repository**: https://github.com/aduboseh/scg-mcp  
@@ -342,7 +342,7 @@ No operations bypass ESV validation:
 
 ```powershell
 # ============================================
-# Warp Directive: Execute Hardened SCG-MCP
+# Directive: Execute Hardened SCG-MCP
 # ============================================
 
 # 1. Fetch code at commit b85fb35
@@ -386,7 +386,7 @@ Get-Content telemetry_pilot.log -Wait | Select-String -Pattern "VIOLATION|QUARAN
 ## Contact and Support
 
 **Repository**: https://github.com/aduboseh/scg-mcp  
-**Lead Engineer**: Haltra AI-Powered Ethical Repossession System Team  
+**Lead Engineer**: Armonti Du-Bose-Hill  
 **Compliance Standard**: SCG Space — Physics-aligned, ethically governed cognition  
 
 For pilot deployment support, consult:
