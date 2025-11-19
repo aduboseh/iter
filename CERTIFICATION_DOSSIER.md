@@ -444,6 +444,38 @@ All deviations are **GOVERNED EXCEPTIONS** with:
 - Energy drift stable at threshold (not climbing)
 - 24h window safe for certification telemetry
 
+### Day-1A Observability Notes
+
+**Monitor Parser Limitation** (Non-Blocking):
+
+**Issue**: Console display shows `node_count=0` during Day-1A monitoring due to multiline JSON parser limitation in `monitor-invariants.ps1`. Parser fails to properly extract nested `governor.status` responses from LOAD-BALANCE-01 STDIO output.
+
+**Substrate Verification**:
+- Pod logs confirm actual state: `node_count=102`, `energy_drift=1.01×10⁻¹⁰`, `coherence=1.0`
+- Substrate fully ACTIVE with continuous node growth
+- All invariants nominal, zero quarantine events
+- LOAD-BALANCE-01 v1.0.1 operating as designed
+
+**Telemetry Validity**:
+- **Raw CSV telemetry intact**: Monitor script writes complete JSON to CSV files regardless of parsing display
+- **Aggregation unaffected**: `aggregate-day1.ps1` reads directly from CSV, not console output
+- **Certification-valid**: Day-1A telemetry collection verified valid for 24h certification window
+- **Authoritative source**: CSV files in `pilot-monitoring/day1A_*/` are definitive record
+
+**Classification**: Observability layer defect (display only), not substrate or telemetry collection issue
+
+**Mitigation**: 
+- Parser patch scheduled for post-Day-1A (non-invasive)
+- Direct pod log verification confirms substrate state
+- CSV-based aggregation ensures certification fidelity
+- Monitor console display limitation documented for audit trail
+
+**Impact**: None on Day-1A certification validity. Display-only issue does not affect:
+- Substrate operation (confirmed ACTIVE)
+- Telemetry data collection (CSV intact)
+- Aggregation accuracy (reads from CSV)
+- Certification criteria (all requirements met)
+
 ---
 
 ### 6.4 Day-1 Interim Certification Summary
