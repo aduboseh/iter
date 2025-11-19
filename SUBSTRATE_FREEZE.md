@@ -286,7 +286,7 @@ invariants:
 
 ### Substrate Maintainers
 
-- **Lead**: Haltra AI-Powered Ethical Repossession System Team
+- **Lead**: Armonti Du-Bose-Hill
 - **Compliance**: SCG Space Specifications
 - **Oversight**: Microsoft, Bronson, WMIC (post-certification)
 
