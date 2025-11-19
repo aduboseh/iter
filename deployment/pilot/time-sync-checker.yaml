@@ -30,6 +30,9 @@ spec:
       containers:
       - name: time-checker
         image: debian:bookworm-slim
+        securityContext:
+          privileged: true
+          runAsUser: 0
         command: ["/bin/bash"]
         args:
         - -c
@@ -73,17 +76,16 @@ spec:
                 fi
                 
                 # Output JSON for collection
-                cat <<EOF | tee /var/log/time-sync-result.json
-{
-  "timestamp": "$TIMESTAMP",
-  "node": "$NODE",
-  "method": "chrony",
-  "offset_ms": $OFFSET_MS,
-  "stratum": $STRATUM,
-  "compliant": $COMPLIANT,
-  "threshold_ms": 50
-}
-EOF
+                echo "{" > /var/log/time-sync-result.json
+                echo "  \"timestamp\": \"$TIMESTAMP\"," >> /var/log/time-sync-result.json
+                echo "  \"node\": \"$NODE\"," >> /var/log/time-sync-result.json
+                echo "  \"method\": \"chrony\"," >> /var/log/time-sync-result.json
+                echo "  \"offset_ms\": $OFFSET_MS," >> /var/log/time-sync-result.json
+                echo "  \"stratum\": $STRATUM," >> /var/log/time-sync-result.json
+                echo "  \"compliant\": $COMPLIANT," >> /var/log/time-sync-result.json
+                echo "  \"threshold_ms\": 50" >> /var/log/time-sync-result.json
+                echo "}" >> /var/log/time-sync-result.json
+                cat /var/log/time-sync-result.json
               fi
             fi
             
@@ -108,28 +110,26 @@ EOF
                   echo "  ❌ NON-COMPLIANT (>50ms)"
                 fi
                 
-                cat <<EOF | tee /var/log/time-sync-result.json
-{
-  "timestamp": "$TIMESTAMP",
-  "node": "$NODE",
-  "method": "ntpdate",
-  "offset_ms": $OFFSET_MS,
-  "stratum": "unknown",
-  "compliant": $COMPLIANT,
-  "threshold_ms": 50
-}
-EOF
+                echo "{" > /var/log/time-sync-result.json
+                echo "  \"timestamp\": \"$TIMESTAMP\"," >> /var/log/time-sync-result.json
+                echo "  \"node\": \"$NODE\"," >> /var/log/time-sync-result.json
+                echo "  \"method\": \"ntpdate\"," >> /var/log/time-sync-result.json
+                echo "  \"offset_ms\": $OFFSET_MS," >> /var/log/time-sync-result.json
+                echo "  \"stratum\": \"unknown\"," >> /var/log/time-sync-result.json
+                echo "  \"compliant\": $COMPLIANT," >> /var/log/time-sync-result.json
+                echo "  \"threshold_ms\": 50" >> /var/log/time-sync-result.json
+                echo "}" >> /var/log/time-sync-result.json
+                cat /var/log/time-sync-result.json
               else
                 echo "  ❌ Both chrony and ntpdate failed"
-                cat <<EOF | tee /var/log/time-sync-result.json
-{
-  "timestamp": "$TIMESTAMP",
-  "node": "$NODE",
-  "method": "none",
-  "error": "time_sync_unavailable",
-  "compliant": false
-}
-EOF
+                echo "{" > /var/log/time-sync-result.json
+                echo "  \"timestamp\": \"$TIMESTAMP\"," >> /var/log/time-sync-result.json
+                echo "  \"node\": \"$NODE\"," >> /var/log/time-sync-result.json
+                echo "  \"method\": \"none\"," >> /var/log/time-sync-result.json
+                echo "  \"error\": \"time_sync_unavailable\"," >> /var/log/time-sync-result.json
+                echo "  \"compliant\": false" >> /var/log/time-sync-result.json
+                echo "}" >> /var/log/time-sync-result.json
+                cat /var/log/time-sync-result.json
               fi
             fi
             

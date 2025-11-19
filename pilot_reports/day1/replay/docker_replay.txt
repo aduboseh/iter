@@ -1,0 +1,1 @@
+SCG MCP server running in STDIO mode
