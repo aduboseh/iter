@@ -515,7 +515,8 @@ request_ids: 250614, 250616, 250617, 250619, 250622
 
 2. **§3 Time Sync Proxy Validation** (✅ COMPLETE):
    - **Method**: k8s_heartbeat_proxy per SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0.md
-   - **Proxy result**: FAIL (225s delta exceeds 5s threshold)
+   - **Latest validation**: 2025-11-20 20:42:31Z
+   - **Proxy result**: FAIL (121s delta exceeds 5s threshold; expected, heartbeat ≠ NTP)
    - **Exception protocol applied**: Azure NTP SLA assurance (primary)
    - **Overall status**: PASS_SLA (<50ms guaranteed via Azure infrastructure)
    - **Output**: pilot_reports/day1/time_sync.json
