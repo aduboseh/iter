@@ -1,18 +1,29 @@
 {
-  "node_count": 4,
-  "heartbeat_max_delta_seconds": 225,
-  "note": "Canonical ≤50ms sync externally assured via Azure NTP SLA per SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0.md. Heartbeat proxy shows 225s delta (FAIL) but Azure infrastructure SLA provides primary assurance. Proxy is supplementary validation only.",
-  "method": "k8s_heartbeat_proxy",
+  "heartbeat_max_delta_seconds": 121.0,
+  "heartbeat_threshold_seconds": 5.0,
+  "timestamp": "2025-11-20T15:42:31Z",
   "azure_ntp_sla": "TRUSTED",
-  "heartbeat_threshold_seconds": 5,
-  "exception": "SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0",
-  "status": "FAIL_PROXY_PASS_SLA",
-  "directive": "SG-SCG-PILOT-ACT-06 v1.0.0 §3",
-  "timestamp": "2025-11-18T16:50:27Z",
+  "node_count": 4,
+  "status": "FAIL",
+  "note": "Canonical ≤50ms sync externally assured via Azure SLA; heartbeat used as coarse cross-check.",
   "nodes": [
-    "aks-defaultpool-13247224-vmss000000",
-    "aks-defaultpool-13247224-vmss000001",
-    "aks-defaultpool-13247224-vmss000002",
-    "aks-defaultpool-13247224-vmss000005"
-  ]
+    {
+      "name": "aks-defaultpool-13247224-vmss000000",
+      "heartbeat": "2025-11-20T15:40:09.000Z"
+    },
+    {
+      "name": "aks-defaultpool-13247224-vmss000001",
+      "heartbeat": "2025-11-20T15:40:46.000Z"
+    },
+    {
+      "name": "aks-defaultpool-13247224-vmss000002",
+      "heartbeat": "2025-11-20T15:39:27.000Z"
+    },
+    {
+      "name": "aks-defaultpool-13247224-vmss000005",
+      "heartbeat": "2025-11-20T15:38:45.000Z"
+    }
+  ],
+  "method": "k8s_heartbeat_proxy",
+  "exception": "SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0"
 }
