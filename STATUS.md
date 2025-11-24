@@ -578,6 +578,73 @@ Core validations (time sync via SLA, replay via harness) passed using governed e
 
 ---
 
+### 🔄 Phase 6.5: Day-1A Monitoring Restart (2025-11-24)
+**Achievement**: Fresh 24h monitoring window initiated with clean substrate
+
+**Directive**: SG-SCG-PILOT-ACT-07B (Corrective Action)
+
+**Status**: **IN_PROGRESS** — 24h telemetry collection active
+
+**Background**:
+- Previous monitoring attempts (11/18-11/19) terminated prematurely:
+  - day1A_20251118_212306: 39 samples (~39 minutes)
+  - day1A_20251118_225631: 30 samples (~4.1 hours)
+  - Longest run (day1/20251118_181506): 94 samples (~3.1 hours)
+- Root cause: Monitoring job tooling gap (background job termination)
+- Substrate remained stable for 3d9h but telemetry collection incomplete
+
+**Governance Protocol Applied**:
+> "Partial monitoring cannot certify Day-1A. The only compliant path is to restart monitoring and produce an uninterrupted 24-hour evidence window with all required invariants."
+
+**Rationale**:
+- SCG certification requires continuous, auditable evidence chains
+- 78+ hours of pod uptime demonstrates stability but does not replace 24h invariant-saturated telemetry
+- COHERENCE-01, ACT-06, and ACT-07 directives explicitly require continuous 24h, 1-sample-per-minute coverage
+- Partial windows valuable for diagnostics but not for certification closure
+
+**Corrective Actions Executed** (2025-11-24 11:18 UTC):
+
+1. ✅ **Terminate residual jobs**: `Get-Job | Remove-Job -Force`
+2. ✅ **Confirm substrate health**: Logs showed node_count=102, quarantine flag active (persistent state)
+3. ✅ **PVC wipe**: Deleted scg-lineage-storage to clear persistent quarantine state
+4. ✅ **Clean substrate boot**: Fresh pod deployed, logs confirm node_count 0→23, energy_drift ~2.3×10⁻¹¹, coherence 1.0, no quarantine
+5. ✅ **Fresh monitoring window initiated**: Started 2025-11-24 11:18:24 UTC
+
+**Current Monitoring Window**:
+- **Job name**: SCG-Day1A-Monitoring-20251124_111824
+- **Start time**: 2025-11-24 11:18:24 UTC
+- **Target completion**: 2025-11-25 11:18:24 UTC (24h)
+- **Output directory**: `pilot-monitoring/day1A_20251124_111824/20251124_111825/`
+- **Expected samples**: ~1,440 (60s intervals)
+- **Substrate pod**: scg-mcp-b64694445-xn7lf (fresh boot, 0 restarts)
+
+**Observability Notes**:
+- Monitor parser displays `Nodes=0` (known ACT-04 limitation)
+- Pod logs confirm actual state: node_count growing, energy_drift nominal
+- CSV telemetry authoritative for aggregation (not console output)
+
+**Certification Requirements**:
+- ✅ Uninterrupted 24h window with ~1,440 samples
+- ✅ All 7 invariants continuously maintained within thresholds
+- ✅ Zero quarantine events during window
+- ✅ Clean substrate boot (node_count=0 at T0)
+- ✅ LOAD-BALANCE-01 v1.0.1 stimulus active throughout
+
+**Upon Completion** (2025-11-25 11:18+ UTC):
+1. Run `aggregate-day1.ps1` on day1A_20251124_111824 directory
+2. Update CERTIFICATION_DOSSIER.md with Day-1A summary block
+3. Update STATUS.md marking Day-1A COMPLETE
+4. Commit and tag: SG-SCG-PILOT-ACT-07B_v1.0.0_DAY1A_COMPLETE
+5. Commence ACT-08 (Day-2 planning)
+
+**Governance Impact**:
+- Restart event documented as operational correction, not substrate fault
+- Previous partial windows retained for diagnostic value
+- Certification evidence chain clean and uninterrupted (fresh substrate + fresh 24h window)
+- Authority: SG-SCG-PILOT-ACT-07B corrective action protocol
+
+---
+
 ### ✅ Phase 6.4: LOAD-BALANCE-01 Parameter Correction & Day-1A Transition (Commits e46b5fd+)
 **Achievement**: Substrate transitioned to clean ACTIVE state with micro-energy load regime
 
