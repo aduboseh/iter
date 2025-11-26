@@ -41,7 +41,7 @@ The **Connectome v2** represents the second layer of SCG-MCP architecture, built
 ┌──────────────────────────▼──────────────────────────────────┐
 │                SUBSTRATE v1.0.0 (FROZEN)                    │
 │  Core Runtime | Fault Domain | Telemetry | Lineage         │
-│  [Immutable — No connectome coupling allowed]               │
+│  Immutable — No connectome coupling allowed]               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,34 +52,34 @@ The **Connectome v2** represents the second layer of SCG-MCP architecture, built
 ```
 scg_mcp_server/
 ├── src/
-│   ├── scg_core.rs           [FROZEN — substrate]
-│   ├── types.rs              [FROZEN — substrate]
-│   ├── mcp_handler.rs        [FROZEN — substrate]
-│   ├── lib.rs                [FROZEN — substrate]
-│   ├── main.rs               [FROZEN — substrate]
-│   ├── fault/                [FROZEN — substrate]
-│   ├── telemetry/            [FROZEN — substrate]
-│   ├── lineage/              [FROZEN — substrate]
+│   ├── scg_core.rs           FROZEN — substrate]
+│   ├── types.rs              FROZEN — substrate]
+│   ├── mcp_handler.rs        FROZEN — substrate]
+│   ├── lib.rs                FROZEN — substrate]
+│   ├── main.rs               FROZEN — substrate]
+│   ├── fault/                FROZEN — substrate]
+│   ├── telemetry/            FROZEN — substrate]
+│   ├── lineage/              FROZEN — substrate]
 │   │
-│   └── connectome/           [NEW — isolated layer]
-│       ├── mod.rs            [Connectome orchestrator]
-│       ├── protocol.rs       [MCP client interface]
-│       ├── attention/        [Attention mechanism module]
-│       ├── memory/           [Memory management module]
-│       ├── reasoning/        [Reasoning engine module]
-│       └── governance/       [Ethical compliance module]
+│   └── connectome/           NEW — isolated layer]
+│       ├── mod.rs            Connectome orchestrator]
+│       ├── protocol.rs       MCP client interface]
+│       ├── attention/        Attention mechanism module]
+│       ├── memory/           Memory management module]
+│       ├── reasoning/        Reasoning engine module]
+│       └── governance/       Ethical compliance module]
 │
 ├── tests/
-│   ├── hardening_fuzz.rs           [FROZEN — substrate tests]
-│   ├── hardening_concurrency.rs    [FROZEN — substrate tests]
-│   ├── integration_validation.rs   [FROZEN — substrate tests]
+│   ├── hardening_fuzz.rs           FROZEN — substrate tests]
+│   ├── hardening_concurrency.rs    FROZEN — substrate tests]
+│   ├── integration_validation.rs   FROZEN — substrate tests]
 │   │
-│   └── connectome_tests.rs         [NEW — connectome tests]
+│   └── connectome_tests.rs         NEW — connectome tests]
 │
-├── SUBSTRATE_FREEZE.md       [FROZEN — substrate documentation]
-├── APEX_CLARIFICATIONS.md    [FROZEN — substrate documentation]
-├── CERTIFICATION_DOSSIER.md  [NEW — pilot certification]
-└── CONNECTOME_V2_SCAFFOLD.md [THIS FILE — architecture guide]
+├── SUBSTRATE_FREEZE.md       FROZEN — substrate documentation]
+├── APEX_CLARIFICATIONS.md    FROZEN — substrate documentation]
+├── CERTIFICATION_DOSSIER.md  NEW — pilot certification]
+└── CONNECTOME_V2_SCAFFOLD.md THIS FILE — architecture guide]
 ```
 
 ---
@@ -229,7 +229,7 @@ pub struct GovernanceModule {
 
 impl GovernanceModule {
     pub async fn validate_operation(&self, op: &Operation) -> Result<bool, GovernanceError>;
-    pub async fn detect_bias(&self, attention_scores: &[f64]) -> Result<BiasReport, GovernanceError>;
+    pub async fn detect_bias(&self, attention_scores: &f64]) -> Result<BiasReport, GovernanceError>;
     pub async fn request_human_approval(&self, op: &Operation) -> Result<bool, GovernanceError>;
 }
 ```
@@ -300,30 +300,30 @@ Critical tests to prove substrate independence:
 ## 6. Development Roadmap
 
 ### Phase 1: Protocol Foundation (Week 1)
-- [ ] Implement `src/connectome/protocol.rs` with MCP client
-- [ ] Write protocol isolation tests
-- [ ] Verify zero substrate coupling
+-  ] Implement `src/connectome/protocol.rs` with MCP client
+-  ] Write protocol isolation tests
+-  ] Verify zero substrate coupling
 
 ### Phase 2: Core Modules (Weeks 2-4)
-- [ ] Implement attention module with unit tests
-- [ ] Implement memory module with unit tests
-- [ ] Implement reasoning module with unit tests
-- [ ] Implement governance module with unit tests
+-  ] Implement attention module with unit tests
+-  ] Implement memory module with unit tests
+-  ] Implement reasoning module with unit tests
+-  ] Implement governance module with unit tests
 
 ### Phase 3: Orchestration (Week 5)
-- [ ] Implement connectome orchestrator
-- [ ] Write end-to-end integration tests
-- [ ] Performance benchmarking (target: <10ms overhead per cognitive task)
+-  ] Implement connectome orchestrator
+-  ] Write end-to-end integration tests
+-  ] Performance benchmarking (target: <10ms overhead per cognitive task)
 
 ### Phase 4: Validation (Week 6)
-- [ ] Run connectome against certified substrate (v1.0.0-substrate)
-- [ ] Verify substrate invariants maintained under cognitive load
-- [ ] Document connectome API and examples
+-  ] Run connectome against certified substrate (v1.0.0-substrate)
+-  ] Verify substrate invariants maintained under cognitive load
+-  ] Document connectome API and examples
 
 ### Phase 5: Release (Week 7)
-- [ ] Tag v2.0.0-connectome
-- [ ] Publish connectome specification
-- [ ] Update README with connectome usage guide
+-  ] Tag v2.0.0-connectome
+-  ] Publish connectome specification
+-  ] Update README with connectome usage guide
 
 ---
 
@@ -334,7 +334,7 @@ Critical tests to prove substrate independence:
 use scg_mcp_server::connectome::ConnectomeOrchestrator;
 use scg_mcp_server::connectome::CognitiveTask;
 
-#[tokio::main]
+#tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Substrate runs as separate process (certified v1.0.0)
     // Connectome connects via MCP protocol
@@ -343,7 +343,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Define cognitive task
     let task = CognitiveTask::Reasoning {
         query: "Find causal path from node A to node B".to_string(),
-        constraints: vec!["ESV ≥ 0.85".to_string()],
+        constraints: vec!"ESV ≥ 0.85".to_string()],
     };
     
     // Execute with full attention, memory, reasoning, governance
@@ -399,7 +399,7 @@ All connectome decisions logged to immutable audit trail:
   "module": "reasoning",
   "operation": "find_optimal_path",
   "input": {"from": "node_A", "to": "node_B"},
-  "output": {"path": ["edge_1", "edge_2"], "esv": 0.92},
+  "output": {"path": "edge_1", "edge_2"], "esv": 0.92},
   "governance_approval": true,
   "substrate_invariants": "MAINTAINED"
 }
@@ -410,11 +410,11 @@ All connectome decisions logged to immutable audit trail:
 ## 10. Documentation Artifacts
 
 Upon connectome v2.0.0 release:
-- [ ] `CONNECTOME_SPECIFICATION.md` — Formal module specifications
-- [ ] `CONNECTOME_API.md` — Public API documentation
-- [ ] `CONNECTOME_EXAMPLES.md` — Usage examples and tutorials
-- [ ] `CONNECTOME_SECURITY.md` — Security model and threat analysis
-- [ ] `CONNECTOME_CHANGELOG.md` — Version history
+-  ] `CONNECTOME_SPECIFICATION.md` — Formal module specifications
+-  ] `CONNECTOME_API.md` — Public API documentation
+-  ] `CONNECTOME_EXAMPLES.md` — Usage examples and tutorials
+-  ] `CONNECTOME_SECURITY.md` — Security model and threat analysis
+-  ] `CONNECTOME_CHANGELOG.md` — Version history
 
 ---
 

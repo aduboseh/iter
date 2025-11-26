@@ -9,12 +9,12 @@
 
 ## Pre-Launch Checklist
 
-- [ ] Substrate frozen at commit `21dd6b5`
-- [ ] All 46 tests passing
-- [ ] Telemetry systems operational
-- [ ] Fault domains tested
-- [ ] Lineage replay validated
-- [ ] Monitoring infrastructure ready
+-  ] Substrate frozen at commit `21dd6b5`
+-  ] All 46 tests passing
+-  ] Telemetry systems operational
+-  ] Fault domains tested
+-  ] Lineage replay validated
+-  ] Monitoring infrastructure ready
 
 ---
 
@@ -50,13 +50,13 @@ cargo run --release 2>&1 | Tee-Object -FilePath .\telemetry\pilot\scg_pilot_01_f
 Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "VIOLATION|CRITICAL"
 
 # Monitor 2: Governor corrections
-Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "\[GOVERNOR_CORRECTION\]" | Tee-Object -FilePath .\audit\pilot\governor_corrections.log
+Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "\GOVERNOR_CORRECTION\]" | Tee-Object -FilePath .\audit\pilot\governor_corrections.log
 
 # Monitor 3: Shard finalizations
-Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "\[SHARD_FINALIZED\]" | Tee-Object -FilePath .\audit\pilot\shard_finalizations.log
+Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "\SHARD_FINALIZED\]" | Tee-Object -FilePath .\audit\pilot\shard_finalizations.log
 
 # Monitor 4: Quarantine events (should be zero)
-Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "\[QUARANTINE\]" | Tee-Object -FilePath .\audit\pilot\quarantine_events.log
+Get-Content .\telemetry\pilot\scg_pilot_01_full.log -Wait | Select-String -Pattern "\QUARANTINE\]" | Tee-Object -FilePath .\audit\pilot\quarantine_events.log
 ```
 
 ### Option 2: Background Service with Rotation
@@ -88,8 +88,8 @@ Remove-Job -Job $job
 **Monitor**:
 ```powershell
 Get-Content .\telemetry\pilot\scg_pilot_01_full.log | Select-String '"energy_drift":' | ForEach-Object {
-    if ($_ -match '"energy_drift":\s*([\d.e\-+]+)') {
-        $drift = [double]$matches[1]
+    if ($_ -match '"energy_drift":\s*(\d.e\-+]+)') {
+        $drift = double]$matches1]
         if ($drift -gt 1e-10) {
             Write-Host "VIOLATION: Energy drift $drift > 1e-10" -ForegroundColor Red
         }
@@ -125,8 +125,8 @@ kubectl run scg-test --image=scg-mcp:v1.0.0-substrate --restart=Never --command 
 **Monitor**:
 ```powershell
 Get-Content .\telemetry\pilot\scg_pilot_01_full.log | Select-String '"coherence":' | ForEach-Object {
-    if ($_ -match '"coherence":\s*([\d.e\-+]+)') {
-        $coherence = [double]$matches[1]
+    if ($_ -match '"coherence":\s*(\d.e\-+]+)') {
+        $coherence = double]$matches1]
         if ($coherence -lt 0.97) {
             Write-Host "VIOLATION: Coherence $coherence < 0.97" -ForegroundColor Red
         }
@@ -143,8 +143,8 @@ Get-Content .\telemetry\pilot\scg_pilot_01_full.log | Select-String '"coherence"
 **Monitor**:
 ```powershell
 Get-Content .\telemetry\pilot\scg_pilot_01_full.log | Select-String '"esv_valid_ratio":' | ForEach-Object {
-    if ($_ -match '"esv_valid_ratio":\s*([\d.e\-+]+)') {
-        $ratio = [double]$matches[1]
+    if ($_ -match '"esv_valid_ratio":\s*(\d.e\-+]+)') {
+        $ratio = double]$matches1]
         if ($ratio -lt 1.0) {
             Write-Host "VIOLATION: ESV ratio $ratio < 1.0" -ForegroundColor Red
         }
@@ -212,7 +212,7 @@ Run this script daily to generate a health report:
 ```powershell
 # daily_health_check.ps1
 param(
-    [int]$Day
+    int]$Day
 )
 
 $report = @"
@@ -223,19 +223,19 @@ Generated: $(Get-Date)
 "@
 
 $drift_violations = Get-Content .\telemetry\pilot\scg_pilot_*.log | Select-String '"energy_drift":' | Where-Object {
-    $_ -match '"energy_drift":\s*([\d.e\-+]+)' -and [double]$matches[1] -gt 1e-10
+    $_ -match '"energy_drift":\s*(\d.e\-+]+)' -and double]$matches1] -gt 1e-10
 }
 $report += "`nViolations: $($drift_violations.Count)"
 
 $report += "`n`n=== Coherence ===`n"
 $coherence_violations = Get-Content .\telemetry\pilot\scg_pilot_*.log | Select-String '"coherence":' | Where-Object {
-    $_ -match '"coherence":\s*([\d.e\-+]+)' -and [double]$matches[1] -lt 0.97
+    $_ -match '"coherence":\s*(\d.e\-+]+)' -and double]$matches1] -lt 0.97
 }
 $report += "Violations: $($coherence_violations.Count)"
 
 $report += "`n`n=== ESV Validation ===`n"
 $esv_violations = Get-Content .\telemetry\pilot\scg_pilot_*.log | Select-String '"esv_valid_ratio":' | Where-Object {
-    $_ -match '"esv_valid_ratio":\s*([\d.e\-+]+)' -and [double]$matches[1] -lt 1.0
+    $_ -match '"esv_valid_ratio":\s*(\d.e\-+]+)' -and double]$matches1] -lt 1.0
 }
 $report += "Violations: $($esv_violations.Count)"
 
@@ -253,9 +253,9 @@ $report += "Shards Finalized: $shards"
 
 $report += "`n`n=== Status ===`n"
 if ($drift_violations.Count -eq 0 -and $coherence_violations.Count -eq 0 -and $esv_violations.Count -eq 0 -and $quarantine_count -eq 0) {
-    $report += "✅ ALL INVARIANTS HOLDING"
+    $report += " ALL INVARIANTS HOLDING"
 } else {
-    $report += "❌ VIOLATIONS DETECTED - INVESTIGATION REQUIRED"
+    $report += " VIOLATIONS DETECTED - INVESTIGATION REQUIRED"
 }
 
 Write-Output $report

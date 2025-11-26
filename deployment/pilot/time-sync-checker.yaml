@@ -33,14 +33,14 @@ spec:
         securityContext:
           privileged: true
           runAsUser: 0
-        command: ["/bin/bash"]
+        command: "/bin/bash"]
         args:
         - -c
         - |
           set -e
-          echo "[TIME-SYNC-CHECKER] Starting time synchronization validation..."
-          echo "[TIME-SYNC-CHECKER] Directive: SG-SCG-PILOT-ACT-04 v1.0.0 §6"
-          echo "[TIME-SYNC-CHECKER] Requirement: NTP/PTP skew ≤50ms"
+          echo "TIME-SYNC-CHECKER] Starting time synchronization validation..."
+          echo "TIME-SYNC-CHECKER] Directive: SG-SCG-PILOT-ACT-04 v1.0.0 §6"
+          echo "TIME-SYNC-CHECKER] Requirement: NTP/PTP skew <=50ms"
           echo ""
           
           # Install time synchronization tools
@@ -51,12 +51,12 @@ spec:
             TIMESTAMP=$(date -Iseconds)
             NODE=$(hostname)
             
-            echo "[$TIMESTAMP] Node: $NODE"
+            echo "$TIMESTAMP] Node: $NODE"
             
             # Try chrony first (preferred for AKS)
             if command -v chronyc &> /dev/null; then
               TRACKING=$(chronyc tracking 2>/dev/null || echo "chrony_unavailable")
-              if [[ "$TRACKING" != "chrony_unavailable" ]]; then
+              if  "$TRACKING" != "chrony_unavailable" ]]; then
                 OFFSET=$(echo "$TRACKING" | grep "System time" | awk '{print $4}')
                 OFFSET_MS=$(echo "$OFFSET * 1000" | bc 2>/dev/null || echo "0")
                 STRATUM=$(echo "$TRACKING" | grep "Stratum" | awk '{print $3}')
@@ -70,9 +70,9 @@ spec:
                 ABS_OFFSET=$(echo "$OFFSET_MS" | awk '{if ($1<0) print -$1; else print $1}')
                 if (( $(echo "$ABS_OFFSET <= 50" | bc -l) )); then
                   COMPLIANT="true"
-                  echo "  ✅ COMPLIANT (≤50ms)"
+                  echo "  PASS] COMPLIANT (<=50ms)"
                 else
-                  echo "  ❌ NON-COMPLIANT (>50ms)"
+                  echo "  FAIL] NON-COMPLIANT (>50ms)"
                 fi
                 
                 # Output JSON for collection
@@ -90,10 +90,10 @@ spec:
             fi
             
             # Fallback to ntpdate if chrony unavailable
-            if [[ "$TRACKING" == "chrony_unavailable" ]]; then
+            if  "$TRACKING" == "chrony_unavailable" ]]; then
               echo "  chrony unavailable, trying ntpdate..."
               NTPDATE_OUTPUT=$(ntpdate -q time.windows.com 2>&1 || echo "ntpdate_failed")
-              if [[ "$NTPDATE_OUTPUT" != "ntpdate_failed" ]]; then
+              if  "$NTPDATE_OUTPUT" != "ntpdate_failed" ]]; then
                 OFFSET=$(echo "$NTPDATE_OUTPUT" | grep "offset" | awk '{print $6}')
                 OFFSET_MS=$(echo "$OFFSET * 1000" | bc 2>/dev/null || echo "0")
                 
@@ -105,9 +105,9 @@ spec:
                 ABS_OFFSET=$(echo "$OFFSET_MS" | awk '{if ($1<0) print -$1; else print $1}')
                 if (( $(echo "$ABS_OFFSET <= 50" | bc -l) )); then
                   COMPLIANT="true"
-                  echo "  ✅ COMPLIANT (≤50ms)"
+                  echo "  PASS] COMPLIANT (<=50ms)"
                 else
-                  echo "  ❌ NON-COMPLIANT (>50ms)"
+                  echo "  FAIL] NON-COMPLIANT (>50ms)"
                 fi
                 
                 echo "{" > /var/log/time-sync-result.json
@@ -121,7 +121,7 @@ spec:
                 echo "}" >> /var/log/time-sync-result.json
                 cat /var/log/time-sync-result.json
               else
-                echo "  ❌ Both chrony and ntpdate failed"
+                echo "  FAIL] Both chrony and ntpdate failed"
                 echo "{" > /var/log/time-sync-result.json
                 echo "  \"timestamp\": \"$TIMESTAMP\"," >> /var/log/time-sync-result.json
                 echo "  \"node\": \"$NODE\"," >> /var/log/time-sync-result.json
@@ -170,13 +170,13 @@ data:
     echo "{"
     echo "  \"directive\": \"SG-SCG-PILOT-ACT-04 v1.0.0 §6\","
     echo "  \"timestamp\": \"$(date -Iseconds)\","
-    echo "  \"nodes\": ["
+    echo "  \"nodes\": "
     
     FIRST=true
     for POD in $PODS; do
       RESULT=$(kubectl exec -n scg-pilot-01 $POD -- cat /var/log/time-sync-result.json 2>/dev/null || echo "{}")
-      if [[ "$RESULT" != "{}" ]]; then
-        if [[ "$FIRST" == "false" ]]; then
+      if  "$RESULT" != "{}" ]]; then
+        if  "$FIRST" == "false" ]]; then
           echo ","
         fi
         echo "    $RESULT"

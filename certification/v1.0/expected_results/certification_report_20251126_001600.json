@@ -1,0 +1,331 @@
+[
+  {
+    "TestNum": 1,
+    "Phase": "Phase0",
+    "Name": "Governor baseline query",
+    "Passed": true,
+    "Details": "Drift: 0, Coherence: 1"
+  },
+  {
+    "TestNum": 2,
+    "Phase": "Phase0",
+    "Name": "Zero initial drift",
+    "Passed": true,
+    "Details": "Drift: 0"
+  },
+  {
+    "TestNum": 3,
+    "Phase": "Phase1",
+    "Name": "Create node belief=midpoint (0.5)",
+    "Passed": true,
+    "Details": "UUID: 0052efb8..."
+  },
+  {
+    "TestNum": 4,
+    "Phase": "Phase1",
+    "Name": "Create node belief=lower bound (0)",
+    "Passed": true,
+    "Details": "UUID: ff9b9702..."
+  },
+  {
+    "TestNum": 5,
+    "Phase": "Phase1",
+    "Name": "Create node belief=upper bound (1)",
+    "Passed": true,
+    "Details": "UUID: aac4bbd4..."
+  },
+  {
+    "TestNum": 6,
+    "Phase": "Phase1",
+    "Name": "Create node belief=near-zero (0.001)",
+    "Passed": true,
+    "Details": "UUID: 66d8d355..."
+  },
+  {
+    "TestNum": 7,
+    "Phase": "Phase1",
+    "Name": "Create node belief=near-one (0.999)",
+    "Passed": true,
+    "Details": "UUID: 5a497b03..."
+  },
+  {
+    "TestNum": 8,
+    "Phase": "Phase1",
+    "Name": "Energy accounting (5 nodes)",
+    "Passed": true,
+    "Details": "Nodes: 5, Drift: 0"
+  },
+  {
+    "TestNum": 9,
+    "Phase": "Phase1",
+    "Name": "Node query verification",
+    "Passed": true,
+    "Details": "Belief: 0.5"
+  },
+  {
+    "TestNum": 10,
+    "Phase": "Phase1",
+    "Name": "Drift stability after creation",
+    "Passed": true,
+    "Details": "Drift: 0"
+  },
+  {
+    "TestNum": 11,
+    "Phase": "Phase2",
+    "Name": "Small positive mutation (+0.1)",
+    "Passed": true,
+    "Details": "New belief: 0.6"
+  },
+  {
+    "TestNum": 12,
+    "Phase": "Phase2",
+    "Name": "Small negative mutation (-0.2)",
+    "Passed": true,
+    "Details": "New belief: 0.4"
+  },
+  {
+    "TestNum": 13,
+    "Phase": "Phase2",
+    "Name": "Upper bound clamping (+0.99)",
+    "Passed": true,
+    "Details": "Clamped belief: 1"
+  },
+  {
+    "TestNum": 14,
+    "Phase": "Phase2",
+    "Name": "Lower bound mutation (-0.5)",
+    "Passed": true,
+    "Details": "Result belief: 0"
+  },
+  {
+    "TestNum": 15,
+    "Phase": "Phase2",
+    "Name": "Zero delta mutation (no-op)",
+    "Passed": true,
+    "Details": "Belief unchanged: 1"
+  },
+  {
+    "TestNum": 16,
+    "Phase": "Phase2",
+    "Name": "Governor stability post-mutation",
+    "Passed": true,
+    "Details": "Drift: 0"
+  },
+  {
+    "TestNum": 17,
+    "Phase": "Phase3",
+    "Name": "Edge binding A->B (weight 0.5)",
+    "Passed": true,
+    "Details": "Edge ID: 59c07807..."
+  },
+  {
+    "TestNum": 18,
+    "Phase": "Phase3",
+    "Name": "Edge binding B->A (weight 0.3)",
+    "Passed": true,
+    "Details": "Bidirectional link created"
+  },
+  {
+    "TestNum": 19,
+    "Phase": "Phase3",
+    "Name": "Edge chain B->C (weight 0.4)",
+    "Passed": true,
+    "Details": "Chain extended"
+  },
+  {
+    "TestNum": 20,
+    "Phase": "Phase3",
+    "Name": "Cycle closure C->A (weight 0.2)",
+    "Passed": true,
+    "Details": "Triangle formed"
+  },
+  {
+    "TestNum": 21,
+    "Phase": "Phase3",
+    "Name": "Self-loop D->D (weight 0.1)",
+    "Passed": true,
+    "Details": "Self-reference created"
+  },
+  {
+    "TestNum": 22,
+    "Phase": "Phase3",
+    "Name": "High-weight edge D->E (0.95)",
+    "Passed": true,
+    "Details": "Strong connection"
+  },
+  {
+    "TestNum": 23,
+    "Phase": "Phase3",
+    "Name": "Low-weight edge E->D (0.05)",
+    "Passed": true,
+    "Details": "Weak connection"
+  },
+  {
+    "TestNum": 24,
+    "Phase": "Phase3",
+    "Name": "Governor stability post-topology",
+    "Passed": true,
+    "Details": "Coherence: 1, Drift: 0"
+  },
+  {
+    "TestNum": 25,
+    "Phase": "Phase4",
+    "Name": "Propagate edge A->B",
+    "Passed": true,
+    "Details": "Propagation executed"
+  },
+  {
+    "TestNum": 26,
+    "Phase": "Phase4",
+    "Name": "Propagate edge B->C",
+    "Passed": true,
+    "Details": "Chain propagation"
+  },
+  {
+    "TestNum": 27,
+    "Phase": "Phase4",
+    "Name": "Propagate cycle edge C->A",
+    "Passed": true,
+    "Details": "Cycle propagation"
+  },
+  {
+    "TestNum": 28,
+    "Phase": "Phase4",
+    "Name": "Propagate self-loop D->D",
+    "Passed": true,
+    "Details": "Self-reference propagation"
+  },
+  {
+    "TestNum": 29,
+    "Phase": "Phase4",
+    "Name": "Propagate high-weight D->E",
+    "Passed": true,
+    "Details": "Strong influence propagation"
+  },
+  {
+    "TestNum": 30,
+    "Phase": "Phase4",
+    "Name": "Governor stability post-propagation",
+    "Passed": true,
+    "Details": "Drift: 0"
+  },
+  {
+    "TestNum": 31,
+    "Phase": "Phase5",
+    "Name": "ESV audit Node1",
+    "Passed": true,
+    "Details": "ESV vector retrieved"
+  },
+  {
+    "TestNum": 32,
+    "Phase": "Phase5",
+    "Name": "ESV audit Node2",
+    "Passed": true,
+    "Details": "ESV vector retrieved"
+  },
+  {
+    "TestNum": 33,
+    "Phase": "Phase5",
+    "Name": "ESV audit Node3",
+    "Passed": true,
+    "Details": "ESV vector retrieved"
+  },
+  {
+    "TestNum": 34,
+    "Phase": "Phase5",
+    "Name": "ESV audit Node4",
+    "Passed": true,
+    "Details": "ESV vector retrieved"
+  },
+  {
+    "TestNum": 35,
+    "Phase": "Phase5",
+    "Name": "ESV audit Node5",
+    "Passed": true,
+    "Details": "ESV vector retrieved"
+  },
+  {
+    "TestNum": 36,
+    "Phase": "Phase6",
+    "Name": "Lineage replay",
+    "Passed": true,
+    "Details": "Lineage retrieved"
+  },
+  {
+    "TestNum": 37,
+    "Phase": "Phase6",
+    "Name": "Lineage export",
+    "Passed": true,
+    "Details": "Checksum: 7ed9d6348b07c4e8..."
+  },
+  {
+    "TestNum": 38,
+    "Phase": "Phase6",
+    "Name": "Lineage replay checksum",
+    "Passed": true,
+    "Details": "Checksum verification"
+  },
+  {
+    "TestNum": 39,
+    "Phase": "Phase6",
+    "Name": "Governor stability post-lineage",
+    "Passed": true,
+    "Details": "Drift: 0"
+  },
+  {
+    "TestNum": 40,
+    "Phase": "Phase7",
+    "Name": "Rapid node creation (10 nodes)",
+    "Passed": true,
+    "Details": "Created: 10/10"
+  },
+  {
+    "TestNum": 41,
+    "Phase": "Phase7",
+    "Name": "Rapid edge binding (5 edges)",
+    "Passed": true,
+    "Details": "Created: 5/5"
+  },
+  {
+    "TestNum": 42,
+    "Phase": "Phase7",
+    "Name": "Burst mutations (5 mutations)",
+    "Passed": true,
+    "Details": "Success: 5/5"
+  },
+  {
+    "TestNum": 43,
+    "Phase": "Phase7",
+    "Name": "Burst propagations",
+    "Passed": true,
+    "Details": "Success: 3/3"
+  },
+  {
+    "TestNum": 44,
+    "Phase": "Phase7",
+    "Name": "Governor stability post-stress",
+    "Passed": true,
+    "Details": "Drift: 0, Coherence: 1"
+  },
+  {
+    "TestNum": 45,
+    "Phase": "Phase7",
+    "Name": "Invalid node ID handling",
+    "Passed": true,
+    "Details": "Error properly returned"
+  },
+  {
+    "TestNum": 46,
+    "Phase": "Phase7",
+    "Name": "Invalid edge ID handling",
+    "Passed": true,
+    "Details": "Error properly returned"
+  },
+  {
+    "TestNum": 47,
+    "Phase": "Phase7",
+    "Name": "Final governor integrity check",
+    "Passed": true,
+    "Details": "Final Drift: 0, Coherence: 1"
+  }
+]

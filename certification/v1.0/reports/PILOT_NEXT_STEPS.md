@@ -14,20 +14,20 @@
 
 **Current Behavior**:
 ```
-{"jsonrpc":"2.0","result":{"content":[{"text":"{\n  \"energy_drift\": 3.3e-11,\n  \"coherence\": 1.0,\n  \"node_count\": 34,\n  \"edge_count\": 0\n}","type":"text"}]},
+{"jsonrpc":"2.0","result":{"content":{"text":"{\n  \"energy_drift\": 3.3e-11,\n  \"coherence\": 1.0,\n  \"node_count\": 34,\n  \"edge_count\": 0\n}","type":"text"}]},
 ```
 
 **Required Fix**: Update `monitor-invariants.ps1` to:
-1. Extract nested JSON from `result.content[0].text` field
+1. Extract nested JSON from `result.content0].text` field
 2. Handle escaped newlines (`\n`) in JSON strings
 3. Parse complete multi-line structures
 
 **Implementation**:
 ```powershell
 # Extract JSON from MCP response wrapper
-$jsonContent = $logs | Select-String -Pattern '"text":"(\{[^}]+\})"' -AllMatches | 
+$jsonContent = $logs | Select-String -Pattern '"text":"(\{^}]+\})"' -AllMatches | 
     ForEach-Object {
-        $_.Matches[0].Groups[1].Value -replace '\\n', '' -replace '\s+', ' '
+        $_.Matches0].Groups1].Value -replace '\\n', '' -replace '\s+', ' '
     } | ConvertFrom-Json
 ```
 
@@ -92,12 +92,12 @@ spec:
       containers:
       - name: checker
         image: debian:bookworm-slim
-        command: ["/bin/sh", "-c"]
+        command: "/bin/sh", "-c"]
         args:
         - |
           apt-get update && apt-get install -y chrony ntpdate
           while true; do
-            echo "[$(date -Iseconds)] Node: $(hostname)"
+            echo "$(date -Iseconds)] Node: $(hostname)"
             chronyc tracking || ntpdate -q time.windows.com
             sleep 300
           done
@@ -179,8 +179,8 @@ chronyc tracking | grep "System time"
 
 ```powershell
 param(
-    [int]$Cycles = 250,
-    [string]$Environment = "cluster"
+    int]$Cycles = 250,
+    string]$Environment = "cluster"
 )
 
 # Execute replay and capture hash
@@ -220,8 +220,8 @@ spec:
           containers:
           - name: replay
             image: scgpilotacr.azurecr.io/scg-mcp:v1.0.0-substrate
-            command: ["/app/scg_mcp_server"]
-            args: ["replay", "--cycles", "250", "--output-hash"]
+            command: "/app/scg_mcp_server"]
+            args: "replay", "--cycles", "250", "--output-hash"]
           restartPolicy: OnFailure
 ```
 
@@ -241,11 +241,11 @@ spec:
 
 ```powershell
 $lineageChecksums = kubectl logs -n scg-pilot-01 -l app=scg-mcp --tail=10000 | 
-    Select-String -Pattern '"checksum":\s*"([a-f0-9]+)"' -AllMatches |
-    ForEach-Object { $_.Matches.Groups[1].Value }
+    Select-String -Pattern '"checksum":\s*"(a-f0-9]+)"' -AllMatches |
+    ForEach-Object { $_.Matches.Groups1].Value }
 
 $concatenated = $lineageChecksums -join ""
-$globalHash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new([Text.Encoding]::UTF8.GetBytes($concatenated))) -Algorithm SHA256).Hash
+$globalHash = (Get-FileHash -InputStream (System.IO.MemoryStream]::new(Text.Encoding]::UTF8.GetBytes($concatenated))) -Algorithm SHA256).Hash
 
 Write-Output "Global Ledger Hash: $globalHash"
 ```
@@ -277,7 +277,7 @@ Write-Output "Global Ledger Hash: $globalHash"
 
 ```powershell
 # Monitor for violations
-$energyDrift = [double]$invariants.energy_drift
+$energyDrift = double]$invariants.energy_drift
 if ($energyDrift -gt 5e-11) {
     Send-Alert -Level "IMMEDIATE" -Message "Energy drift exceeded: $energyDrift"
     Write-Log "VIOLATION: Energy drift > 5e-11"
@@ -355,7 +355,7 @@ if ($invariants.esv_valid_ratio -lt 1.0) {
 
 | Day | Milestone | Tasks |
 |-----|-----------|-------|
-| **Day 0** | ✅ Complete | Infrastructure, monitoring, baseline prep |
+| **Day 0** |  Complete | Infrastructure, monitoring, baseline prep |
 | **Day 1** | Parser upgrade, time sync, baseline collection | Tasks 1-3 |
 | **Day 2** | Daily aggregation, first replay episode | Tasks 4-5 |
 | **Day 3** | Ledger validation, violation monitoring | Tasks 6-7 |
@@ -380,10 +380,10 @@ if ($invariants.esv_valid_ratio -lt 1.0) {
 
 ## Success Criteria Checklist
 
-**Day-1 Authorization** (✅ Complete):
-- ✅ Infrastructure stable
-- ✅ Quarantine cleared
-- ✅ Monitoring operational
+**Day-1 Authorization** ( Complete):
+-  Infrastructure stable
+-  Quarantine cleared
+-  Monitoring operational
 - ⏳ Baseline in progress
 
 **7-Day Certification** (⏳ In Progress):
@@ -391,7 +391,7 @@ if ($invariants.esv_valid_ratio -lt 1.0) {
 - ⏳ ε ≤ 1×10⁻¹⁰ (replay)
 - ⏳ C(t) ≥ 0.97 (continuous)
 - ⏳ ESV_valid_ratio = 1.0 (continuous)
-- ✅ Zero quarantine events (Day 0)
+-  Zero quarantine events (Day 0)
 - ⏳ Governor convergence verified
 - ⏳ Ledger hash integrity (7 days)
 

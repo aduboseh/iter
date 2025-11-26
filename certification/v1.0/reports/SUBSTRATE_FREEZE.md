@@ -72,8 +72,8 @@ These modules define substrate identity. Modification triggers substrate v2.0.0 
 **Canonical Reference**: Math Foundations II.3, Deployment Arch 4.3, APEX_CLARIFICATIONS.md §1
 
 **Immutable Specification**:
-- ALL governor correction attempts MUST be logged to stderr with `[GOVERNOR_CORRECTION]` prefix
-- Log format (NON-NEGOTIABLE): `attempt=N pre_delta=X post_delta=Y attempted_correction=Z status=[success|partial|failed]`
+- ALL governor correction attempts MUST be logged to stderr with `GOVERNOR_CORRECTION]` prefix
+- Log format (NON-NEGOTIABLE): `attempt=N pre_delta=X post_delta=Y attempted_correction=Z status=success|partial|failed]`
 - Convergence criterion: `post_delta < pre_delta` (success), `post_delta ≥ pre_delta` (partial/failed)
 - Cycle counting: Each correction maintains `cycle_number` and `correction_magnitude` history
 - JSON audit export for certification dossier
@@ -93,7 +93,7 @@ These modules define substrate identity. Modification triggers substrate v2.0.0 
 - No partial operations across shard boundaries (atomicity guarantee)
 - Global hash computed in **ascending shard order** (oldest → newest, deterministic finalization)
 - Finalized shards are immutable (no post-hoc modifications)
-- Logged to stderr: `[SHARD_FINALIZED] shard_id=X operations=250 global_hash=H`
+- Logged to stderr: `SHARD_FINALIZED] shard_id=X operations=250 global_hash=H`
 
 **Test Coverage**: 3/3 passing (shard_rotation, finalization_determinism, boundary_enforcement)
 
@@ -140,7 +140,7 @@ Any modification to frozen components requires:
 # .github/workflows/substrate_guard.yml
 name: Substrate Integrity Guard
 
-on: [pull_request]
+on: pull_request]
 
 jobs:
   check_frozen_modules:
@@ -206,7 +206,7 @@ When generating the SCG Substrate Certification Dossier:
 
 1. **Clarification Proofs**: Commit `21dd6b5` with test coverage
 2. **Governor Convergence Logs**: 7-day pilot telemetry
-3. **Shard Boundary Logs**: `[SHARD_FINALIZED]` events
+3. **Shard Boundary Logs**: `SHARD_FINALIZED]` events
 4. **Global Hash Reconstructions**: Daily snapshots with SHA256 chains
 5. **Deterministic Replay Proofs**: Hash triples (local, docker, k8s)
 6. **Telemetry Snapshots**: Representative samples from 7-day pilot
@@ -260,12 +260,12 @@ cargo tree --package scg_mcp_server --features=connectome_audit | grep -E "scg_c
 
 The substrate is certified for field validation:
 
-- ✅ All 46 tests passing
-- ✅ Invariants enforced at runtime
-- ✅ Telemetry operational
-- ✅ Fault domains operational
-- ✅ Lineage integrity validated
-- ✅ Replay protocol tested
+-  All 46 tests passing
+-  Invariants enforced at runtime
+-  Telemetry operational
+-  Fault domains operational
+-  Lineage integrity validated
+-  Replay protocol tested
 
 ### Pilot Configuration
 

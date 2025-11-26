@@ -21,7 +21,7 @@
     "expected_samples_at_interrupt": 461,
     "samples_before_adjustment": 0
   },
-  "recovery_actions": [
+  "recovery_actions": 
     "Deploy LOAD-BALANCE-01 stimulus pattern",
     "Restart scg-mcp pod with new configuration",
     "Verify startup banner and active substrate state",

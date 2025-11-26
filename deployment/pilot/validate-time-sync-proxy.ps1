@@ -4,7 +4,7 @@
 # Non-privileged heartbeat-based temporal coherence check
 
 param(
-    [string]$OutputPath = ".\pilot_reports\day1"
+    string]$OutputPath = ".\pilot_reports\day1"
 )
 
 Write-Host "================================================"
@@ -19,7 +19,7 @@ Write-Host ""
 
 # Extract node heartbeat times
 Write-Host "Extracting node heartbeat timestamps..." -ForegroundColor Cyan
-$heartbeatsRaw = kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}{"\n"}{end}'
+$heartbeatsRaw = kubectl get nodes -o jsonpath='{range .items*]}{.metadata.name}{"\t"}{.status.conditions?(@.type=="Ready")].lastHeartbeatTime}{"\n"}{end}'
 
 if (-not $heartbeatsRaw) {
     Write-Host "ERROR: Failed to retrieve node heartbeats" -ForegroundColor Red
@@ -32,10 +32,10 @@ foreach ($line in ($heartbeatsRaw -split "`n" | Where-Object { $_ -ne "" })) {
     $parts = $line -split "`t"
     if ($parts.Count -eq 2) {
         $nodes += @{
-            name = $parts[0]
-            heartbeat = [DateTime]::Parse($parts[1])
+            name = $parts0]
+            heartbeat = DateTime]::Parse($parts1])
         }
-        Write-Host "  $($parts[0]): $($parts[1])"
+        Write-Host "  $($parts0]): $($parts1])"
     }
 }
 
@@ -65,11 +65,11 @@ Write-Host "Status: $status" -ForegroundColor $statusColor
 Write-Host ""
 
 if ($status -eq "PASS_PROXY") {
-    Write-Host "✅ Cluster heartbeat temporally coherent (proxy)" -ForegroundColor Green
+    Write-Host " Cluster heartbeat temporally coherent (proxy)" -ForegroundColor Green
     Write-Host "   Note: This is a COARSE check (5s vs canonical 50ms)" -ForegroundColor Yellow
     Write-Host "   Primary validation: Azure NTP SLA" -ForegroundColor Yellow
 } else {
-    Write-Host "❌ Cluster heartbeat shows temporal incoherence" -ForegroundColor Red
+    Write-Host " Cluster heartbeat shows temporal incoherence" -ForegroundColor Red
     Write-Host "   Delta exceeds $threshold second threshold" -ForegroundColor Red
 }
 Write-Host ""
@@ -78,7 +78,7 @@ Write-Host ""
 $result = @{
     method = "k8s_heartbeat_proxy"
     azure_ntp_sla = "TRUSTED"
-    heartbeat_max_delta_seconds = [math]::Round($deltaSeconds, 2)
+    heartbeat_max_delta_seconds = math]::Round($deltaSeconds, 2)
     heartbeat_threshold_seconds = $threshold
     node_count = $nodes.Count
     nodes = $nodes | ForEach-Object {

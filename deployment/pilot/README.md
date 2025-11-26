@@ -86,8 +86,8 @@ Telemetry records are emitted to stderr and to `telemetry/scg_pilot.jsonl`. Each
 Monitor stderr for alerts:
 
 ```
-[TELEMETRY] VIOLATION DETECTED: EnergyDrift { current: 1.2e-9, threshold: 1e-10 }
-[QUARANTINE] ===== ENTERING QUARANTINE MODE =====
+TELEMETRY] VIOLATION DETECTED: EnergyDrift { current: 1.2e-9, threshold: 1e-10 }
+QUARANTINE] ===== ENTERING QUARANTINE MODE =====
 ```
 
 ### Lineage Snapshots
@@ -159,15 +159,15 @@ See `scg_mcp_pilot.yml` for detailed configuration options:
 
 ## Deployment Checklist
 
-- [ ] Rust toolchain installed (1.70+)
-- [ ] Server builds successfully (`cargo build --release`)
-- [ ] MCP client configured with correct path
-- [ ] Telemetry directory created (`./telemetry/`)
-- [ ] Snapshots directory created (`./snapshots/`)
-- [ ] Monitoring dashboard prepared (optional)
-- [ ] Alert webhook configured (optional)
-- [ ] Team notified of pilot start date
-- [ ] Baseline telemetry captured for comparison
+-  ] Rust toolchain installed (1.70+)
+-  ] Server builds successfully (`cargo build --release`)
+-  ] MCP client configured with correct path
+-  ] Telemetry directory created (`./telemetry/`)
+-  ] Snapshots directory created (`./snapshots/`)
+-  ] Monitoring dashboard prepared (optional)
+-  ] Alert webhook configured (optional)
+-  ] Team notified of pilot start date
+-  ] Baseline telemetry captured for comparison
 
 ## Support
 
@@ -175,7 +175,7 @@ For issues during pilot:
 - Review logs in `./telemetry/` and stderr
 - Consult `scg_mcp_pilot.yml` for threshold configuration
 - Check GitHub issues for known problems
-- Contact: [Your contact info]
+- Contact: Your contact info]
 
 ## After Pilot
 

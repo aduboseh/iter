@@ -31,10 +31,10 @@ $serverPath = if ($Release) { ".\\target\\release\\scg_mcp_server.exe" } else { 
 
 Write-Host "[CERT] Running certification harness" -ForegroundColor Cyan
 $detFlag = if ($Determinism) { "-Determinism" } else { "" }
-pwsh -NoProfile -File .\scg_certification_harness.ps1 -ServerPath $serverPath $detFlag
+pwsh -NoProfile -File .\certification\v1.0\harness\scg_certification_harness.ps1 -ServerPath $serverPath $detFlag
 
 Write-Host "[DET] Running determinism validator v2.0" -ForegroundColor Cyan
 $env:SCG_DETERMINISM = if ($Determinism) { "1" } else { $null }
-pwsh -NoProfile -File .\scg_determinism_validator.ps1
+pwsh -NoProfile -File .\certification\v1.0\harness\scg_determinism_validator.ps1
 
 Pop-Location

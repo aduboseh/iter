@@ -7,9 +7,9 @@
 # UPGRADE: Multiline JSON accumulator for nested MCP responses
 
 param(
-    [string]$Namespace = "scg-pilot-01",
-    [int]$IntervalSeconds = 60,
-    [string]$OutputPath = ".\pilot-monitoring"
+    string]$Namespace = "scg-pilot-01",
+    int]$IntervalSeconds = 60,
+    string]$OutputPath = ".\pilot-monitoring"
 )
 
 Write-Host "================================================"
@@ -34,16 +34,16 @@ function Get-PodStatus {
     if ($pod.items.Count -eq 0) {
         return @{ Ready = $false; Name = "none" }
     }
-    $podItem = $pod.items[0]
+    $podItem = $pod.items0]
     return @{
-        Ready = $podItem.status.containerStatuses[0].ready
+        Ready = $podItem.status.containerStatuses0].ready
         Name = $podItem.metadata.name
-        RestartCount = $podItem.status.containerStatuses[0].restartCount
+        RestartCount = $podItem.status.containerStatuses0].restartCount
     }
 }
 
 function Parse-MultilineJSON {
-    param([string]$LogOutput)
+    param(string]$LogOutput)
     
     # ACT-04 §2.1: Block-scoped JSON accumulator
     $jsonBlocks = @()
@@ -86,12 +86,12 @@ function Parse-MultilineJSON {
 }
 
 function Extract-SubstrateTelemetry {
-    param([object]$McpResponse)
+    param(object]$McpResponse)
     
     # ACT-04 §2.2: Extract nested telemetry from MCP wrapper
     try {
-        if ($McpResponse.result -and $McpResponse.result.content -and $McpResponse.result.content[0].text) {
-            $escapedJson = $McpResponse.result.content[0].text
+        if ($McpResponse.result -and $McpResponse.result.content -and $McpResponse.result.content0].text) {
+            $escapedJson = $McpResponse.result.content0].text
             # Remove escaped newlines and parse inner JSON
             $cleanJson = $escapedJson -replace '\\n', '' -replace '\\"', '"'
             $telemetry = $cleanJson | ConvertFrom-Json
@@ -107,17 +107,17 @@ function Extract-SubstrateTelemetry {
 function Check-Invariants {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     
-    Write-Host "[$timestamp] Checking invariants..."
+    Write-Host "$timestamp] Checking invariants..."
     
     # Get pod status
     $podStatus = Get-PodStatus
     
     if (-not $podStatus.Ready) {
-        Write-Host "  ❌ Pod not ready: $($podStatus.Name)" -ForegroundColor Red
+        Write-Host "   Pod not ready: $($podStatus.Name)" -ForegroundColor Red
         return
     }
     
-    Write-Host "  ✅ Pod Ready: $($podStatus.Name)" -ForegroundColor Green
+    Write-Host "   Pod Ready: $($podStatus.Name)" -ForegroundColor Green
     
     # Get recent logs and parse telemetry
     $logs = kubectl logs -n $Namespace $podStatus.Name --tail=200 2>$null
@@ -145,14 +145,14 @@ function Check-Invariants {
         $entropyIndex = if ($latestTelemetry.entropy_index -ne $null) { $latestTelemetry.entropy_index } else { 0.0 }
     } else {
         # Fallback: single-line regex parsing
-        $governorData = $logs | Select-String -Pattern '"energy_drift":\s*([0-9.e-]+).*"coherence":\s*([0-9.]+).*"node_count":\s*(\d+).*"edge_count":\s*(\d+)' -AllMatches | Select-Object -Last 1
+        $governorData = $logs | Select-String -Pattern '"energy_drift":\s*(0-9.e-]+).*"coherence":\s*(0-9.]+).*"node_count":\s*(\d+).*"edge_count":\s*(\d+)' -AllMatches | Select-Object -Last 1
         
         if ($governorData -and $governorData.Matches.Count -gt 0) {
-            $match = $governorData.Matches[0]
-            $energyDrift = [double]$match.Groups[1].Value
-            $coherence = [double]$match.Groups[2].Value
-            $nodeCount = [int]$match.Groups[3].Value
-            $edgeCount = [int]$match.Groups[4].Value
+            $match = $governorData.Matches0]
+            $energyDrift = double]$match.Groups1].Value
+            $coherence = double]$match.Groups2].Value
+            $nodeCount = int]$match.Groups3].Value
+            $edgeCount = int]$match.Groups4].Value
         } else {
             $energyDrift = 0.0
             $coherence = 1.0
@@ -165,7 +165,7 @@ function Check-Invariants {
     }
     
     # Parse lineage.replay responses for variance tracking
-    $lineageData = $logs | Select-String -Pattern '"op":\s*"([^"]+)".*"checksum":\s*"([^"]+)"' -AllMatches | Select-Object -Last 3
+    $lineageData = $logs | Select-String -Pattern '"op":\s*"(^"]+)".*"checksum":\s*"(^"]+)"' -AllMatches | Select-Object -Last 3
     $lineageEpsilon = 0.0  # Would need replay comparison for actual variance
     
     # Check for quarantine events in logs (historical)
@@ -178,25 +178,25 @@ function Check-Invariants {
     $replayVariance = 0.0
     
     # ACT-04 §5: Continuous invariant enforcement
-    $energyOk = ([double]$energyDrift -le 1e-10)
-    $coherenceOk = ([double]$coherence -ge 0.97)
-    $esvOk = ([double]$esvRatio -eq 1.0)
+    $energyOk = (double]$energyDrift -le 1e-10)
+    $coherenceOk = (double]$coherence -ge 0.97)
+    $esvOk = (double]$esvRatio -eq 1.0)
     $quarantineOk = (-not $quarantined -and $quarantineEventCount -eq 0)
     
     $status = if ($energyOk -and $coherenceOk -and $esvOk -and $quarantineOk) { "HEALTHY" } else { "DEGRADED" }
     
     # ACT-04 §5: Alert on violations
     if (-not $energyOk) {
-        Write-Host "  ⚠️ ALERT: Energy drift violation (ΔE = $energyDrift > 1e-10)" -ForegroundColor Red
+        Write-Host "   ALERT: Energy drift violation (ΔE = $energyDrift > 1e-10)" -ForegroundColor Red
     }
     if (-not $coherenceOk) {
-        Write-Host "  ⚠️ ALERT: Coherence violation (C = $coherence < 0.97)" -ForegroundColor Red
+        Write-Host "   ALERT: Coherence violation (C = $coherence < 0.97)" -ForegroundColor Red
     }
     if (-not $esvOk) {
-        Write-Host "  ⚠️ ALERT: ESV validation failed (ratio = $esvRatio)" -ForegroundColor Red
+        Write-Host "   ALERT: ESV validation failed (ratio = $esvRatio)" -ForegroundColor Red
     }
     if ($quarantined) {
-        Write-Host "  ⚠️ ALERT: Substrate quarantined" -ForegroundColor Red
+        Write-Host "   ALERT: Substrate quarantined" -ForegroundColor Red
     }
     
     # Display results (ACT-04 §2.3: Real readings, not placeholders)
@@ -216,7 +216,7 @@ function Check-Invariants {
     
     # Log to file
     @"
-[$timestamp] Invariant Check
+$timestamp] Invariant Check
 Pod: $($podStatus.Name) (Restarts: $($podStatus.RestartCount))
 Energy Drift: $energyDrift
 Coherence: $coherence

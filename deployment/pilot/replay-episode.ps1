@@ -5,14 +5,14 @@
 # Validates hash variance ε ≤ 1×10⁻¹⁰
 
 param(
-    [Parameter(Mandatory=$true)]
-    [int]$Day,
+    Parameter(Mandatory=$true)]
+    int]$Day,
     
-    [int]$Cycles = 250,
+    int]$Cycles = 250,
     
-    [string]$Namespace = "scg-pilot-01",
+    string]$Namespace = "scg-pilot-01",
     
-    [string]$OutputPath = ".\pilot_reports\day$Day\replay"
+    string]$OutputPath = ".\pilot_reports\day$Day\replay"
 )
 
 Write-Host "================================================"
@@ -35,12 +35,12 @@ $results = @()
 
 function Invoke-ReplayEpisode {
     param(
-        [string]$Environment,
-        [string]$Seed,
-        [int]$Cycles
+        string]$Environment,
+        string]$Seed,
+        int]$Cycles
     )
     
-    Write-Host "[$Environment] Executing replay episode..." -ForegroundColor Cyan
+    Write-Host "$Environment] Executing replay episode..." -ForegroundColor Cyan
     Write-Host "  Seed: $Seed"
     Write-Host "  Cycles: $Cycles"
     
@@ -51,7 +51,7 @@ function Invoke-ReplayEpisode {
             "local" {
                 # Note: Requires scg_mcp_server binary in PATH
                 # This is a placeholder - actual implementation depends on binary availability
-                Write-Host "  ⚠️  Local replay requires scg_mcp_server binary (not yet implemented)" -ForegroundColor Yellow
+                Write-Host "    Local replay requires scg_mcp_server binary (not yet implemented)" -ForegroundColor Yellow
                 "PLACEHOLDER: Local replay not yet implemented" | Out-File -FilePath $outputFile
                 return @{
                     environment = $Environment
@@ -65,7 +65,7 @@ function Invoke-ReplayEpisode {
                 # Check if Docker image exists
                 $imageCheck = docker images scgpilotacr.azurecr.io/scg-mcp:v1.0.0-substrate -q
                 if (-not $imageCheck) {
-                    Write-Host "  ⚠️  Docker image not found locally" -ForegroundColor Yellow
+                    Write-Host "    Docker image not found locally" -ForegroundColor Yellow
                     "ERROR: Docker image scgpilotacr.azurecr.io/scg-mcp:v1.0.0-substrate not found" | Out-File -FilePath $outputFile
                     return @{
                         environment = $Environment
@@ -92,10 +92,10 @@ function Invoke-ReplayEpisode {
                 Write-Host "  Executing replay in Kubernetes pod..."
                 
                 # Get active scg-mcp pod
-                $pod = kubectl get pods -n $Namespace -l app=scg-mcp -o jsonpath='{.items[0].metadata.name}' 2>$null
+                $pod = kubectl get pods -n $Namespace -l app=scg-mcp -o jsonpath='{.items0].metadata.name}' 2>$null
                 
                 if (-not $pod) {
-                    Write-Host "  ❌ No scg-mcp pod found in namespace $Namespace" -ForegroundColor Red
+                    Write-Host "   No scg-mcp pod found in namespace $Namespace" -ForegroundColor Red
                     "ERROR: No scg-mcp pod found" | Out-File -FilePath $outputFile
                     return @{
                         environment = $Environment
@@ -115,9 +115,9 @@ function Invoke-ReplayEpisode {
                 
                 # Parse output for hash (would need actual implementation)
                 $output = Get-Content $outputFile -Raw
-                if ($output -match "replay_hash:\s*([a-f0-9]+)") {
-                    $hash = $matches[1]
-                    Write-Host "  ✅ Replay complete: hash=$hash" -ForegroundColor Green
+                if ($output -match "replay_hash:\s*(a-f0-9]+)") {
+                    $hash = $matches1]
+                    Write-Host "   Replay complete: hash=$hash" -ForegroundColor Green
                     return @{
                         environment = $Environment
                         status = "EXECUTED"
@@ -125,7 +125,7 @@ function Invoke-ReplayEpisode {
                         cycles = $Cycles
                     }
                 } else {
-                    Write-Host "  ⚠️  Replay executed but hash not found in output" -ForegroundColor Yellow
+                    Write-Host "    Replay executed but hash not found in output" -ForegroundColor Yellow
                     return @{
                         environment = $Environment
                         status = "HASH_NOT_FOUND"
@@ -137,7 +137,7 @@ function Invoke-ReplayEpisode {
         }
     }
     catch {
-        Write-Host "  ❌ Error executing replay: $_" -ForegroundColor Red
+        Write-Host "   Error executing replay: $_" -ForegroundColor Red
         $_ | Out-File -FilePath $outputFile -Append
         return @{
             environment = $Environment
@@ -165,20 +165,20 @@ Write-Host "Analyzing hash variance..." -ForegroundColor Cyan
 $executedResults = $results | Where-Object { $_.status -eq "EXECUTED" -and $_.hash -ne "N/A" }
 
 if ($executedResults.Count -ge 2) {
-    $referenceHash = $executedResults[0].hash
+    $referenceHash = $executedResults0].hash
     $variance = 0.0
     
-    foreach ($result in $executedResults[1..($executedResults.Count-1)]) {
+    foreach ($result in $executedResults1..($executedResults.Count-1)]) {
         if ($result.hash -ne $referenceHash) {
             $variance = 1.0  # Non-deterministic
-            Write-Host "  ❌ Hash mismatch detected!" -ForegroundColor Red
-            Write-Host "    Reference: $referenceHash ($($executedResults[0].environment))"
+            Write-Host "   Hash mismatch detected!" -ForegroundColor Red
+            Write-Host "    Reference: $referenceHash ($($executedResults0].environment))"
             Write-Host "    Mismatch:  $($result.hash) ($($result.environment))"
         }
     }
     
     if ($variance -eq 0.0) {
-        Write-Host "  ✅ All hashes match: variance = 0.0 (deterministic)" -ForegroundColor Green
+        Write-Host "   All hashes match: variance = 0.0 (deterministic)" -ForegroundColor Green
     }
     
     $varianceResult = @{
@@ -200,7 +200,7 @@ if ($executedResults.Count -ge 2) {
     Write-Host "Variance analysis saved to: $varianceFile"
     
 } else {
-    Write-Host "  ⚠️  Insufficient executed replays for variance analysis" -ForegroundColor Yellow
+    Write-Host "    Insufficient executed replays for variance analysis" -ForegroundColor Yellow
     Write-Host "    At least 2 successful replays required"
     Write-Host "    Executed: $($executedResults.Count)"
     
@@ -242,9 +242,9 @@ foreach ($result in $results) {
 Write-Host ""
 
 if ($varianceResult.compliant) {
-    Write-Host "✅ Replay episode validation PASSED" -ForegroundColor Green
+    Write-Host " Replay episode validation PASSED" -ForegroundColor Green
 } else {
-    Write-Host "❌ Replay episode validation FAILED" -ForegroundColor Red
+    Write-Host " Replay episode validation FAILED" -ForegroundColor Red
 }
 Write-Host ""
 
