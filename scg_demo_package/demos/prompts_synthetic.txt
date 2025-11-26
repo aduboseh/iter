@@ -1,0 +1,166 @@
+# SCG Synthetic Prompt Library
+# Version: 1.0 (Production Edition)
+# Domain-neutral prompts for certification and demo scenarios
+# No PHI, PII, or vertical-specific terminology
+
+# =============================================================================
+# SECTION A: BASELINE REASONING PROMPTS
+# Purpose: Verify normal graph traversal and belief propagation
+# =============================================================================
+
+[BASELINE_001]
+Create a belief node with initial confidence 0.5 and standard energy allocation.
+
+[BASELINE_002]
+Query the current state of a previously created node to verify persistence.
+
+[BASELINE_003]
+Establish a weighted connection between two nodes with moderate influence.
+
+[BASELINE_004]
+Propagate belief along an established edge and observe state change.
+
+[BASELINE_005]
+Request governor status to verify system invariants are maintained.
+
+[BASELINE_006]
+Audit a node for ethical state vector compliance.
+
+[BASELINE_007]
+Export the current lineage chain to verify cryptographic consistency.
+
+[BASELINE_008]
+Replay the latest lineage entry to confirm checksum integrity.
+
+# =============================================================================
+# SECTION B: BOUNDARY CASE PROMPTS
+# Purpose: Test edge conditions without triggering violations
+# =============================================================================
+
+[BOUNDARY_001]
+Create a node with belief at lower bound (0.0) and verify clamping.
+
+[BOUNDARY_002]
+Create a node with belief at upper bound (1.0) and verify clamping.
+
+[BOUNDARY_003]
+Create a node with belief slightly above upper bound (1.01) and verify clamping to 1.0.
+
+[BOUNDARY_004]
+Create a node with belief slightly below lower bound (-0.01) and verify clamping to 0.0.
+
+[BOUNDARY_005]
+Bind an edge with weight at lower bound (0.0) and verify propagation has no effect.
+
+[BOUNDARY_006]
+Bind an edge with weight at upper bound (1.0) and verify full belief transfer.
+
+[BOUNDARY_007]
+Create a self-referential edge (node to itself) and verify safe handling.
+
+[BOUNDARY_008]
+Propagate through a self-loop edge and verify no infinite recursion.
+
+[BOUNDARY_009]
+Create a cyclic topology (A->B->C->A) and verify propagation terminates.
+
+[BOUNDARY_010]
+Mutate a node by zero delta and verify state unchanged.
+
+[BOUNDARY_011]
+Mutate a node to exactly the upper bound (1.0) and verify no violation.
+
+[BOUNDARY_012]
+Mutate a node to exactly the lower bound (0.0) and verify no violation.
+
+# =============================================================================
+# SECTION C: CONSTRAINT VIOLATION TRIGGER PROMPTS
+# Purpose: Deliberately trigger ESV or drift violations for error handling tests
+# =============================================================================
+
+[VIOLATION_001]
+Attempt to mutate a node with a delta that would push belief beyond ESV threshold.
+
+[VIOLATION_002]
+Request an operation that explicitly prioritizes speed over safety constraints.
+
+[VIOLATION_003]
+Attempt to create a node with invalid energy allocation (negative value).
+
+[VIOLATION_004]
+Attempt to bind an edge with source node that does not exist.
+
+[VIOLATION_005]
+Attempt to bind an edge with destination node that does not exist.
+
+[VIOLATION_006]
+Attempt to propagate along a non-existent edge identifier.
+
+[VIOLATION_007]
+Attempt to query a node with malformed identifier string.
+
+[VIOLATION_008]
+Attempt to mutate a non-existent node.
+
+[VIOLATION_009]
+Request lineage export to an invalid filesystem path.
+
+[VIOLATION_010]
+Trigger a synthetic constraint that violates ethical boundaries.
+
+# =============================================================================
+# SECTION D: STRESS AND ADVERSARIAL PROMPTS
+# Purpose: High-frequency operations for certification Phase 7
+# =============================================================================
+
+[STRESS_001]
+Create multiple nodes in rapid succession to test allocation throughput.
+
+[STRESS_002]
+Bind multiple edges in a single batch to test topology construction.
+
+[STRESS_003]
+Execute multiple mutations in sequence to verify state consistency.
+
+[STRESS_004]
+Propagate through multiple edges rapidly to stress the belief engine.
+
+[STRESS_005]
+Interleave create, mutate, and propagate operations for concurrency testing.
+
+[STRESS_006]
+Request governor status repeatedly to verify invariant preservation under load.
+
+[STRESS_007]
+Export lineage multiple times to verify checksum stability.
+
+[STRESS_008]
+Create a deep chain topology and propagate through all edges sequentially.
+
+# =============================================================================
+# SECTION E: DETERMINISM VERIFICATION PROMPTS
+# Purpose: Confirm identical outputs across multiple runs
+# =============================================================================
+
+[DETERMINISM_001]
+Execute a fixed sequence of operations and capture final governor state.
+
+[DETERMINISM_002]
+Export lineage and verify checksum matches expected value.
+
+[DETERMINISM_003]
+Create identical node configurations and verify matching identifiers are NOT generated (UUIDs should differ).
+
+[DETERMINISM_004]
+Execute the same mutation sequence twice and verify final beliefs match.
+
+[DETERMINISM_005]
+Verify that governor drift remains zero after a balanced set of operations.
+
+# =============================================================================
+# METADATA
+# =============================================================================
+# Total prompts: 40
+# Categories: 5
+# Domain terms avoided: patient, vehicle, loan, account, EMR, chart, medical, financial, automotive
+# Compliance: Microsoft Audit Ready
