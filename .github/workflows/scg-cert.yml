@@ -1,0 +1,61 @@
+name: SCG MCP Certification
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  certify:
+    runs-on: windows-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Format check
+        shell: pwsh
+        run: cargo fmt -- --check
+
+      - name: Clippy (deny warnings)
+        shell: pwsh
+run: cargo clippy -- -D warnings -A dead_code
+
+      - name: Build (release)
+        shell: pwsh
+        run: cargo build --release
+
+      - name: Run certification harness
+        shell: pwsh
+        run: pwsh -NoProfile -File .\scg_certification_harness.ps1 -ServerPath .\target\release\scg_mcp_server.exe
+
+      - name: Determinism validator v2.0
+        shell: pwsh
+        env:
+          SCG_DETERMINISM: '1'
+        run: |
+          Remove-Item "certification_report_*.json" -ErrorAction SilentlyContinue
+          pwsh -NoProfile -File .\scg_determinism_validator.ps1
+
+      - name: Upload certification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scg-certification-artifacts
+          path: |
+            certification_report_*.json
+            logs/**
+            detnorm*.txt
+          if-no-files-found: ignore
