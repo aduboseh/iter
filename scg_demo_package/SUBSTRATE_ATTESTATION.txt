@@ -1,0 +1,55 @@
+SCG SUBSTRATE TECHNICAL ATTESTATION
+====================================
+Package Version: 1.0
+Certification Date: 2025-11-26
+
+INVARIANT GUARANTEES
+--------------------
+Drift Bound:        |Δ coherence| ≤ 1e-10 per graph operation
+Energy Conservation: Total graph energy preserved across propagation cycles
+Temporal Stability:  Deterministic output independent of system clock
+Belief Clamping:     All values constrained to [0.0, 1.0] range
+
+CRYPTOGRAPHIC PROPERTIES
+-------------------------
+Lineage Integrity:  Merkle-style operation chain with SHA-256 checksums
+Reproducibility:    Binary-identical outputs across sequential runs
+Error Determinism:  Constraint violations produce fixed error codes
+ID Sequencing:      JSON-RPC IDs are sequential integers (1..N)
+
+COMPLIANCE SCOPE
+----------------
+Domain Neutrality:  Zero business logic; synthetic topology only
+Vertical Agnostic:  No healthcare, automotive, financial, or sector-specific primitives
+IP Isolation:       No references to customer implementations
+Personal Data:      Zero PII, PHI, or identifiable information
+
+VALIDATION METHODOLOGY
+----------------------
+Dual-Run Test:      Script executes scenario twice; SHA-256 checksums must match
+Health Probes:      MCP server startup validated within 5-second timeout
+Constraint Testing: Synthetic unsafe operations rejected with code 4000
+Normalization:      CRLF→LF, trailing whitespace stripped before hashing
+
+DEMONSTRATION ARCHITECTURE
+---------------------------
+Protocol:           JSON-RPC 2.0 over stdin/stdout
+Operations Tested:  governor.status, node.create, edge.bind, edge.propagate, lineage.export
+Environment:        POSIX-compliant shell (bash 4.0+, jq 1.6+)
+Locale:             LC_ALL=C, LANG=C, TZ=UTC
+
+REPRODUCIBILITY CERTIFICATION
+------------------------------
+Artifact Hash:      588153f3c00a95c3296b576a74f4d8bea8ea556fb2a0366236bd7b21b899d1df
+Certification Date: 2025-11-26
+Validator:          Dual-run SHA-256 comparison (cryptographic proof)
+
+THREAT MODEL COMPLIANCE
+------------------------
+Static Analysis:    No exec injection points
+Secrets Scanning:   No API keys or credentials (even in comments)
+Vertical Fingerprinting: No domain keywords (patient, vehicle, account)
+Diff Auditing:      Binary-identical outputs after normalization
+
+NO PRIVATE IP DISCLOSED
+All content synthetic and domain-neutral per enterprise review requirements.
