@@ -80,142 +80,140 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             RpcResponse::success(id, json!({ "prompts": [] }))
         }
 
-        "tools/list" | "tools.list" => {
-            RpcResponse::success(
-                id,
-                json!({
-                    "tools": [
-                        {
-                            "name": "node.create",
-                            "description": "Create SCG node with belief and energy values",
-                            "version": "0.1.0",
-                            "sideEffects": ["state_mutation", "energy_allocation", "lineage_append"],
-                            "dependencies": [],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "belief": { "type": "number", "description": "Initial belief value" },
-                                    "energy": { "type": "number", "description": "Initial energy value" }
-                                },
-                                "required": ["belief", "energy"]
-                            }
-                        },
-                        {
-                            "name": "node.mutate",
-                            "description": "Mutate node belief by delta",
-                            "version": "0.1.0",
-                            "sideEffects": ["state_mutation", "esv_validation", "lineage_append"],
-                            "dependencies": ["node.query"],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "node_id": { "type": "string", "description": "Node UUID" },
-                                    "delta": { "type": "number", "description": "Belief delta" }
-                                },
-                                "required": ["node_id", "delta"]
-                            }
-                        },
-                        {
-                            "name": "node.query",
-                            "description": "Query node state by ID",
-                            "version": "0.1.0",
-                            "sideEffects": [],
-                            "dependencies": [],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "node_id": { "type": "string", "description": "Node UUID" }
-                                },
-                                "required": ["node_id"]
-                            }
-                        },
-                        {
-                            "name": "edge.bind",
-                            "description": "Bind edge between two nodes",
-                            "version": "0.1.0",
-                            "sideEffects": ["state_mutation", "topology_change", "lineage_append"],
-                            "dependencies": ["node.query"],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "src": { "type": "string", "description": "Source node UUID" },
-                                    "dst": { "type": "string", "description": "Destination node UUID" },
-                                    "weight": { "type": "number", "description": "Edge weight" }
-                                },
-                                "required": ["src", "dst", "weight"]
-                            }
-                        },
-                        {
-                            "name": "edge.propagate",
-                            "description": "Propagate belief along edge",
-                            "version": "0.1.0",
-                            "sideEffects": ["state_mutation", "energy_transfer", "lineage_append"],
-                            "dependencies": ["node.query"],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "edge_id": { "type": "string", "description": "Edge UUID" }
-                                },
-                                "required": ["edge_id"]
-                            }
-                        },
-                        {
-                            "name": "governor.status",
-                            "description": "Query governor drift and coherence status",
-                            "version": "0.1.0",
-                            "sideEffects": [],
-                            "dependencies": [],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {}
-                            }
-                        },
-                        {
-                            "name": "esv.audit",
-                            "description": "Audit node ethical state vector",
-                            "version": "0.1.0",
-                            "sideEffects": ["esv_validation"],
-                            "dependencies": ["node.query"],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "node_id": { "type": "string", "description": "Node UUID" }
-                                },
-                                "required": ["node_id"]
-                            }
-                        },
-                        {
-                            "name": "lineage.replay",
-                            "description": "Replay lineage checksum history",
-                            "version": "0.1.0",
-                            "sideEffects": [],
-                            "dependencies": [],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {}
-                            }
-                        },
-                        {
-                            "name": "lineage.export",
-                            "description": "Export lineage log to file and return checksum",
-                            "version": "0.1.0",
-                            "sideEffects": ["filesystem_write"],
-                            "dependencies": [],
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "path": {
-                                        "type": "string",
-                                        "description": "Filesystem path to write lineage JSON log"
-                                    }
-                                },
-                                "required": ["path"]
-                            }
+        "tools/list" | "tools.list" => RpcResponse::success(
+            id,
+            json!({
+                "tools": [
+                    {
+                        "name": "node.create",
+                        "description": "Create SCG node with belief and energy values",
+                        "version": "0.1.0",
+                        "sideEffects": ["state_mutation", "energy_allocation", "lineage_append"],
+                        "dependencies": [],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "belief": { "type": "number", "description": "Initial belief value" },
+                                "energy": { "type": "number", "description": "Initial energy value" }
+                            },
+                            "required": ["belief", "energy"]
                         }
-                    ]
-                })
-            )
-        }
+                    },
+                    {
+                        "name": "node.mutate",
+                        "description": "Mutate node belief by delta",
+                        "version": "0.1.0",
+                        "sideEffects": ["state_mutation", "esv_validation", "lineage_append"],
+                        "dependencies": ["node.query"],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": { "type": "string", "description": "Node UUID" },
+                                "delta": { "type": "number", "description": "Belief delta" }
+                            },
+                            "required": ["node_id", "delta"]
+                        }
+                    },
+                    {
+                        "name": "node.query",
+                        "description": "Query node state by ID",
+                        "version": "0.1.0",
+                        "sideEffects": [],
+                        "dependencies": [],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": { "type": "string", "description": "Node UUID" }
+                            },
+                            "required": ["node_id"]
+                        }
+                    },
+                    {
+                        "name": "edge.bind",
+                        "description": "Bind edge between two nodes",
+                        "version": "0.1.0",
+                        "sideEffects": ["state_mutation", "topology_change", "lineage_append"],
+                        "dependencies": ["node.query"],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "src": { "type": "string", "description": "Source node UUID" },
+                                "dst": { "type": "string", "description": "Destination node UUID" },
+                                "weight": { "type": "number", "description": "Edge weight" }
+                            },
+                            "required": ["src", "dst", "weight"]
+                        }
+                    },
+                    {
+                        "name": "edge.propagate",
+                        "description": "Propagate belief along edge",
+                        "version": "0.1.0",
+                        "sideEffects": ["state_mutation", "energy_transfer", "lineage_append"],
+                        "dependencies": ["node.query"],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "edge_id": { "type": "string", "description": "Edge UUID" }
+                            },
+                            "required": ["edge_id"]
+                        }
+                    },
+                    {
+                        "name": "governor.status",
+                        "description": "Query governor drift and coherence status",
+                        "version": "0.1.0",
+                        "sideEffects": [],
+                        "dependencies": [],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    },
+                    {
+                        "name": "esv.audit",
+                        "description": "Audit node ethical state vector",
+                        "version": "0.1.0",
+                        "sideEffects": ["esv_validation"],
+                        "dependencies": ["node.query"],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": { "type": "string", "description": "Node UUID" }
+                            },
+                            "required": ["node_id"]
+                        }
+                    },
+                    {
+                        "name": "lineage.replay",
+                        "description": "Replay lineage checksum history",
+                        "version": "0.1.0",
+                        "sideEffects": [],
+                        "dependencies": [],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    },
+                    {
+                        "name": "lineage.export",
+                        "description": "Export lineage log to file and return checksum",
+                        "version": "0.1.0",
+                        "sideEffects": ["filesystem_write"],
+                        "dependencies": [],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string",
+                                    "description": "Filesystem path to write lineage JSON log"
+                                }
+                            },
+                            "required": ["path"]
+                        }
+                    }
+                ]
+            }),
+        ),
 
         "tools/call" => {
             // MCP protocol tools/call - extract tool name and arguments
@@ -253,14 +251,17 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             };
 
             let node = runtime.node_create(p.belief, p.energy);
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
+                        }
+                    ]
+                }),
+            )
         }
 
         "node.mutate" => {
@@ -284,9 +285,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                 None => return rpc_error_from_scg(id, ScgError::NotFound("node".into())),
             };
 
-            // 2) Compute new belief and run ESV guard
+            // 2) Compute new belief (clamped to [0,1]) and run ESV guard
             let threshold = runtime.get_esv_threshold();
-            let new_belief = current.belief + p.delta;
+            let new_belief = (current.belief + p.delta).clamp(0.0, 1.0);
             if let Err(e) = esv_guard(new_belief, threshold) {
                 return rpc_error_from_scg(id, e); // -> code 1000
             }
@@ -301,14 +302,17 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                 Err(e) => return rpc_error_from_scg(id, ScgError::NotFound(e)),
             };
 
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
+                        }
+                    ]
+                }),
+            )
         }
 
         "node.query" => {
@@ -331,14 +335,17 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                 None => return rpc_error_from_scg(id, ScgError::NotFound("node".into())),
             };
 
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
+                        }
+                    ]
+                }),
+            )
         }
 
         "edge.bind" => {
@@ -371,14 +378,17 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                 Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e)),
             };
 
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&edge).unwrap_or_else(|_| format!("{:?}", edge))
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&edge).unwrap_or_else(|_| format!("{:?}", edge))
+                        }
+                    ]
+                }),
+            )
         }
 
         "edge.propagate" => {
@@ -404,26 +414,32 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                 return rpc_error_from_scg(id, ScgError::BadRequest(e));
             }
 
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "Edge propagation successful"
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Edge propagation successful"
+                        }
+                    ]
+                }),
+            )
         }
 
         "governor.status" => {
             let status = runtime.governor_status();
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&status).unwrap_or_else(|_| format!("{:?}", status))
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&status).unwrap_or_else(|_| format!("{:?}", status))
+                        }
+                    ]
+                }),
+            )
         }
 
         "esv.audit" => {
@@ -446,26 +462,32 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                 Err(e) => return rpc_error_from_scg(id, ScgError::NotFound(e)),
             };
 
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": format!("ESV audit result: {}", if ok { "VALID" } else { "INVALID" })
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": format!("ESV audit result: {}", if ok { "VALID" } else { "INVALID" })
+                        }
+                    ]
+                }),
+            )
         }
 
         "lineage.replay" => {
             let entry = runtime.replay_lineage();
-            RpcResponse::success(id, json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&entry).unwrap_or_else(|_| format!("{:?}", entry))
-                    }
-                ]
-            }))
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&entry).unwrap_or_else(|_| format!("{:?}", entry))
+                        }
+                    ]
+                }),
+            )
         }
 
         "lineage.export" => {
@@ -500,6 +522,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             )
         }
 
-        _ => rpc_error_from_scg(id, ScgError::BadRequest(format!("Unknown method: {}", method))),
+        _ => rpc_error_from_scg(
+            id,
+            ScgError::BadRequest(format!("Unknown method: {}", method)),
+        ),
     }
 }
