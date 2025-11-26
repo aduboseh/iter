@@ -1,5 +1,49 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use uuid::Uuid;
+
+/// SCG Error types for explicit failure handling
+/// Directive: SCG-EDGEBIND-STALL-V1.0
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SCGError {
+    /// Node not found by ID
+    NodeNotFound(Uuid),
+    /// Edge not found by ID
+    EdgeNotFound(Uuid),
+    /// System is quarantined
+    Quarantined,
+    /// Generic operation error
+    OperationFailed(String),
+    /// Stall detected during operation (Phase 7 certification critical)
+    StallDetected { context: String, elapsed_ms: u64 },
+}
+
+impl fmt::Display for SCGError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SCGError::NodeNotFound(id) => write!(f, "Node not found: {}", id),
+            SCGError::EdgeNotFound(id) => write!(f, "Edge not found: {}", id),
+            SCGError::Quarantined => write!(f, "System is quarantined"),
+            SCGError::OperationFailed(msg) => write!(f, "Operation failed: {}", msg),
+            SCGError::StallDetected {
+                context,
+                elapsed_ms,
+            } => {
+                write!(f, "StallDetected: {} (elapsed: {}ms)", context, elapsed_ms)
+            }
+        }
+    }
+}
+
+impl std::error::Error for SCGError {}
+
+/// Edge specification for batch binding
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EdgeSpec {
+    pub src: Uuid,
+    pub dst: Uuid,
+    pub weight: f64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeState {
@@ -86,7 +130,10 @@ impl RpcResponse {
         Self {
             jsonrpc: "2.0".into(),
             result: None,
-            error: Some(RpcError { code, message: msg.into() }),
+            error: Some(RpcError {
+                code,
+                message: msg.into(),
+            }),
             id,
         }
     }

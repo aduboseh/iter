@@ -9,9 +9,9 @@
 ## Problem Statement (Gap D)
 
 **Console Errors from Formatted Text**:
-- Directives often include bullets (•), checkmarks (✅), section markers (===), headers (##)
+- Directives often include bullets (•), checkmarks (), section markers (===), headers (##)
 - PowerShell/bash interpret these as unknown commands
-- Result: `The term '===' is not recognized as a cmdlet`, `unknown command: ✅`
+- Result: `The term '===' is not recognized as a cmdlet`, `unknown command: `
 
 **Root Cause**:
 - Formatted documentation pasted directly into terminal
@@ -40,13 +40,13 @@ kubectl apply -f deployment/pilot/time-sync-checker.yaml
 
 All runnable commands MUST include `# RUN THIS` comment:
 
-✅ **Good**:
+ **Good**:
 ```powershell
 # RUN THIS
 .\deployment\pilot\monitor-invariants.ps1 -Namespace scg-pilot-01
 ```
 
-❌ **Bad** (ambiguous):
+ **Bad** (ambiguous):
 ```powershell
 .\deployment\pilot\monitor-invariants.ps1 -Namespace scg-pilot-01
 ```
@@ -60,11 +60,11 @@ Code blocks contain ONLY:
 - Code comments (starting with `#` or `//`)
 - Actual code
 
-❌ **Never include**:
-- Checkmarks: ✅ ❌ ⏳
+ **Never include**:
+- Checkmarks:   ⏳
 - Bullets: •, -, *
 - Section headers: ===, ##, ---
-- Status indicators: [COMPLETE], (P0)
+- Status indicators: COMPLETE], (P0)
 
 ---
 
@@ -116,13 +116,13 @@ kubectl apply -f deployment/pilot/time-sync-checker.yaml
 
 ### Violation 1: Inline Status Markers
 
-❌ **Bad**:
+ **Bad**:
 ```
-✅ PASS — Infrastructure deployed
-❌ FAIL — Time sync blocked
+ PASS — Infrastructure deployed
+ FAIL — Time sync blocked
 ```
 
-✅ **Good** (in code context):
+ **Good** (in code context):
 ```powershell
 # RUN THIS
 if ($status -eq "PASS") {
@@ -134,14 +134,14 @@ if ($status -eq "PASS") {
 
 ### Violation 2: Section Dividers in Scripts
 
-❌ **Bad**:
+ **Bad**:
 ```
 ================================================
 SCG-PILOT-01 Monitoring
 ================================================
 ```
 
-✅ **Good**:
+ **Good**:
 ```powershell
 # RUN THIS
 Write-Host "================================================"
@@ -153,7 +153,7 @@ Write-Host "================================================"
 
 ### Violation 3: Mixed Prose and Commands
 
-❌ **Bad**:
+ **Bad**:
 ```
 To deploy time sync, run:
 kubectl apply -f time-sync-checker.yaml
@@ -162,7 +162,7 @@ Then verify with:
 kubectl get pods -n scg-pilot-01
 ```
 
-✅ **Good**:
+ **Good**:
 ```powershell
 # RUN THIS
 kubectl apply -f time-sync-checker.yaml
@@ -260,7 +260,7 @@ kubectl get pods -n scg-pilot-01 -l app=time-sync-checker
 
 **Before Hygiene Protocol**:
 ```
-The term '✅' is not recognized as a cmdlet
+The term '' is not recognized as a cmdlet
 The term '===' is not recognized as a cmdlet
 P0: The term 'P0' is not recognized as a cmdlet
 ```

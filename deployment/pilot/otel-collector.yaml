@@ -1,6 +1,6 @@
 ---
 # OpenTelemetry Collector for SCG-PILOT-01
-# Directive: SG-SCG-PILOT-AUTH-02 v2.1.0 §2.1
+# Directive: SG-SCG-PILOT-AUTH-02 v2.1.0 S2.1
 #
 # Receives OTLP telemetry from SCG-MCP substrate
 # Exports to logs and persistent storage for certification dossier
@@ -67,19 +67,19 @@ data:
     service:
       pipelines:
         traces:
-          receivers: [otlp]
-          processors: [memory_limiter, batch]
-          exporters: [logging, file]
+          receivers: otlp]
+          processors: memory_limiter, batch]
+          exporters: logging, file]
         
         metrics:
-          receivers: [otlp]
-          processors: [memory_limiter, batch]
-          exporters: [logging, file]
+          receivers: otlp]
+          processors: memory_limiter, batch]
+          exporters: logging, file]
         
         logs:
-          receivers: [otlp]
-          processors: [memory_limiter, batch]
-          exporters: [logging, file]
+          receivers: otlp]
+          processors: memory_limiter, batch]
+          exporters: logging, file]
 
 ---
 apiVersion: apps/v1

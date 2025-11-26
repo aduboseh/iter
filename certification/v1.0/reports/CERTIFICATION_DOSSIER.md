@@ -2,7 +2,7 @@
 
 **Pilot ID**: SCG-PILOT-01  
 **Substrate Version**: v1.0.0-substrate  
-**Certification Date**: [TBD after 7-day pilot]  
+**Certification Date**: TBD after 7-day pilot]  
 **Status**: PENDING FIELD VALIDATION
 
 ---
@@ -12,11 +12,11 @@
 This dossier collects operational evidence from the SCG-PILOT-01 field validation to certify the substrate for production deployment. Upon successful completion, this document becomes the official audit trail for substrate certification.
 
 **Certification Criteria** (all must pass):
-- ✅ 7 days of continuous operation without substrate quarantine
-- ✅ All 7 invariants maintained within specified thresholds
-- ✅ Zero critical failures (P0/P1 incidents)
-- ✅ Complete lineage integrity across full pilot duration
-- ✅ Telemetry completeness ≥ 99.9%
+-  7 days of continuous operation without substrate quarantine
+-  All 7 invariants maintained within specified thresholds
+-  Zero critical failures (P0/P1 incidents)
+-  Complete lineage integrity across full pilot duration
+-  Telemetry completeness ≥ 99.9%
 
 ---
 
@@ -69,9 +69,9 @@ Log Aggregation:
 
 ## 2. Daily Health Reports
 
-### Day 1: [Date]
+### Day 1: Date]
 
-**Status**: [HEALTHY | DEGRADED | CRITICAL]
+**Status**: HEALTHY | DEGRADED | CRITICAL]
 
 #### Invariant Performance
 
@@ -88,71 +88,71 @@ Log Aggregation:
 #### Operational Metrics
 
 ```
-Uptime: [XX.XX]%
-Total Operations: [count]
-Peak RPS: [value]
-P50 Latency: [ms]
-P95 Latency: [ms]
-P99 Latency: [ms]
-Error Rate: [%]
+Uptime: XX.XX]%
+Total Operations: count]
+Peak RPS: value]
+P50 Latency: ms]
+P95 Latency: ms]
+P99 Latency: ms]
+Error Rate: %]
 ```
 
 #### Notable Events
 
-- [Timestamp]: [Event description]
-- [Timestamp]: [Event description]
+- Timestamp]: Event description]
+- Timestamp]: Event description]
 
 #### Telemetry Samples
 
 ```json
-[Paste 3-5 representative telemetry records from this day]
+Paste 3-5 representative telemetry records from this day]
 ```
 
 #### Lineage Health
 
 ```
-Shards Finalized: [count]
-Replay Episodes: [count]
-Hash Variance: [0.0 | 1.0]
-Checkpoint Rollbacks: [count]
+Shards Finalized: count]
+Replay Episodes: count]
+Hash Variance: 0.0 | 1.0]
+Checkpoint Rollbacks: count]
 ```
 
 #### Governor Corrections
 
 ```
-[GOVERNOR_CORRECTION] [timestamp]: attempt=X pre_delta=Y post_delta=Z status=[success|partial|failed]
-[Paste all correction logs from this day]
+GOVERNOR_CORRECTION] timestamp]: attempt=X pre_delta=Y post_delta=Z status=success|partial|failed]
+Paste all correction logs from this day]
 ```
 
 ---
 
-### Day 2: [Date]
-[Repeat Day 1 structure]
+### Day 2: Date]
+Repeat Day 1 structure]
 
 ---
 
-### Day 3: [Date]
-[Repeat Day 1 structure]
+### Day 3: Date]
+Repeat Day 1 structure]
 
 ---
 
-### Day 4: [Date]
-[Repeat Day 1 structure]
+### Day 4: Date]
+Repeat Day 1 structure]
 
 ---
 
-### Day 5: [Date]
-[Repeat Day 1 structure]
+### Day 5: Date]
+Repeat Day 1 structure]
 
 ---
 
-### Day 6: [Date]
-[Repeat Day 1 structure]
+### Day 6: Date]
+Repeat Day 1 structure]
 
 ---
 
-### Day 7: [Date]
-[Repeat Day 1 structure]
+### Day 7: Date]
+Repeat Day 1 structure]
 
 ---
 
@@ -169,13 +169,13 @@ Checkpoint Rollbacks: [count]
 
 #### Incident #1 (if any)
 
-**Severity**: [P0 | P1 | P2 | P3]  
-**Date/Time**: [timestamp]  
-**Duration**: [minutes]  
-**Root Cause**: [description]  
-**Impact**: [description]  
-**Resolution**: [description]  
-**Follow-up Actions**: [list]
+**Severity**: P0 | P1 | P2 | P3]  
+**Date/Time**: timestamp]  
+**Duration**: minutes]  
+**Root Cause**: description]  
+**Impact**: description]  
+**Resolution**: description]  
+**Follow-up Actions**: list]
 
 ---
 
@@ -184,28 +184,28 @@ Checkpoint Rollbacks: [count]
 ### 4.1 Snapshot Integrity
 
 ```
-Total Snapshots: [count]
-Verified Hashes: [count / total]
-Replay Success Rate: [%]
-Maximum ε Observed: [value]
+Total Snapshots: count]
+Verified Hashes: count / total]
+Replay Success Rate: %]
+Maximum ε Observed: value]
 ```
 
 ### 4.2 Shard Chain
 
 ```
-Total Shards: [count]
-Operations per Shard: [min, max, mean]
-Global Hash: [final hash after 7 days]
-Chain Verified: [YES | NO]
+Total Shards: count]
+Operations per Shard: min, max, mean]
+Global Hash: final hash after 7 days]
+Chain Verified: YES | NO]
 ```
 
 ### 4.3 Replay Episodes
 
 ```
-Total Episodes: [count]
-3-Environment Validation: [pass/fail counts]
-Unique Episode IDs: [list all]
-Hash Variance Distribution: [0.0: X%, 1.0: Y%]
+Total Episodes: count]
+3-Environment Validation: pass/fail counts]
+Unique Episode IDs: list all]
+Hash Variance Distribution: 0.0: X%, 1.0: Y%]
 ```
 
 ---
@@ -216,26 +216,26 @@ Hash Variance Distribution: [0.0: X%, 1.0: Y%]
 
 | Timestamp | Trigger | Pre-State | Post-State | Recovery Time |
 |-----------|---------|-----------|------------|---------------|
-| [if any quarantine was triggered] |
+| if any quarantine was triggered] |
 
-**Total Quarantine Events**: [count]  
+**Total Quarantine Events**: count]  
 **Expected**: 0 (pilot should complete with zero quarantines)
 
 ### 5.2 Rollback Operations
 
 | Timestamp | Checkpoint ID | Reason | Operations Rolled Back |
 |-----------|---------------|--------|------------------------|
-| [if any rollbacks occurred] |
+| if any rollbacks occurred] |
 
-**Total Rollbacks**: [count]
+**Total Rollbacks**: count]
 
 ### 5.3 Governor Correction Analysis
 
 ```
-Total Correction Attempts: [count]
-Success Rate: [%]
-Convergence Failures: [count]
-Mean Correction Cycles: [value]
+Total Correction Attempts: count]
+Success Rate: %]
+Convergence Failures: count]
+Mean Correction Cycles: value]
 ```
 
 ---
@@ -245,24 +245,24 @@ Mean Correction Cycles: [value]
 ### 6.1 Coverage
 
 ```
-Total Operations: [count]
-Telemetry Records: [count]
-Completeness: [%]
+Total Operations: count]
+Telemetry Records: count]
+Completeness: %]
 Expected: ≥ 99.9%
 ```
 
 ### 6.2 Schema Validation
 
 ```
-Valid Records: [count / total]
-Malformed Records: [count]
-Violation Detections: [count]
+Valid Records: count / total]
+Malformed Records: count]
+Violation Detections: count]
 ```
 
 ### 6.3 Day-1 Deviation Log
 
 **Directive**: COHERENCE-01 v1.0.0  
-**Date**: [Day-1 activation date]  
+**Date**: Day-1 activation date]  
 **Status**: GOVERNED EXCEPTIONS
 
 This section documents deviations from the original pilot certification plan, resolved through architectural governance rather than infrastructure workarounds.
@@ -334,7 +334,7 @@ This section documents deviations from the original pilot certification plan, re
 
 **Original Concern**: Substrate monitoring running but substrate potentially idle (no request flow).
 
-**Resolution**: VERIFIED ACTIVE as of [Day-1 date]
+**Resolution**: VERIFIED ACTIVE as of Day-1 date]
 
 **Evidence**:
 ```
@@ -351,11 +351,11 @@ request_ids: 250614, 250616, 250617, 250619, 250622 (multiple IDs confirm flow)
 #### Certification Impact
 
 All deviations are **GOVERNED EXCEPTIONS** with:
-- ✅ Formal documentation
-- ✅ Versioned exception protocols
-- ✅ Residual risk assessment (all LOW)
-- ✅ Clear expiry conditions
-- ✅ Alternative validation methods defined
+-  Formal documentation
+-  Versioned exception protocols
+-  Residual risk assessment (all LOW)
+-  Clear expiry conditions
+-  Alternative validation methods defined
 
 **Certification Status**: All original requirements satisfied through architectural equivalence. No reduction in assurance level.
 
@@ -486,7 +486,7 @@ All deviations are **GOVERNED EXCEPTIONS** with:
 
 This section documents the interim Day-1 validation results. Full Day-1 completion pending 24-hour continuous monitoring window.
 
-#### Section 2: Pre-flight Verification — ✅ COMPLETE
+#### Section 2: Pre-flight Verification —  COMPLETE
 
 **Substrate Health**:
 - Pod: scg-mcp-7c7dc6f9d5-gw8t2
@@ -501,15 +501,15 @@ This section documents the interim Day-1 validation results. Full Day-1 completi
 - Conclusion: Substrate actively processing requests
 
 **Tooling Verification**:
-- ✅ validate-time-sync-proxy.ps1 (3,962 bytes)
-- ✅ monitor-invariants.ps1 (10,174 bytes)
-- ✅ aggregate-day1.ps1 (8,455 bytes)
-- ✅ SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0.md (6,315 bytes)
-- ✅ SCG_PILOT_REPLAY_HARNESS_v1.0.0.md (8,105 bytes)
+-  validate-time-sync-proxy.ps1 (3,962 bytes)
+-  monitor-invariants.ps1 (10,174 bytes)
+-  aggregate-day1.ps1 (8,455 bytes)
+-  SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0.md (6,315 bytes)
+-  SCG_PILOT_REPLAY_HARNESS_v1.0.0.md (8,105 bytes)
 
 ---
 
-#### Section 3: Time Sync Proxy Validation — ✅ COMPLETE
+#### Section 3: Time Sync Proxy Validation —  COMPLETE
 
 **Method**: k8s_heartbeat_proxy (per SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0.md)
 
@@ -545,7 +545,7 @@ This section documents the interim Day-1 validation results. Full Day-1 completi
 
 ---
 
-#### Section 5: Replay Harness Execution — ✅ COMPLETE
+#### Section 5: Replay Harness Execution —  COMPLETE
 
 **Method**: Canonical build/test harness (per SCG_PILOT_REPLAY_HARNESS_v1.0.0.md)
 
@@ -606,7 +606,7 @@ This section documents the interim Day-1 validation results. Full Day-1 completi
 
 ---
 
-#### Section 6: Telemetry Aggregation — 🔒 BLOCKED
+#### Section 6: Telemetry Aggregation —  BLOCKED
 
 **Status**: BLOCKED_BY_SECTION_4  
 **Dependency**: Requires §4 (24h monitoring) to complete
@@ -633,12 +633,12 @@ This section documents the interim Day-1 validation results. Full Day-1 completi
 
 | Criterion | Target | Status | Notes |
 |-----------|--------|--------|-------|
-| **Pre-flight checks** | All pass | ✅ PASS | Substrate healthy, telemetry active |
-| **Time sync validation** | ≤50ms skew | ✅ PASS_SLA | Azure SLA assurance, proxy failed but non-blocking |
-| **Replay determinism** | Variance = 0.0 | ✅ PASS | Canonical proof via build harness |
+| **Pre-flight checks** | All pass |  PASS | Substrate healthy, telemetry active |
+| **Time sync validation** | ≤50ms skew |  PASS_SLA | Azure SLA assurance, proxy failed but non-blocking |
+| **Replay determinism** | Variance = 0.0 |  PASS | Canonical proof via build harness |
 | **24h monitoring** | ~1,440 samples | ⏳ PENDING | Operator must initiate real-time window |
-| **Telemetry aggregation** | Summary JSON | 🔒 BLOCKED | Depends on 24h monitoring completion |
-| **Documentation** | Interim complete | ✅ DONE | This section documents interim state |
+| **Telemetry aggregation** | Summary JSON |  BLOCKED | Depends on 24h monitoring completion |
+| **Documentation** | Interim complete |  DONE | This section documents interim state |
 | **Git tag** | ACT-06_DAY1 | ⏳ READY | Can tag interim or wait for full completion |
 
 **Overall Day-1 Status**: **INTERIM_COMPLETE** — Core validations (time sync, replay) passed via exception protocols. 24h monitoring window pending operator initiation.
@@ -658,31 +658,31 @@ This section documents the interim Day-1 validation results. Full Day-1 completi
 ### 7.1 Latency Distribution (7-day aggregate)
 
 ```
-P50: [ms]
-P90: [ms]
-P95: [ms]
-P99: [ms]
-P99.9: [ms]
-Max: [ms]
+P50: ms]
+P90: ms]
+P95: ms]
+P99: ms]
+P99.9: ms]
+Max: ms]
 ```
 
 ### 7.2 Throughput
 
 ```
-Mean RPS: [value]
-Peak RPS: [value]
-Capacity Utilization: [%]
-Target Achievement: [% of 7500 RPS target]
+Mean RPS: value]
+Peak RPS: value]
+Capacity Utilization: %]
+Target Achievement: % of 7500 RPS target]
 ```
 
 ### 7.3 Resource Consumption
 
 ```
-Mean CPU: [cores]
-Peak CPU: [cores]
-Mean Memory: [GB]
-Peak Memory: [GB]
-Disk I/O: [MB/s]
+Mean CPU: cores]
+Peak CPU: cores]
+Mean Memory: GB]
+Peak Memory: GB]
+Disk I/O: MB/s]
 ```
 
 ---
@@ -693,32 +693,32 @@ Disk I/O: [MB/s]
 
 | Criterion | Target | Actual | Status |
 |-----------|--------|--------|--------|
-| **Continuous Operation** | 7 days | [actual] | [PASS/FAIL] |
-| **Energy Conservation** | ΔE ≤ 1×10⁻¹⁰ | [max observed] | [PASS/FAIL] |
-| **Coherence** | C(t) ≥ 0.97 | [min observed] | [PASS/FAIL] |
-| **ESV Validation** | 100% | [actual %] | [PASS/FAIL] |
-| **Lineage Integrity** | ε ≤ 1×10⁻¹⁰ | [max observed] | [PASS/FAIL] |
-| **Governor Convergence** | post < pre | [convergence rate %] | [PASS/FAIL] |
-| **Shard Rotation** | N = 250 | [variance from 250] | [PASS/FAIL] |
-| **Replay Variance** | 0.0 or 1.0 | [actual] | [PASS/FAIL] |
-| **Critical Failures** | 0 P0/P1 | [actual count] | [PASS/FAIL] |
-| **Telemetry Completeness** | ≥ 99.9% | [actual %] | [PASS/FAIL] |
+| **Continuous Operation** | 7 days | actual] | PASS/FAIL] |
+| **Energy Conservation** | ΔE ≤ 1×10⁻¹⁰ | max observed] | PASS/FAIL] |
+| **Coherence** | C(t) ≥ 0.97 | min observed] | PASS/FAIL] |
+| **ESV Validation** | 100% | actual %] | PASS/FAIL] |
+| **Lineage Integrity** | ε ≤ 1×10⁻¹⁰ | max observed] | PASS/FAIL] |
+| **Governor Convergence** | post < pre | convergence rate %] | PASS/FAIL] |
+| **Shard Rotation** | N = 250 | variance from 250] | PASS/FAIL] |
+| **Replay Variance** | 0.0 or 1.0 | actual] | PASS/FAIL] |
+| **Critical Failures** | 0 P0/P1 | actual count] | PASS/FAIL] |
+| **Telemetry Completeness** | ≥ 99.9% | actual %] | PASS/FAIL] |
 
 ### 8.2 Final Certification
 
-**Overall Status**: [CERTIFIED | NOT CERTIFIED | CONDITIONAL]
+**Overall Status**: CERTIFIED | NOT CERTIFIED | CONDITIONAL]
 
 **Rationale**:
-[Detailed explanation of certification decision]
+Detailed explanation of certification decision]
 
 **Sign-off Required**:
-- [ ] Technical Lead (substrate architecture)
-- [ ] Operations Lead (production readiness)
-- [ ] Security Lead (audit compliance)
-- [ ] Product Lead (business approval)
+-  ] Technical Lead (substrate architecture)
+-  ] Operations Lead (production readiness)
+-  ] Security Lead (audit compliance)
+-  ] Product Lead (business approval)
 
-**Certification Date**: [date]  
-**Valid Until**: [date + 12 months]
+**Certification Date**: date]  
+**Valid Until**: date + 12 months]
 
 ---
 
@@ -726,18 +726,18 @@ Disk I/O: [MB/s]
 
 ### 9.1 Immediate Actions
 
-- [Action item 1]
-- [Action item 2]
+- Action item 1]
+- Action item 2]
 
 ### 9.2 Future Enhancements
 
-- [Enhancement 1]
-- [Enhancement 2]
+- Enhancement 1]
+- Enhancement 2]
 
 ### 9.3 Monitoring Improvements
 
-- [Improvement 1]
-- [Improvement 2]
+- Improvement 1]
+- Improvement 2]
 
 ---
 
@@ -745,44 +745,44 @@ Disk I/O: [MB/s]
 
 ### Appendix A: Full Telemetry Dataset
 
-[Link to telemetry archive or attach compressed dataset]
+Link to telemetry archive or attach compressed dataset]
 
 ### Appendix B: Lineage Chain Export
 
 ```
-[Paste full lineage chain or provide link to export]
+Paste full lineage chain or provide link to export]
 ```
 
 ### Appendix C: Governor Correction Logs
 
 ```
-[Paste all GOVERNOR_CORRECTION logs or provide link]
+Paste all GOVERNOR_CORRECTION logs or provide link]
 ```
 
 ### Appendix D: Shard Finalization Logs
 
 ```
-[Paste all SHARD_FINALIZED logs or provide link]
+Paste all SHARD_FINALIZED logs or provide link]
 ```
 
 ### Appendix E: Test Results
 
 ```
 cargo test --release output:
-[Paste full test output showing 46/46 passing]
+Paste full test output showing 46/46 passing]
 ```
 
 ### Appendix F: Security Audit
 
-[If external security review was conducted, attach findings]
+If external security review was conducted, attach findings]
 
 ---
 
 ## Document Control
 
 **Version**: 1.0.0  
-**Last Updated**: [date]  
-**Next Review**: [date]  
+**Last Updated**: date]  
+**Next Review**: date]  
 **Owner**: SCG Substrate Team  
 **Classification**: Internal/Confidential
 
@@ -790,4 +790,4 @@ cargo test --release output:
 
 **END OF CERTIFICATION DOSSIER**
 
-*This document will be finalized after SCG-PILOT-01 completes on [end date].*
+*This document will be finalized after SCG-PILOT-01 completes on end date].*

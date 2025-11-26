@@ -1,4 +1,16 @@
 /target
-lineage.json
+
+# Transient logs and outputs
 *.log
+*.bak
+tmp/
+demo_output/
+demo_runs/
+*.ansi
+
+# Certification artifacts (generated)
+certification/v1.0/expected_results/lineage.json
 pilot_reports/day1/replay/variance_analysis.json
+
+# Backup directory
+.repo_cleanup_backup_2025/

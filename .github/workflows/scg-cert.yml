@@ -40,22 +40,21 @@ run: cargo clippy -- -D warnings -A dead_code
 
       - name: Run certification harness
         shell: pwsh
-        run: pwsh -NoProfile -File .\scg_certification_harness.ps1 -ServerPath .\target\release\scg_mcp_server.exe
+        run: pwsh -NoProfile -File .\certification\v1.0\harness\scg_certification_harness.ps1 -ServerPath .\target\release\scg_mcp_server.exe
 
       - name: Determinism validator v2.0
         shell: pwsh
         env:
           SCG_DETERMINISM: '1'
         run: |
-          Remove-Item "certification_report_*.json" -ErrorAction SilentlyContinue
-          pwsh -NoProfile -File .\scg_determinism_validator.ps1
+          Remove-Item "certification\v1.0\expected_results\certification_report_*.json" -ErrorAction SilentlyContinue
+          pwsh -NoProfile -File .\certification\v1.0\harness\scg_determinism_validator.ps1
 
       - name: Upload certification artifacts
         uses: actions/upload-artifact@v4
         with:
           name: scg-certification-artifacts
           path: |
-            certification_report_*.json
+            certification/v1.0/expected_results/*.json
             logs/**
-            detnorm*.txt
           if-no-files-found: ignore

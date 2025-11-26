@@ -4,8 +4,8 @@
 # Processes 24-hour telemetry window and generates certified Day-1 summary
 
 param(
-    [string]$CsvPath = ".\pilot-monitoring\day1\*.csv",
-    [string]$OutputPath = ".\pilot_reports\day1"
+    string]$CsvPath = ".\pilot-monitoring\day1\*.csv",
+    string]$OutputPath = ".\pilot_reports\day1"
 )
 
 Write-Host "================================================"
@@ -44,14 +44,14 @@ Write-Host ""
 Write-Host "Aggregating invariant metrics..." -ForegroundColor Cyan
 
 # Convert string values to numbers for measurement
-$energyDriftValues = $data.Energy_Drift | Where-Object { $_ -ne "0.0" -and $_ -ne "" } | ForEach-Object { [double]$_ }
-$coherenceValues = $data.Coherence | Where-Object { $_ -ne "1.0" -and $_ -ne "" } | ForEach-Object { [double]$_ }
-$esvRatioValues = $data.ESV_Valid_Ratio | Where-Object { $_ -ne "" } | ForEach-Object { [double]$_ }
+$energyDriftValues = $data.Energy_Drift | Where-Object { $_ -ne "0.0" -and $_ -ne "" } | ForEach-Object { double]$_ }
+$coherenceValues = $data.Coherence | Where-Object { $_ -ne "1.0" -and $_ -ne "" } | ForEach-Object { double]$_ }
+$esvRatioValues = $data.ESV_Valid_Ratio | Where-Object { $_ -ne "" } | ForEach-Object { double]$_ }
 $quarantineValues = $data.Quarantined | Where-Object { $_ -eq "true" -or $_ -eq "True" }
 
 # Energy Drift Analysis
 $energyStats = $energyDriftValues | Measure-Object -Average -Minimum -Maximum
-$summary = [ordered]@{
+$summary = ordered]@{
     day = 1
     timestamp_start = ($data | Select-Object -First 1).Timestamp
     timestamp_end = ($data | Select-Object -Last 1).Timestamp
@@ -131,10 +131,10 @@ if ($summary.quarantine_events -gt 0) {
 
 if ($violations.Count -eq 0) {
     $summary.status = "PASS"
-    Write-Host "✅ All invariant thresholds met - Day-1 PASS" -ForegroundColor Green
+    Write-Host " All invariant thresholds met - Day-1 PASS" -ForegroundColor Green
 } else {
     $summary.status = "FAIL"
-    Write-Host "❌ Invariant violations detected - Day-1 FAIL" -ForegroundColor Red
+    Write-Host " Invariant violations detected - Day-1 FAIL" -ForegroundColor Red
     foreach ($v in $violations) {
         Write-Host "  - $v" -ForegroundColor Red
     }
@@ -165,10 +165,10 @@ if (Test-Path $dossierPath) {
 
 | Invariant | Measurement | Threshold | Status |
 |-----------|-------------|-----------|--------|
-| Energy Drift (ΔE) | $($summary.avg_energy_drift) (max: $($summary.max_energy_drift)) | ≤1×10⁻¹⁰ | $(if ($summary.energy_drift_threshold_breaches -eq 0) { "✅ PASS" } else { "❌ FAIL" }) |
-| Coherence C(t) | $($summary.coherence_avg) (min: $($summary.coherence_min)) | ≥0.97 | $(if ($summary.coherence_threshold_breaches -eq 0) { "✅ PASS" } else { "❌ FAIL" }) |
-| ESV Valid Ratio | $($summary.esv_valid_ratio) | =1.0 | $(if ($summary.esv_valid_ratio -eq 1.0) { "✅ PASS" } else { "❌ FAIL" }) |
-| Quarantine Events | $($summary.quarantine_events) | =0 | $(if ($summary.quarantine_events -eq 0) { "✅ PASS" } else { "❌ FAIL" }) |
+| Energy Drift (ΔE) | $($summary.avg_energy_drift) (max: $($summary.max_energy_drift)) | ≤1×10⁻¹⁰ | $(if ($summary.energy_drift_threshold_breaches -eq 0) { " PASS" } else { " FAIL" }) |
+| Coherence C(t) | $($summary.coherence_avg) (min: $($summary.coherence_min)) | ≥0.97 | $(if ($summary.coherence_threshold_breaches -eq 0) { " PASS" } else { " FAIL" }) |
+| ESV Valid Ratio | $($summary.esv_valid_ratio) | =1.0 | $(if ($summary.esv_valid_ratio -eq 1.0) { " PASS" } else { " FAIL" }) |
+| Quarantine Events | $($summary.quarantine_events) | =0 | $(if ($summary.quarantine_events -eq 0) { " PASS" } else { " FAIL" }) |
 | Time Sync Skew | $($summary.time_sync_skew_ms) | ≤50ms | TBD |
 | Replay Variance | $($summary.replay_variance) | =0.0 | TBD |
 | Ledger Hash | $($summary.ledger_hash_valid) | Match | TBD |
@@ -186,9 +186,9 @@ $
 "@
     
     Add-Content -Path $dossierPath -Value $dossierEntry
-    Write-Host "✅ Dossier updated" -ForegroundColor Green
+    Write-Host " Dossier updated" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  CERTIFICATION_DOSSIER.md not found - skipping dossier update" -ForegroundColor Yellow
+    Write-Host "  CERTIFICATION_DOSSIER.md not found - skipping dossier update" -ForegroundColor Yellow
 }
 
 Write-Host ""

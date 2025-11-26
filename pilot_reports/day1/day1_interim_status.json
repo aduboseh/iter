@@ -1,13 +1,13 @@
 {
   "timestamp": "2025-11-18T16:54:02Z",
-  "next_steps": [
+  "next_steps": 
     "Operator initiates 24h monitoring window",
     "After 24h: Run aggregate-day1.ps1",
     "Update CERTIFICATION_DOSSIER.md with final metrics",
     "Tag: SG-SCG-PILOT-ACT-06_v1.0.0_DAY1_COMPLETE"
   ],
   "directive": "SG-SCG-PILOT-ACT-06 v1.0.0",
-  "pending_sections": [
+  "pending_sections": 
     {
       "blocker": "Requires real-time 24-hour execution window",
       "action_required": "Operator must initiate monitor-invariants.ps1 and wait 24h",
@@ -31,7 +31,7 @@
     }
   ],
   "status": "PARTIAL_COMPLETE_AWAITING_24H_WINDOW",
-  "completed_sections": [
+  "completed_sections": 
     {
       "substrate_health": "scg-mcp: 1/1 Ready, 0 restarts, Age >1 day",
       "section": "§2 Pre-flight",

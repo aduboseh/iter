@@ -55,12 +55,12 @@ This document defines the **Long-Term Support (LTS) versioning strategy** for th
 **LTS Period**: 24 months from v1.0.0-substrate release (2025-01-15 → 2027-01-15)
 
 **During LTS**:
-- ✅ Security patches expedited (v1.0.1, v1.0.2, etc.)
-- ✅ Critical bug fixes (energy drift, lineage corruption, etc.)
-- ✅ Clarification implementations (if new mathematical proofs emerge)
-- ❌ New features (deferred to v2.0.0-substrate or connectome v2.x)
-- ❌ Performance enhancements (unless security-critical)
-- ❌ API expansions (substrate API is frozen)
+-  Security patches expedited (v1.0.1, v1.0.2, etc.)
+-  Critical bug fixes (energy drift, lineage corruption, etc.)
+-  Clarification implementations (if new mathematical proofs emerge)
+-  New features (deferred to v2.0.0-substrate or connectome v2.x)
+-  Performance enhancements (unless security-critical)
+-  API expansions (substrate API is frozen)
 
 ---
 
@@ -165,11 +165,11 @@ The following substrate components are **ABSOLUTELY FROZEN** and cannot be modif
 
 | Connectome Version | Substrate Version | Status |
 |--------------------|-------------------|--------|
-| v2.0.0 | v1.0.0-substrate | ✅ Supported |
-| v2.0.0 | v1.0.1-substrate | ✅ Supported |
-| v2.1.0 | v1.0.0-substrate | ✅ Supported |
-| v2.1.0 | v1.0.2-substrate | ✅ Supported |
-| v3.0.0 | v1.0.x-substrate | ❌ Not compatible (requires v2.0.0-substrate) |
+| v2.0.0 | v1.0.0-substrate |  Supported |
+| v2.0.0 | v1.0.1-substrate |  Supported |
+| v2.1.0 | v1.0.0-substrate |  Supported |
+| v2.1.0 | v1.0.2-substrate |  Supported |
+| v3.0.0 | v1.0.x-substrate |  Not compatible (requires v2.0.0-substrate) |
 
 ---
 
@@ -372,7 +372,7 @@ main (substrate v1.0.x-substrate)
 
 **Example Log**:
 ```
-[SCG-STARTUP] substrate_version=v1.0.0-substrate connectome_version=v2.1.0 deployment_id=SCG-PILOT-01
+SCG-STARTUP] substrate_version=v1.0.0-substrate connectome_version=v2.1.0 deployment_id=SCG-PILOT-01
 ```
 
 ---
@@ -393,11 +393,11 @@ main (substrate v1.0.x-substrate)
 
 | Substrate Version | Release Date | EOL Date | Status |
 |-------------------|--------------|----------|--------|
-| v1.0.0-substrate | 2025-01-15 | 2027-01-15 | ✅ LTS Active |
+| v1.0.0-substrate | 2025-01-15 | 2027-01-15 |  LTS Active |
 
 | Connectome Version | Release Date | EOL Date | Substrate Compatibility | Status |
 |--------------------|--------------|----------|-------------------------|--------|
-| v2.0.0-alpha | TBD | TBD | v1.0.x-substrate | 🚧 Development |
+| v2.0.0-alpha | TBD | TBD | v1.0.x-substrate |  Development |
 | v2.0.0 | TBD | TBD | v1.0.x-substrate | ⏳ Planned (post-pilot) |
 
 ---

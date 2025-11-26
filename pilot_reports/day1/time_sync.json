@@ -6,7 +6,7 @@
   "node_count": 4,
   "status": "FAIL",
   "note": "Canonical ≤50ms sync externally assured via Azure SLA; heartbeat used as coarse cross-check.",
-  "nodes": [
+  "nodes": 
     {
       "name": "aks-defaultpool-13247224-vmss000000",
       "heartbeat": "2025-11-20T15:40:09.000Z"

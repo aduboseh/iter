@@ -1,6 +1,6 @@
 param(
     [int]$Runs = 3,
-    [string]$HarnessPath = ".\scg_certification_harness.ps1"
+    [string]$HarnessPath = ".\certification\v1.0\harness\scg_certification_harness.ps1"
 )
 
 $ErrorActionPreference = "Stop"

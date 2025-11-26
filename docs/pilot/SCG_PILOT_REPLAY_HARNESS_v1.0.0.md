@@ -26,14 +26,14 @@
 - kubectl logs parsing is unreliable for canonical determinism proof
 
 **What We Cannot Do**:
-- ❌ Run `scg_mcp_server replay` as a standalone command in pod
-- ❌ Parse STDOUT for replay hash via kubectl exec
-- ❌ Rely on log scraping for certification-grade evidence
+-  Run `scg_mcp_server replay` as a standalone command in pod
+-  Parse STDOUT for replay hash via kubectl exec
+-  Rely on log scraping for certification-grade evidence
 
 **What We Must Do Instead**:
-- ✅ Prove determinism via **build/test harness** outside AKS
-- ✅ Use **lineage hash** as the canonical determinism metric
-- ✅ AKS pod provides **supplementary ledger export** as cross-check
+-  Prove determinism via **build/test harness** outside AKS
+-  Use **lineage hash** as the canonical determinism metric
+-  AKS pod provides **supplementary ledger export** as cross-check
 
 ---
 
@@ -53,7 +53,7 @@ Determinism is proven by executing identical replay tests across **three indepen
 
 ```rust
 // tests/replay_episode_deterministic.rs
-#[test]
+#test]
 fn replay_episode_deterministic() {
     let seed = "DAY1_EPISODE";
     let cycles = 250;
@@ -118,8 +118,8 @@ Parse logs to extract `REPLAY_HASH` from each environment:
 # RUN THIS
 function Extract-ReplayHash($logFile) {
     $content = Get-Content $logFile -Raw
-    if ($content -match "REPLAY_HASH:\s*([a-f0-9]+)") {
-        return $matches[1]
+    if ($content -match "REPLAY_HASH:\s*(a-f0-9]+)") {
+        return $matches1]
     }
     return $null
 }
@@ -144,7 +144,7 @@ ANY hash mismatch  →  variance = 1.0  →  FAIL (non-deterministic)
 **Result Format**:
 ```json
 {
-  "environments": ["local", "docker", "ci"],
+  "environments": "local", "docker", "ci"],
   "hashes": {
     "local":  "abc123...",
     "docker": "abc123...",
@@ -183,9 +183,9 @@ $hash_aks = (Get-FileHash -Path "pilot_reports/day1/ledger_aks.bin" -Algorithm S
 ```powershell
 # RUN THIS
 if ($hash_aks -eq $hashLocal) {
-    Write-Host "✅ AKS ledger matches harness" -ForegroundColor Green
+    Write-Host " AKS ledger matches harness" -ForegroundColor Green
 } else {
-    Write-Host "⚠️ AKS ledger diverged from harness" -ForegroundColor Yellow
+    Write-Host " AKS ledger diverged from harness" -ForegroundColor Yellow
     Write-Host "  This is INFORMATIONAL, not a failure" -ForegroundColor Yellow
     Write-Host "  Canonical proof is harness-based" -ForegroundColor Yellow
 }
@@ -230,7 +230,7 @@ Future substrate releases SHOULD implement:
 
 3. **Telemetry-Embedded Hash**:
    ```
-   [TELEMETRY] replay_hash=abc123... seed=DAY1_EPISODE cycles=250
+   TELEMETRY] replay_hash=abc123... seed=DAY1_EPISODE cycles=250
    ```
 
 **Until then**, harness-based validation remains canonical.

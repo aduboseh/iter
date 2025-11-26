@@ -91,7 +91,7 @@ kubectl set env deployment/scg-mcp \
 Warp MUST validate substrate log emission:
 
 ```bash
-kubectl logs -f deploy/scg-mcp -n scg-pilot-01 | grep "\[TELEMETRY\]"
+kubectl logs -f deploy/scg-mcp -n scg-pilot-01 | grep "\TELEMETRY\]"
 ```
 
 **Done-When**: 
@@ -186,11 +186,11 @@ Warp SHALL begin daily pilot cycles:
 
 Warp SHALL complete SCG-PILOT-01 **only when**:
 
-- ✅ Seven consecutive days show **zero invariant breaches**
-- ✅ All replay episodes produce **identical hashes** across environments
-- ✅ Global ledger hash reconstruction is **identical** for all 7 days
-- ✅ **No quarantines**, governor divergence, or telemetry gaps
-- ✅ Certification Dossier is fully populated and SHA256-signed as `scg_substrate_certification_dossier_v1.0.0.tar.gz`
+-  Seven consecutive days show **zero invariant breaches**
+-  All replay episodes produce **identical hashes** across environments
+-  Global ledger hash reconstruction is **identical** for all 7 days
+-  **No quarantines**, governor divergence, or telemetry gaps
+-  Certification Dossier is fully populated and SHA256-signed as `scg_substrate_certification_dossier_v1.0.0.tar.gz`
 
 Upon completion, Warp SHALL submit `SCG_PILOT_01_FINAL_REPORT.md`.
 
@@ -203,25 +203,25 @@ Upon completion, Warp SHALL submit `SCG_PILOT_01_FINAL_REPORT.md`.
 Warp SHALL:
 
 ### Network Security
-- ✅ Verify and enforce network policies to isolate `scg-pilot-01` namespace
-- ✅ Block all external ingress except pod-to-pod communication
-- ✅ Allow egress only to DNS, internal pods, and telemetry collectors (ports 4317, 4318, 9090)
+-  Verify and enforce network policies to isolate `scg-pilot-01` namespace
+-  Block all external ingress except pod-to-pod communication
+-  Allow egress only to DNS, internal pods, and telemetry collectors (ports 4317, 4318, 9090)
 
 ### Resource Management
-- ✅ Enforce CPU limits: **max 4 cores** per substrate
-- ✅ Enforce memory limits: **max 12GB** per namespace
-- ✅ Monitor I/O quotas per pilot manifest
-- ✅ Maintain storage: 10GB telemetry + 20GB lineage + 10GB OTEL collector
+-  Enforce CPU limits: **max 4 cores** per substrate
+-  Enforce memory limits: **max 12GB** per namespace
+-  Monitor I/O quotas per pilot manifest
+-  Maintain storage: 10GB telemetry + 20GB lineage + 10GB OTEL collector
 
 ### Telemetry Configuration
-- ✅ Configure exporter buffers capped at **20MB**
-- ✅ Auto-flush every **5 seconds**
-- ✅ File rotation: 100MB per file, 7 days retention, 30 backups
+-  Configure exporter buffers capped at **20MB**
+-  Auto-flush every **5 seconds**
+-  File rotation: 100MB per file, 7 days retention, 30 backups
 
 ### Alerting & Escalation
-- ⚠️ Escalate if invariant violations exceed threshold
-- ⚠️ Auto-remediate if ≥2 quarantine events within any 60-minute window
-- ⚠️ Generate incident reports for any substrate violations
+-  Escalate if invariant violations exceed threshold
+-  Auto-remediate if ≥2 quarantine events within any 60-minute window
+-  Generate incident reports for any substrate violations
 
 ### Daily Validation
 - ⏳ Perform NTP/PTP synchronization validation
@@ -236,14 +236,14 @@ Warp SHALL:
 
 | Timestamp | Action | Status |
 |-----------|--------|--------|
-| 2025-11-17 10:05 UTC | OTEL Collector manifest created | ✅ Complete |
-| 2025-11-17 10:06 UTC | OTEL Collector deployed | ✅ Complete |
-| 2025-11-17 10:10 UTC | Resource quota adjusted (4 CPU substrate limit) | ✅ Complete |
-| 2025-11-17 10:11 UTC | OTEL Collector configuration fixed | ✅ Complete |
-| 2025-11-17 10:13 UTC | Health probes corrected (port 8888) | ✅ Complete |
-| 2025-11-17 10:13 UTC | OTEL Collector operational (1/1 Running) | ✅ Complete |
-| 2025-11-17 10:14 UTC | SCG-MCP configured with OTEL endpoint | ✅ Complete |
-| 2025-11-17 10:14 UTC | Both pods running (OTEL + SCG-MCP) | ✅ Complete |
+| 2025-11-17 10:05 UTC | OTEL Collector manifest created |  Complete |
+| 2025-11-17 10:06 UTC | OTEL Collector deployed |  Complete |
+| 2025-11-17 10:10 UTC | Resource quota adjusted (4 CPU substrate limit) |  Complete |
+| 2025-11-17 10:11 UTC | OTEL Collector configuration fixed |  Complete |
+| 2025-11-17 10:13 UTC | Health probes corrected (port 8888) |  Complete |
+| 2025-11-17 10:13 UTC | OTEL Collector operational (1/1 Running) |  Complete |
+| 2025-11-17 10:14 UTC | SCG-MCP configured with OTEL endpoint |  Complete |
+| 2025-11-17 10:14 UTC | Both pods running (OTEL + SCG-MCP) |  Complete |
 
 ### Current Infrastructure State
 
@@ -313,12 +313,12 @@ RESOURCE QUOTA:
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| OTEL Collector Uptime | 7 days | 0 hours | ✅ Running |
-| Telemetry Pipeline Active | Yes | Yes | ✅ Complete |
-| Substrate OTEL Binding | Configured | Configured | ✅ Complete |
-| Resource Limits Enforced | 4 CPU / 12GB | 4.5 CPU / 10.25GB | ✅ Compliant |
-| Network Isolation | Enforced | Enforced | ✅ Complete |
-| Storage Provisioned | 40GB | 40GB Bound | ✅ Complete |
+| OTEL Collector Uptime | 7 days | 0 hours |  Running |
+| Telemetry Pipeline Active | Yes | Yes |  Complete |
+| Substrate OTEL Binding | Configured | Configured |  Complete |
+| Resource Limits Enforced | 4 CPU / 12GB | 4.5 CPU / 10.25GB |  Compliant |
+| Network Isolation | Enforced | Enforced |  Complete |
+| Storage Provisioned | 40GB | 40GB Bound |  Complete |
 | Time Sync Validated | ≤50ms | Pending | ⏳ Scheduled |
 | Invariant Monitoring | Active | Ready | ⏳ Activation pending |
 | Daily Reports | 7 days | 0 days | ⏳ Day-0 baseline |
@@ -335,11 +335,11 @@ RESOURCE QUOTA:
 
 ### Approval Chain
 
-- ✅ Issued by: Armonti Du-Bose-Hill (Substrate Sovereign Authority)
-- ✅ Executed by: Warp AI Terminal
-- ✅ Repository: `github.com/aduboseh/scg-mcp`
-- ✅ Commit: TBD (pending final commit)
-- ✅ Tag: `SG-SCG-PILOT-AUTH-02_v2.1.0`
+-  Issued by: Armonti Du-Bose-Hill (Substrate Sovereign Authority)
+-  Executed by: Warp AI Terminal
+-  Repository: `github.com/aduboseh/scg-mcp`
+-  Commit: TBD (pending final commit)
+-  Tag: `SG-SCG-PILOT-AUTH-02_v2.1.0`
 
 ### Audit Trail
 
@@ -388,20 +388,20 @@ If namespace hits resource limits:
 
 ## SECTION 14 — Certification Readiness
 
-### Prerequisites (All Met ✅)
+### Prerequisites (All Met )
 
-- ✅ Kubernetes cluster accessible and stable
-- ✅ Container registry operational (scgpilotacr.azurecr.io)
-- ✅ Substrate image built and pushed (v1.0.0-substrate)
-- ✅ Namespace isolated with NetworkPolicies
-- ✅ Resource quotas enforced
-- ✅ RBAC configured with minimal permissions
-- ✅ Persistent storage provisioned and bound
+-  Kubernetes cluster accessible and stable
+-  Container registry operational (scgpilotacr.azurecr.io)
+-  Substrate image built and pushed (v1.0.0-substrate)
+-  Namespace isolated with NetworkPolicies
+-  Resource quotas enforced
+-  RBAC configured with minimal permissions
+-  Persistent storage provisioned and bound
 
 ### Day-0 Baseline Tasks (In Progress ⏳)
 
-- ✅ OTEL collector deployed and operational
-- ✅ Substrate configured with OTEL endpoint
+-  OTEL collector deployed and operational
+-  Substrate configured with OTEL endpoint
 - ⏳ Time synchronization validated
 - ⏳ Invariant monitoring activated with real data
 - ⏳ First 24h telemetry collection
@@ -424,7 +424,7 @@ If namespace hits resource limits:
 
 This directive is considered **complete** when:
 
-1. ✅ Telemetry pipeline is operational (OTEL collector + substrate binding)
+1.  Telemetry pipeline is operational (OTEL collector + substrate binding)
 2. ⏳ Invariant monitoring is active with real data
 3. ⏳ Time synchronization is validated across all nodes
 4. ⏳ Day-0 baseline is established

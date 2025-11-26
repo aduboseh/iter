@@ -1,0 +1,6 @@
+Timestamp,PodStatus,Energy_Drift,Coherence,ESV_Valid_Ratio,Lineage_Epsilon,Quarantined,Governor_Delta,Shard_Count,Replay_Variance,Status
+2025-11-18 22:47:00,True,0,1,1,0,False,0,0,0,HEALTHY
+2025-11-18 22:48:03,True,0,1,1,0,False,0,0,0,DEGRADED
+2025-11-18 22:49:05,True,0,1,1,0,False,0,0,0,DEGRADED
+2025-11-18 22:50:06,True,0,1,1,0,False,0,0,0,DEGRADED
+2025-11-18 22:51:08,True,0,1,1,0,False,0,0,0,DEGRADED

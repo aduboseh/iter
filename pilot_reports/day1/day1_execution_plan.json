@@ -18,7 +18,7 @@
     "duration_hours": 24
   },
   "section_2_5": {
-    "resume_actions": [
+    "resume_actions": 
       "§2: Run aggregate-day1.ps1",
       "§3: Update CERTIFICATION_DOSSIER.md with final metrics",
       "§4: Commit and tag DAY1_COMPLETE",

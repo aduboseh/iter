@@ -9,7 +9,7 @@
   "directive": "SG-SCG-PILOT-ACT-06 v1.0.0 §5",
   "status": "PASS_CANONICAL",
   "method": "SCG_PILOT_REPLAY_HARNESS_v1.0.0",
-  "environments": [
+  "environments": 
     {
       "note": "Deterministic scenario generation validated via cargo test",
       "test": "test_scenario_generation_deterministic",

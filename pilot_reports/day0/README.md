@@ -15,10 +15,10 @@ This directory contains Day-0 baseline measurements for the SCG-PILOT-01 7-day c
 
 | File | Status | Purpose |
 |------|--------|---------|
-| `day0_summary_template.json` | ✅ Ready | Template awaiting real measurements |
-| `day0_attestation.md` | ✅ Complete | Day-0 preparation documentation |
+| `day0_summary_template.json` |  Ready | Template awaiting real measurements |
+| `day0_attestation.md` |  Complete | Day-0 preparation documentation |
 | `day0_summary_final.json` | ⏳ Pending | Final baseline (6-12h collection) |
-| `README.md` | ✅ This file | Directory documentation |
+| `README.md` |  This file | Directory documentation |
 
 ---
 
@@ -61,15 +61,15 @@ $energyDrift = $data | Measure-Object -Property Energy_Drift -Average -Minimum -
 
 # Verify all invariants pass
 $violations = $data | Where-Object { 
-    [double]$_.Energy_Drift -gt 1e-10 -or 
-    [double]$_.Coherence -lt 0.97 -or
-    [int]$_.Quarantine_Events -gt 0
+    double]$_.Energy_Drift -gt 1e-10 -or 
+    double]$_.Coherence -lt 0.97 -or
+    int]$_.Quarantine_Events -gt 0
 }
 
 if ($violations.Count -eq 0) {
-    Write-Host "✅ Baseline VALID - All invariants passed" -ForegroundColor Green
+    Write-Host " Baseline VALID - All invariants passed" -ForegroundColor Green
 } else {
-    Write-Host "❌ Baseline INVALID - $($violations.Count) violations detected" -ForegroundColor Red
+    Write-Host " Baseline INVALID - $($violations.Count) violations detected" -ForegroundColor Red
 }
 ```
 
