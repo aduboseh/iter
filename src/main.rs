@@ -1,13 +1,13 @@
-mod types;
-mod scg_core;
-mod mcp_handler;
 mod fault;
-mod telemetry;
 mod lineage;
+mod mcp_handler;
+mod scg_core;
+mod telemetry;
+mod types;
 
 use crate::mcp_handler::handle_rpc;
 use crate::scg_core::ScgRuntime;
-use crate::types::{RpcRequest, RpcResponse};
+use crate::types::RpcRequest;
 use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 
@@ -37,8 +37,8 @@ fn run_stdio_server() {
                     Ok(req) => {
                         let resp = handle_rpc(&runtime, req);
                         if let Ok(json) = serde_json::to_string(&resp) {
-                            let _ = writeln!(stdout, "{}", json);
-                            let _ = stdout.flush();
+                            writeln!(stdout, "{}", json).expect("stdout write failed");
+                            stdout.flush().expect("stdout flush failed");
                         }
                     }
                     Err(e) => {
@@ -52,8 +52,8 @@ fn run_stdio_server() {
                             }
                         });
                         if let Ok(json) = serde_json::to_string(&error_resp) {
-                            let _ = writeln!(stdout, "{}", json);
-                            let _ = stdout.flush();
+                            writeln!(stdout, "{}", json).expect("stdout write failed");
+                            stdout.flush().expect("stdout flush failed");
                         }
                     }
                 }
