@@ -1,0 +1,76 @@
+{
+  "episode_id": "synthetic_violation_001",
+  "export_checksum": "sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+  "operation_chain": [
+    {
+      "id": "00000001-0000-0000-0000-000000000001",
+      "op": "node.create:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "00000002-0000-0000-0000-000000000002",
+      "op": "node.create:b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "checksum": "f1a2b3c4d5e6f7890123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000003",
+      "op": "node.create:c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "checksum": "a2b3c4d5e6f7a8901234567890abcdef1234567890abcdef1234567890abcdef"
+    },
+    {
+      "id": "00000004-0000-0000-0000-000000000004",
+      "op": "node.create:d4e5f6a7-b8c9-0123-defa-234567890123",
+      "checksum": "b3c4d5e6f7a8b9012345678901abcdef2345678901abcdef2345678901abcdef"
+    },
+    {
+      "id": "00000005-0000-0000-0000-000000000005",
+      "op": "node.create:e5f6a7b8-c9d0-1234-efab-345678901234",
+      "checksum": "c4d5e6f7a8b9c0123456789012abcdef3456789012abcdef3456789012abcdef"
+    },
+    {
+      "id": "00000006-0000-0000-0000-000000000006",
+      "op": "edge.bind:f1a2b3c4-d5e6-7890-1234-567890abcdef",
+      "checksum": "d5e6f7a8b9c0d1234567890123abcdef4567890123abcdef4567890123abcdef"
+    },
+    {
+      "id": "00000007-0000-0000-0000-000000000007",
+      "op": "edge.bind:f2b3c4d5-e6f7-8901-2345-67890abcdef1",
+      "checksum": "e6f7a8b9c0d1e2345678901234abcdef5678901234abcdef5678901234abcdef"
+    },
+    {
+      "id": "00000008-0000-0000-0000-000000000008",
+      "op": "edge.bind:f3c4d5e6-f7a8-9012-3456-7890abcdef12",
+      "checksum": "f7a8b9c0d1e2f3456789012345abcdef6789012345abcdef6789012345abcdef"
+    },
+    {
+      "id": "00000009-0000-0000-0000-000000000009",
+      "op": "edge.bind:f4d5e6f7-a8b9-0123-4567-890abcdef123",
+      "checksum": "a8b9c0d1e2f3a4567890123456abcdef7890123456abcdef7890123456abcdef"
+    },
+    {
+      "id": "00000010-0000-0000-0000-000000000010",
+      "op": "edge.bind:f5e6f7a8-b9c0-1234-5678-90abcdef1234",
+      "checksum": "b9c0d1e2f3a4b5678901234567abcdef8901234567abcdef8901234567abcdef"
+    },
+    {
+      "id": "00000011-0000-0000-0000-000000000011",
+      "op": "edge.propagate:f1a2b3c4-d5e6-7890-1234-567890abcdef",
+      "checksum": "c0d1e2f3a4b5c6789012345678abcdef9012345678abcdef9012345678abcdef"
+    },
+    {
+      "id": "00000012-0000-0000-0000-000000000012",
+      "op": "edge.propagate:f3c4d5e6-f7a8-9012-3456-7890abcdef12",
+      "checksum": "d1e2f3a4b5c6d7890123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "id": "00000013-0000-0000-0000-000000000013",
+      "op": "edge.propagate.selfloop:f4d5e6f7-a8b9-0123-4567-890abcdef123",
+      "checksum": "e2f3a4b5c6d7e8901234567890abcdef1234567890abcdef1234567890abcdef"
+    }
+  ],
+  "invariant_proof": {
+    "drift_before": 0.0,
+    "drift_after": 0.0,
+    "coherence_preserved": true
+  }
+}

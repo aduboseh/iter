@@ -1,0 +1,53 @@
+# SCG Demo Configuration - Determinism Mode
+# Version: 1.0 (Production Edition)
+# This config ensures cross-run reproducibility by eliminating timestamp noise.
+
+[governor]
+# Fixed timestamp source for deterministic lineage checksums
+timestamp_source = "fixed"
+# Deterministic epoch: 2023-11-14T22:13:20Z (arbitrary stable anchor)
+fixed_epoch = 1700000000
+# Enable determinism mode to suppress all dynamic noise
+determinism_mode = true
+# Energy drift threshold (thermodynamic invariant)
+drift_threshold = 1e-10
+# Coherence threshold (ESV validity ratio)
+coherence_threshold = 0.97
+
+[telemetry]
+# Enable telemetry for observability
+enable = true
+# Suppress timestamps in telemetry output (determinism)
+include_timestamps = false
+# Suppress PID in telemetry output (determinism)
+include_pid = false
+# Telemetry interval (ms) - only relevant when timestamps enabled
+interval_ms = 1000
+
+[execution]
+# Silent mode: suppress INFO/DEBUG chatter to stdout
+silent_mode = true
+# Log level: only emit errors to stderr
+log_level = "error"
+# Filter these log levels from stdout
+stdout_filter = ["INFO", "DEBUG", "TRACE"]
+# Preserve lineage receipts for audit trail
+preserve_receipts = true
+# Maximum operations before forced checkpoint
+max_ops_before_checkpoint = 1000
+
+[esv]
+# Ethical State Vector configuration
+threshold = 1.0
+# Violation error code (JSON-RPC)
+violation_code = -32001
+# Violation message template
+violation_message = "Ethical constraint violation"
+
+[lineage]
+# Enable cryptographic lineage checksums
+enable_checksums = true
+# Hash algorithm for lineage chain
+hash_algorithm = "sha256"
+# Export format
+export_format = "json"
