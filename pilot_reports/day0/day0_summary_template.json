@@ -35,7 +35,7 @@
     "notes": "Awaiting first 6-12 hours of continuous telemetry for valid baseline."
   },
   
-  "operational_notes": [
+  "operational_notes": 
     "Substrate stabilized after controlled restart (§3.1 protocol)",
     "Quarantine cleared by reducing energy allocation to 1e-12",
     "Request generator adjusted to ultra-conservative profile",

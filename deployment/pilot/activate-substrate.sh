@@ -74,15 +74,15 @@ generate_requests() {
         sleep 0.01
         
         # Log progress every 1000 requests
-        if [ $((request_id % 1000)) -eq 0 ]; then
-            echo "[ACTIVATION] Sent ${request_id} requests (cycle ${cycle})" >&2
+        if  $((request_id % 1000)) -eq 0 ]; then
+            echo "ACTIVATION] Sent ${request_id} requests (cycle ${cycle})" >&2
         fi
     done
 }
 
 # Start substrate server with request generator piped to stdin
-echo "[ACTIVATION] Launching substrate with synthetic request stream..."
-echo "[ACTIVATION] Target RPS: ~100 (well below 7500 limit)"
+echo "ACTIVATION] Launching substrate with synthetic request stream..."
+echo "ACTIVATION] Target RPS: ~100 (well below 7500 limit)"
 echo ""
 
 # Generate requests and pipe to substrate

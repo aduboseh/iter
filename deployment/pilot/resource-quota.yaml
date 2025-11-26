@@ -8,11 +8,11 @@ metadata:
     component: resource-management
 spec:
   hard:
-    # CPU limits per Directive §2.3
+    # CPU limits per Directive S2.3
     requests.cpu: "2"      # 2 cores guaranteed
     limits.cpu: "6"        # 6 cores burst max
     
-    # Memory limits per Directive §2.3
+    # Memory limits per Directive S2.3
     requests.memory: "4Gi"   # 4GB guaranteed
     limits.memory: "12Gi"    # 12GB burst max
     
@@ -33,7 +33,7 @@ metadata:
     component: resource-management
 spec:
   limits:
-    # Container defaults (aligned with Directive §2.3)
+    # Container defaults (aligned with Directive S2.3)
     - type: Container
       default:
         cpu: "2"
@@ -42,8 +42,8 @@ spec:
         cpu: "1"
         memory: "2Gi"
       max:
-        cpu: "6"  # Directive §2.3: 6 cores burst max
-        memory: "12Gi"  # Directive §2.3: 12GB burst max
+        cpu: "6"  # Directive S2.3: 6 cores burst max
+        memory: "12Gi"  # Directive S2.3: 12GB burst max
       min:
         cpu: "100m"
         memory: "128Mi"

@@ -52,7 +52,7 @@ Every governor correction attempt is logged with full traceability:
 ### Audit Trail
 
 All correction attempts are:
-- Logged to stderr with `[GOVERNOR_CORRECTION]` prefix
+- Logged to stderr with `GOVERNOR_CORRECTION]` prefix
 - Stored in memory for runtime inspection
 - Exportable to JSON for audit compliance
 
@@ -196,7 +196,7 @@ test test_shard_finalization .................. ok
   "seed": 42,
   "scenario": "tool_chain_inference_5_steps",
   "cycle_count": 250,
-  "environments": [
+  "environments": 
     {
       "name": "local",
       "config": "scg_pilot_config.json",
@@ -305,7 +305,7 @@ test test_replay_protocol ..................... ok
 ```
 cargo build --release
    Compiling scg_mcp_server v0.1.0
-   Finished release [optimized] target(s) in 5.43s
+   Finished release optimized] target(s) in 5.43s
 ```
 
 ### Test Status
@@ -336,24 +336,24 @@ These clarifications are now integrated into the deployment pipeline:
 
 ```powershell
 # Monitor governor correction attempts
-cargo run --release 2>&1 | Select-String -Pattern "\[GOVERNOR_CORRECTION\]"
+cargo run --release 2>&1 | Select-String -Pattern "\GOVERNOR_CORRECTION\]"
 ```
 
 Expected output:
 ```json
-[GOVERNOR_CORRECTION] {"attempt_id":"...","correction_status":"success","pre_delta":1e-9,"post_delta":5e-11,"converged":true}
+GOVERNOR_CORRECTION] {"attempt_id":"...","correction_status":"success","pre_delta":1e-9,"post_delta":5e-11,"converged":true}
 ```
 
 ### Shard Finalization Tracking
 
 ```powershell
 # Monitor shard finalization events
-cargo run --release 2>&1 | Select-String -Pattern "\[SHARD_FINALIZED\]"
+cargo run --release 2>&1 | Select-String -Pattern "\SHARD_FINALIZED\]"
 ```
 
 Expected output:
 ```
-[SHARD_FINALIZED] Shard 0 (ops 0-249) hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+SHARD_FINALIZED] Shard 0 (ops 0-249) hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ```
 
 ### Replay Episode Validation

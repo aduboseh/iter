@@ -9,7 +9,7 @@
 
 ## Current State
 
-### ✅ Section 1: 24-Hour Monitoring — ACTIVE
+###  Section 1: 24-Hour Monitoring — ACTIVE
 
 **Job Details:**
 - Job ID: 3
@@ -44,9 +44,9 @@ Get-ChildItem '.\pilot-monitoring\day1\20251118_181506' -Filter *.csv
 # RUN THIS
 $job = Get-Job -Name 'SCG-Day1-Monitoring'
 if ($job.State -eq 'Running') {
-    Write-Host "✅ Monitoring active" -ForegroundColor Green
+    Write-Host " Monitoring active" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  Job state: $($job.State)" -ForegroundColor Yellow
+    Write-Host "  Job state: $($job.State)" -ForegroundColor Yellow
 }
 ```
 
@@ -55,7 +55,7 @@ if ($job.State -eq 'Running') {
 # RUN THIS
 $sampleCount = (Import-Csv '.\pilot-monitoring\day1\20251118_181506\invariants.csv').Count
 $hoursElapsed = ((Get-Date) - (Get-Date "2025-11-18T18:15:05Z")).TotalHours
-$expectedSamples = [int]($hoursElapsed * 60)
+$expectedSamples = int]($hoursElapsed * 60)
 Write-Host "Samples collected: $sampleCount / ~$expectedSamples expected" -ForegroundColor Cyan
 ```
 
@@ -68,7 +68,7 @@ kubectl get pod -n scg-pilot-01 -l app=scg-mcp -o wide
 **4. Check for invariant violations:**
 ```powershell
 # RUN THIS
-Receive-Job -Name 'SCG-Day1-Monitoring' -Keep | Select-String -Pattern "⚠️|❌|VIOLATION|QUARANTINE" | Select-Object -Last 10
+Receive-Job -Name 'SCG-Day1-Monitoring' -Keep | Select-String -Pattern "||VIOLATION|QUARANTINE" | Select-Object -Last 10
 ```
 
 ---
@@ -116,7 +116,7 @@ Start-Job -ScriptBlock $jobScript -ArgumentList "scg-pilot-01", 60, ".\pilot-mon
 ```powershell
 # RUN THIS
 kubectl get pod -n scg-pilot-01 -l app=scg-mcp -o json | ConvertFrom-Json | `
-    ForEach-Object { $_.items[0].status.containerStatuses[0].restartCount }
+    ForEach-Object { $_.items0].status.containerStatuses0].restartCount }
 ```
 
 **Action:**
@@ -153,21 +153,21 @@ $sampleCount = (Import-Csv '.\pilot-monitoring\day1\20251118_181506\invariants.c
 Write-Host "Total samples: $sampleCount" -ForegroundColor Cyan
 Write-Host "Target: ~1,440" -ForegroundColor Gray
 if ($sampleCount -ge 1400) {
-    Write-Host "✅ Sample count sufficient for Day-1 certification" -ForegroundColor Green
+    Write-Host " Sample count sufficient for Day-1 certification" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  Sample count below target - review interruptions" -ForegroundColor Yellow
+    Write-Host "  Sample count below target - review interruptions" -ForegroundColor Yellow
 }
 ```
 
 **2. Check for P0 violations:**
 ```powershell
 # RUN THIS
-$violations = Receive-Job -Name 'SCG-Day1-Monitoring' -Keep | Select-String -Pattern "❌|QUARANTINE"
+$violations = Receive-Job -Name 'SCG-Day1-Monitoring' -Keep | Select-String -Pattern "|QUARANTINE"
 if ($violations) {
-    Write-Host "⚠️  P0 violations detected - review before proceeding" -ForegroundColor Red
+    Write-Host "  P0 violations detected - review before proceeding" -ForegroundColor Red
     $violations | Select-Object -Last 20
 } else {
-    Write-Host "✅ No P0 violations - ready for aggregation" -ForegroundColor Green
+    Write-Host " No P0 violations - ready for aggregation" -ForegroundColor Green
 }
 ```
 
@@ -177,7 +177,7 @@ if ($violations) {
 Stop-Job -Name 'SCG-Day1-Monitoring'
 Receive-Job -Name 'SCG-Day1-Monitoring' | Out-File -FilePath ".\pilot-monitoring\day1\monitoring_full_output.log" -Encoding UTF8
 Remove-Job -Name 'SCG-Day1-Monitoring'
-Write-Host "✅ Monitoring job stopped and logged"
+Write-Host " Monitoring job stopped and logged"
 ```
 
 ### Execute ACT-07 Sections 2-5

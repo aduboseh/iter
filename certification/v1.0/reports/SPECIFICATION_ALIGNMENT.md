@@ -30,7 +30,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Test Coverage**: `tests/integration_validation.rs::energy_conservation_tracking`
 - **Telemetry**: Every operation emits energy snapshot via `TelemetryEmitter`
 
-**Alignment**: ✅ **EXACT** — Math Foundation threshold implemented without relaxation
+**Alignment**:  **EXACT** — Math Foundation threshold implemented without relaxation
 
 ---
 
@@ -48,7 +48,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Test Coverage**: `tests/integration_validation.rs::coherence_calculation`
 - **Telemetry**: Coherence ratio emitted with every operation
 
-**Alignment**: ✅ **EXACT** — Coherence threshold matches Math Foundation specification
+**Alignment**:  **EXACT** — Coherence threshold matches Math Foundation specification
 
 ---
 
@@ -67,7 +67,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Test Coverage**: `tests/hardening_fuzz.rs::fuzz_esv_bypass_attempt`
 - **Telemetry**: ESV violations logged with `violation_detected: true`
 
-**Alignment**: ✅ **EXACT** — ESV formula and threshold from Math Foundations
+**Alignment**:  **EXACT** — ESV formula and threshold from Math Foundations
 
 ---
 
@@ -87,7 +87,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Test Coverage**: `tests/integration_validation.rs` + clarification tests
 - **Telemetry**: Episode hashes and variance logged
 
-**Alignment**: ✅ **EXACT** — Replay variance threshold matches Math Foundations
+**Alignment**:  **EXACT** — Replay variance threshold matches Math Foundations
 
 ---
 
@@ -103,11 +103,11 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
   - Logs post_delta after correction
   - **Convergence status**: success (post < pre), partial/failed (post ≥ pre)
   - Cycle counting and magnitude tracking
-- **Enforcement**: Logged to stderr with `[GOVERNOR_CORRECTION]` prefix
+- **Enforcement**: Logged to stderr with `GOVERNOR_CORRECTION]` prefix
 - **Test Coverage**: 4 clarification tests (logging, tracking, status, cycles)
 - **Telemetry**: All correction attempts immutably logged
 
-**Alignment**: ✅ **EXACT** — Convergence criterion from Math Foundations
+**Alignment**:  **EXACT** — Convergence criterion from Math Foundations
 
 ---
 
@@ -122,11 +122,11 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
   - No partial operations across boundaries (atomicity)
   - Global hash computed in ascending shard order
   - Immutable shard records (no post-hoc modifications)
-- **Enforcement**: Logged to stderr with `[SHARD_FINALIZED]`
+- **Enforcement**: Logged to stderr with `SHARD_FINALIZED]`
 - **Test Coverage**: 3 clarification tests (rotation, finalization, boundary)
 - **Telemetry**: Shard finalization events with global hash
 
-**Alignment**: ✅ **EXACT** — Shard boundary N=250 from Math Foundations
+**Alignment**:  **EXACT** — Shard boundary N=250 from Math Foundations
 
 ---
 
@@ -144,7 +144,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Test Coverage**: 5 clarification tests (generation, validation, variance, ID, delta)
 - **Telemetry**: Hash variance distribution logged
 
-**Alignment**: ✅ **EXACT** — Binary variance model from Math Foundations
+**Alignment**:  **EXACT** — Binary variance model from Math Foundations
 
 ---
 
@@ -160,7 +160,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Signals**: Temporal propagation with governor-controlled dynamics
 - **Runtime**: Single unified graph with quarantine and telemetry
 
-**Alignment**: ✅ **COMPLETE** — Substrate layer fully implements Neuro Mapping primitives
+**Alignment**:  **COMPLETE** — Substrate layer fully implements Neuro Mapping primitives
 
 ---
 
@@ -174,7 +174,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Timesteps**: Temporal dynamics with region-specific latencies
 - **Zero Coupling**: All substrate interaction via MCP protocol
 
-**Alignment**: ✅ **SCAFFOLDED** — Connectome architecture matches Neuro Mapping v1
+**Alignment**:  **SCAFFOLDED** — Connectome architecture matches Neuro Mapping v1
 
 **Implementation Status**: Architecture defined, implementation begins post-pilot
 
@@ -191,7 +191,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Quarantine**: `src/fault/quarantine.rs` (error codes 1000-5000, immutable traces)
 - **Governor Correction**: `src/fault/governor_correction.rs` (convergence logging)
 
-**Alignment**: ✅ **EXACT** — Fault domain matches Deployment Architecture specification
+**Alignment**:  **EXACT** — Fault domain matches Deployment Architecture specification
 
 ---
 
@@ -204,7 +204,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Emitter**: Integrated into `ScgRuntime`, emits on every operation
 - **Violation Detection**: Real-time flagging of invariant breaches
 
-**Alignment**: ✅ **EXACT** — Telemetry schema matches Deployment Architecture
+**Alignment**:  **EXACT** — Telemetry schema matches Deployment Architecture
 
 ---
 
@@ -217,7 +217,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Shards**: `src/lineage/shard.rs` (N=250 boundary, global hash)
 - **Replay Episodes**: `src/lineage/replay_episode.rs` (3-environment validation)
 
-**Alignment**: ✅ **EXACT** — Lineage system matches Deployment Architecture
+**Alignment**:  **EXACT** — Lineage system matches Deployment Architecture
 
 ---
 
@@ -230,7 +230,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - **Config**: `deployment/pilot/mcp_client_config.json` (client setup)
 - **Monitoring**: OpenTelemetry Collector, Prometheus, Grafana (defined in pilot guide)
 
-**Alignment**: ✅ **EXACT** — Pilot deployment follows Deployment Architecture
+**Alignment**:  **EXACT** — Pilot deployment follows Deployment Architecture
 
 ---
 
@@ -246,7 +246,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - Complete telemetry and lineage audit trail
 - CI/CD guard prevents unauthorized modifications
 
-**Alignment**: ✅ **ACHIEVED** — Mathematical closure demonstrated
+**Alignment**:  **ACHIEVED** — Mathematical closure demonstrated
 
 ---
 
@@ -261,7 +261,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - All operations logged with immutable telemetry
 - Lineage chain provides replay capability
 
-**Alignment**: ✅ **ACHIEVED** — Audit artifacts complete
+**Alignment**:  **ACHIEVED** — Audit artifacts complete
 
 ---
 
@@ -275,7 +275,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - No substrate internals exposed to connectome
 - Independent versioning strategy (v2.x connectome, v1.0.x substrate)
 
-**Alignment**: ✅ **ACHIEVED** — Connectome isolation guaranteed
+**Alignment**:  **ACHIEVED** — Connectome isolation guaranteed
 
 ---
 
@@ -290,7 +290,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - `SCG_PILOT_01_LAUNCH.md`: Complete 7-day validation protocol
 - Success criteria defined (7 invariants, zero P0/P1 incidents)
 
-**Alignment**: ✅ **ACHIEVED** — Pilot launch approved
+**Alignment**:  **ACHIEVED** — Pilot launch approved
 
 ---
 
@@ -308,7 +308,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
   - Dependencies mapped
 - **Examples**: create_node, bind_edge, mutate_node, propagate_signal, query_lineage, etc.
 
-**Alignment**: ✅ **EXACT** — Tool contracts match API Spec
+**Alignment**:  **EXACT** — Tool contracts match API Spec
 
 ---
 
@@ -321,7 +321,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - Operations rejected before state mutation if ESV < 0.5
 - Telemetry captures ESV violations
 
-**Alignment**: ✅ **EXACT** — ESV enforcement matches API Spec
+**Alignment**:  **EXACT** — ESV enforcement matches API Spec
 
 ---
 
@@ -334,7 +334,7 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 - When quarantine active, operations return error
 - Quarantine triggered automatically on invariant violations
 
-**Alignment**: ✅ **EXACT** — Quarantine behavior matches API Spec
+**Alignment**:  **EXACT** — Quarantine behavior matches API Spec
 
 ---
 
@@ -343,30 +343,30 @@ This document maps the **SCG-MCP Substrate v1.0.0** implementation to the comple
 | SCG Canon Component | Substrate Implementation | Alignment Status | Evidence |
 |---------------------|--------------------------|------------------|----------|
 | **Math Foundations** | | | |
-| Energy Conservation (ΔE ≤ 1e-10) | `src/scg_core.rs` | ✅ EXACT | `tests/integration_validation.rs` |
-| Coherence (C(t) ≥ 0.97) | `src/scg_core.rs` | ✅ EXACT | `tests/integration_validation.rs` |
-| ESV Validation (100%) | `src/scg_core.rs` | ✅ EXACT | `tests/hardening_fuzz.rs` |
-| Lineage Integrity (ε ≤ 1e-10) | `src/lineage/replay_episode.rs` | ✅ EXACT | Clarification tests |
-| Governor Convergence | `src/fault/governor_correction.rs` | ✅ EXACT | Clarification tests |
-| Shard Rotation (N=250) | `src/lineage/shard.rs` | ✅ EXACT | Clarification tests |
-| Replay Variance (0.0/1.0) | `src/lineage/replay_episode.rs` | ✅ EXACT | Clarification tests |
+| Energy Conservation (ΔE ≤ 1e-10) | `src/scg_core.rs` |  EXACT | `tests/integration_validation.rs` |
+| Coherence (C(t) ≥ 0.97) | `src/scg_core.rs` |  EXACT | `tests/integration_validation.rs` |
+| ESV Validation (100%) | `src/scg_core.rs` |  EXACT | `tests/hardening_fuzz.rs` |
+| Lineage Integrity (ε ≤ 1e-10) | `src/lineage/replay_episode.rs` |  EXACT | Clarification tests |
+| Governor Convergence | `src/fault/governor_correction.rs` |  EXACT | Clarification tests |
+| Shard Rotation (N=250) | `src/lineage/shard.rs` |  EXACT | Clarification tests |
+| Replay Variance (0.0/1.0) | `src/lineage/replay_episode.rs` |  EXACT | Clarification tests |
 | **Neuro Mapping** | | | |
-| Substrate Primitives | `src/scg_core.rs`, `src/types.rs` | ✅ COMPLETE | All tests |
-| Connectome Architecture | `CONNECTOME_V2_SCAFFOLD.md` | ✅ SCAFFOLDED | Architecture doc |
+| Substrate Primitives | `src/scg_core.rs`, `src/types.rs` |  COMPLETE | All tests |
+| Connectome Architecture | `CONNECTOME_V2_SCAFFOLD.md` |  SCAFFOLDED | Architecture doc |
 | **Deployment Architecture** | | | |
-| Fault Domain | `src/fault/` | ✅ EXACT | Hardening tests |
-| Telemetry | `src/telemetry/` | ✅ EXACT | Integration tests |
-| Lineage | `src/lineage/` | ✅ EXACT | Clarification tests |
-| Pilot Deployment | `deployment/pilot/` | ✅ EXACT | Deployment manifests |
+| Fault Domain | `src/fault/` |  EXACT | Hardening tests |
+| Telemetry | `src/telemetry/` |  EXACT | Integration tests |
+| Lineage | `src/lineage/` |  EXACT | Clarification tests |
+| Pilot Deployment | `deployment/pilot/` |  EXACT | Deployment manifests |
 | **Goal Manifest** | | | |
-| Mathematical Closure | v1.0.0-substrate | ✅ ACHIEVED | 46/46 tests |
-| Audit Readiness | Certification artifacts | ✅ ACHIEVED | Dossier template |
-| Connectome Readiness | Zero-coupling design | ✅ ACHIEVED | Scaffold doc |
-| Production Deployment | Pilot launch approved | ✅ ACHIEVED | Launch guide |
+| Mathematical Closure | v1.0.0-substrate |  ACHIEVED | 46/46 tests |
+| Audit Readiness | Certification artifacts |  ACHIEVED | Dossier template |
+| Connectome Readiness | Zero-coupling design |  ACHIEVED | Scaffold doc |
+| Production Deployment | Pilot launch approved |  ACHIEVED | Launch guide |
 | **API Spec** | | | |
-| Tool Contracts | `src/mcp_handler.rs` | ✅ EXACT | 9 tools versioned |
-| ESV Enforcement | API boundary validation | ✅ EXACT | Fuzz tests |
-| Quarantine Propagation | Controller integration | ✅ EXACT | Integration tests |
+| Tool Contracts | `src/mcp_handler.rs` |  EXACT | 9 tools versioned |
+| ESV Enforcement | API boundary validation |  EXACT | Fuzz tests |
+| Quarantine Propagation | Controller integration |  EXACT | Integration tests |
 
 ---
 
@@ -431,13 +431,13 @@ All substrate components implement SCG Canon specifications with exact fidelity.
 
 For external entities (Microsoft, hospitals, auditors) reviewing SCG substrate:
 
-- [ ] Review this specification alignment document
-- [ ] Verify all 7 invariants in `SUBSTRATE_FREEZE.md`
-- [ ] Inspect `APEX_CLARIFICATIONS.md` for implementation proofs
-- [ ] Run test suite: `cargo test --release` (expect 46/46 passing)
-- [ ] Review `CERTIFICATION_DOSSIER.md` post-pilot
-- [ ] Validate connectome isolation in `CONNECTOME_V2_SCAFFOLD.md`
-- [ ] Inspect CI/CD enforcement: `.github/workflows/substrate_guard.yml`
+-  ] Review this specification alignment document
+-  ] Verify all 7 invariants in `SUBSTRATE_FREEZE.md`
+-  ] Inspect `APEX_CLARIFICATIONS.md` for implementation proofs
+-  ] Run test suite: `cargo test --release` (expect 46/46 passing)
+-  ] Review `CERTIFICATION_DOSSIER.md` post-pilot
+-  ] Validate connectome isolation in `CONNECTOME_V2_SCAFFOLD.md`
+-  ] Inspect CI/CD enforcement: `.github/workflows/substrate_guard.yml`
 
 **External Validation Contact**: SCG Substrate Team  
 **Repository**: https://github.com/aduboseh/scg-mcp

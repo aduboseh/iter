@@ -116,7 +116,7 @@ This document defines the **canonical synthetic stimulus pattern** for SCG-PILOT
 
 ```bash
 #!/bin/sh
-echo "[SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
+echo "SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
 
 while true; do
   printf '{"jsonrpc":"2.0","id":"1","method":"governor.status","params":{}}\n'
@@ -128,7 +128,7 @@ done | /app/scg_mcp_server
 
 **Execution**: Loop pipes JSON-RPC messages to `scg_mcp_server` STDIO interface at 0.9s intervals
 
-**Startup Banner**: `[SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
+**Startup Banner**: `SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
 
 ---
 
@@ -166,13 +166,13 @@ done | /app/scg_mcp_server
 $QuarantinePattern = "System is quarantined"
 
 if ($rawBlock -match $QuarantinePattern) {
-    Write-Host "❌ P0: Substrate quarantine detected. Invoke ACT-07A now." -ForegroundColor Red
+    Write-Host " P0: Substrate quarantine detected. Invoke ACT-07A now." -ForegroundColor Red
     # Log to pilot_reports/day1/interruptions.json
     exit 1
 }
 
 if ($invariants.quarantined -eq $true) {
-    Write-Host "❌ P0: Invariant-level quarantine state detected. Invoke ACT-07A now." -ForegroundColor Red
+    Write-Host " P0: Invariant-level quarantine state detected. Invoke ACT-07A now." -ForegroundColor Red
     exit 1
 }
 ```
@@ -222,10 +222,10 @@ spec:
       containers:
       - name: scg-mcp
         image: scg-mcp:v1.0.0-substrate
-        command: ["/bin/sh", "-c"]
+        command: "/bin/sh", "-c"]
         args:
           - |
-            echo "[SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
+            echo "SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
             while true; do
               printf '{"jsonrpc":"2.0","id":"1","method":"governor.status","params":{}}\n'
               printf '{"jsonrpc":"2.0","id":"2","method":"node.create","params":{"belief":0.01,"energy":1e-12}}\n'
@@ -252,12 +252,12 @@ kubectl logs -n scg-pilot-01 deploy/scg-mcp --tail=100 | grep "node_count"
 
 ### 5.3 Verification Checklist
 
-- ✅ Startup banner visible in logs: `[SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
-- ✅ Telemetry shows `node_count > 0`
-- ✅ Energy drift remains `< 1×10⁻¹⁰`
-- ✅ Coherence remains `≥ 0.97`
-- ✅ No quarantine events triggered
-- ✅ Monitoring script shows "Overall Status: HEALTHY" (not DEGRADED)
+-  Startup banner visible in logs: `SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
+-  Telemetry shows `node_count > 0`
+-  Energy drift remains `< 1×10⁻¹⁰`
+-  Coherence remains `≥ 0.97`
+-  No quarantine events triggered
+-  Monitoring script shows "Overall Status: HEALTHY" (not DEGRADED)
 
 ---
 
@@ -300,7 +300,7 @@ kubectl logs -n scg-pilot-01 deploy/scg-mcp --tail=100 | grep "node_count"
 **Impact**: LOW (confusion, not technical failure)
 
 **Mitigation**:
-- Startup banner clearly identifies load regime: `[SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
+- Startup banner clearly identifies load regime: `SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
 - Load profile embedded in telemetry metadata
 - OPERATOR_INSTRUCTIONS.md updated with load regime explanation
 - CERTIFICATION_DOSSIER.md documents Day-1A load description

@@ -62,7 +62,7 @@ Since direct NTP validation is blocked, we use Kubernetes node heartbeat timesta
 
 ```bash
 # Extract node heartbeat times (non-privileged)
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}{"\n"}{end}'
+kubectl get nodes -o jsonpath='{range .items*]}{.metadata.name}{"\t"}{.status.conditions?(@.type=="Ready")].lastHeartbeatTime}{"\n"}{end}'
 ```
 
 **Threshold**: Δt_max ≤ 5 seconds across all nodes
@@ -162,7 +162,7 @@ Future substrate releases or pilot environments MUST implement one of:
 - **Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0
 - **Risk Registry**: R3 (Time Sync DaemonSet Permission Denied)
 - **SCG Math Foundations**: §II.2 (Temporal Coherence Requirements)
-- **Azure Documentation**: [Azure Time Service](https://learn.microsoft.com/en-us/azure/virtual-machines/windows/time-sync)
+- **Azure Documentation**: Azure Time Service](https://learn.microsoft.com/en-us/azure/virtual-machines/windows/time-sync)
 
 ---
 

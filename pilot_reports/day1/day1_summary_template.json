@@ -56,7 +56,7 @@
   
   "replay_episodes": {
     "executed": 0,
-    "environments": ["local", "docker", "kubernetes"],
+    "environments": "local", "docker", "kubernetes"],
     "cycles_per_episode": 250,
     "hash_variance": "TBD",
     "results_path": "pilot_reports/day1/replay/"
@@ -71,12 +71,12 @@
   
   "violations_log": {
     "count": 0,
-    "incidents": [],
+    "incidents": ],
     "forensics_path": "pilot_reports/day1/violations/"
   },
   
   "certification_status": "IN_PROGRESS",
-  "notes": [
+  "notes": 
     "Day-1 activated with multiline telemetry parser",
     "Continuous invariant enforcement operational",
     "24-hour aggregation cycle initiated",

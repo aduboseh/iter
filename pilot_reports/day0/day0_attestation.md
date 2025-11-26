@@ -18,12 +18,12 @@ Day-0 preparation phase **COMPLETE**. Infrastructure deployed, substrate stabili
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Substrate Pod** | ✅ Running | scg-mcp-7c7dc6f9d5-gw8t2 (1/1 Ready) |
-| **OTEL Collector** | ✅ Running | otel-collector-5c9bb67cbd-d8xfb (listening 4317) |
-| **Request Generator** | ✅ Active | ~10 RPS, 95% read-only operations |
-| **Network Isolation** | ✅ Enforced | 2 NetworkPolicies active |
-| **Resource Quotas** | ✅ Compliant | 4.5 CPU / 10.25GB (within 6/12GB limit) |
-| **Storage** | ✅ Bound | 40GB across 3 PVCs |
+| **Substrate Pod** |  Running | scg-mcp-7c7dc6f9d5-gw8t2 (1/1 Ready) |
+| **OTEL Collector** |  Running | otel-collector-5c9bb67cbd-d8xfb (listening 4317) |
+| **Request Generator** |  Active | ~10 RPS, 95% read-only operations |
+| **Network Isolation** |  Enforced | 2 NetworkPolicies active |
+| **Resource Quotas** |  Compliant | 4.5 CPU / 10.25GB (within 6/12GB limit) |
+| **Storage** |  Bound | 40GB across 3 PVCs |
 
 ---
 
@@ -36,7 +36,7 @@ Day-0 preparation phase **COMPLETE**. Infrastructure deployed, substrate stabili
 **Primary Telemetry Endpoints**:
 - `governor.status` → energy_drift, coherence, node_count, edge_count
 - `lineage.replay` → operation checksums for replay variance
-- `[TELEMETRY]` markers → esv_valid_ratio, entropy_index (when present)
+- `TELEMETRY]` markers → esv_valid_ratio, entropy_index (when present)
 
 **Known Limitations**:
 - Multiline JSON responses require parser enhancement (scheduled Day-1)
@@ -73,11 +73,11 @@ Day-0 preparation phase **COMPLETE**. Infrastructure deployed, substrate stabili
 
 | Invariant | Threshold | Current | Status |
 |-----------|-----------|---------|--------|
-| **Energy Drift (ΔE)** | ≤ 1×10⁻¹⁰ | 3.3×10⁻¹¹ | ✅ PASS |
-| **Coherence C(t)** | ≥ 0.97 | 1.0 | ✅ PASS |
+| **Energy Drift (ΔE)** | ≤ 1×10⁻¹⁰ | 3.3×10⁻¹¹ |  PASS |
+| **Coherence C(t)** | ≥ 0.97 | 1.0 |  PASS |
 | **ESV Valid Ratio** | = 1.0 | TBD* | ⏳ Monitoring |
 | **Lineage Epsilon (ε)** | ≤ 1×10⁻¹⁰ | TBD* | ⏳ Replay needed |
-| **Quarantine Events** | = 0 | 0 | ✅ PASS |
+| **Quarantine Events** | = 0 | 0 |  PASS |
 | **Governor Convergence** | ΔE_post ≤ 1×10⁻¹⁰ | TBD* | ⏳ Correction tracking |
 | **Ledger Integrity** | Hash match | TBD* | ⏳ 24h aggregation |
 
@@ -102,10 +102,10 @@ Day-0 preparation phase **COMPLETE**. Infrastructure deployed, substrate stabili
 - `pilot-monitoring/<timestamp>/invariant-data.csv`
 
 **Parser Status**:
-- ✅ Single-line JSON parsing operational
+-  Single-line JSON parsing operational
 - ⏳ Multiline JSON enhancement pending (Day-1 task)
-- ✅ Regex extraction for governor.status fields functional
-- ✅ Quarantine detection operational
+-  Regex extraction for governor.status fields functional
+-  Quarantine detection operational
 - ⏳ Lineage checksum variance calculation pending
 
 ---
@@ -120,12 +120,12 @@ Day-0 preparation phase **COMPLETE**. Infrastructure deployed, substrate stabili
 **Current Allocation**:
 - Substrate: 4 CPU / 10GB (limits)
 - OTEL Collector: 500m CPU / 256MB (limits)
-- Total: 4.5 CPU / 10.25GB ✅ **COMPLIANT**
+- Total: 4.5 CPU / 10.25GB  **COMPLIANT**
 
 **Network Security**:
-- ✅ Ingress: Blocked except pod-to-pod
-- ✅ Egress: DNS, internal pods, telemetry ports only
-- ✅ No external LoadBalancer exposure
+-  Ingress: Blocked except pod-to-pod
+-  Egress: DNS, internal pods, telemetry ports only
+-  No external LoadBalancer exposure
 
 ---
 
@@ -148,12 +148,12 @@ Day-0 preparation phase **COMPLETE**. Infrastructure deployed, substrate stabili
 
 ## Day-1 Authorization Criteria
 
-✅ **Infrastructure deployed and stable**  
-✅ **Substrate processing requests (>40m continuous)**  
-✅ **Quarantine cleared and stable**  
-✅ **Telemetry collection operational**  
-✅ **Resource quotas compliant**  
-✅ **Network isolation enforced**  
+ **Infrastructure deployed and stable**  
+ **Substrate processing requests (>40m continuous)**  
+ **Quarantine cleared and stable**  
+ **Telemetry collection operational**  
+ **Resource quotas compliant**  
+ **Network isolation enforced**  
 ⏳ **Baseline metrics pending 6-12h runtime**
 
 **Status**: **Day-1 AUTHORIZED** — may commence once baseline window complete

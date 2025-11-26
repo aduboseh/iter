@@ -2,7 +2,7 @@
 
 **Current Version**: v1.0.0-substrate  
 **Commit**: 3cc4d99  
-**Status**: ✅ **PRODUCTION-READY — PILOT LAUNCH APPROVED**  
+**Status**:  **PRODUCTION-READY — PILOT LAUNCH APPROVED**  
 **Repository**: https://github.com/aduboseh/scg-mcp
 
 ---
@@ -17,12 +17,12 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 
 ## Milestone Timeline
 
-### ✅ Phase 0: Repository Initialization (Commit ebda76e)
+###  Phase 0: Repository Initialization (Commit ebda76e)
 - Created GitHub repository: https://github.com/aduboseh/scg-mcp
 - Initial SCG-MCP cognitive substrate with 9 MCP tools
 - Basic fault tolerance and telemetry scaffolds
 
-### ✅ Phase 1: Substrate Hardening Sprint (Commit 7f87345)
+###  Phase 1: Substrate Hardening Sprint (Commit 7f87345)
 **Achievement**: Elite Execution Protocol — All Phase 1 requirements met
 
 **Hardening Test Harnesses** (16 tests):
@@ -47,11 +47,11 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 - `deployment/pilot/mcp_client_config.json`: Client configuration
 - `deployment/pilot/README.md`: Deployment guide
 
-**Build Status**: ✅ Success (expected scaffold warnings)
+**Build Status**:  Success (expected scaffold warnings)
 
 ---
 
-### ✅ Phase 2: Runtime Integration (Commit b85fb35)
+###  Phase 2: Runtime Integration (Commit b85fb35)
 **Achievement**: Core-runtime-integrated telemetry, quarantine, and energy tracking
 
 **Integrations into `src/scg_core.rs`**:
@@ -71,14 +71,14 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 
 ---
 
-### ✅ Phase 3: Apex Directive v1.1.0 Clarifications (Commit 21dd6b5)
+###  Phase 3: Apex Directive v1.1.0 Clarifications (Commit 21dd6b5)
 **Achievement**: OPERATIONALLY COMPLETE. AUDIT-READY. SPECIFICATION-ALIGNED.
 
 **Clarification 1: Governor Correction Logging** (`src/fault/governor_correction.rs`, 176 lines):
 - Logs all correction attempts with pre_delta, attempted_correction, post_delta
 - Tracks convergence status (success/partial/failed)
 - Maintains cycle_number and correction_magnitude history
-- Emits to stderr with `[GOVERNOR_CORRECTION]` prefix
+- Emits to stderr with `GOVERNOR_CORRECTION]` prefix
 - **Tests**: 4/4 passing
 
 **Clarification 2: Lineage Shard Rotation** (`src/lineage/shard.rs`, 276 lines):
@@ -86,7 +86,7 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 - No partial operations across boundaries
 - Global hash computed in ascending order (deterministic finalization)
 - Immutable shard records with operation snapshots
-- Emits to stderr with `[SHARD_FINALIZED]` prefix
+- Emits to stderr with `SHARD_FINALIZED]` prefix
 - **Tests**: 3/3 passing
 
 **Clarification 3: Replay Episode Validation** (`src/lineage/replay_episode.rs`, 288 lines):
@@ -99,12 +99,12 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 
 **Documentation**: `APEX_CLARIFICATIONS.md` (429 lines)
 
-**Build Status**: ✅ Success  
-**Test Status**: ✅ 46/46 passing (24 unit + 22 integration)
+**Build Status**:  Success  
+**Test Status**:  46/46 passing (24 unit + 22 integration)
 
 ---
 
-### ✅ Phase 4: Substrate Boundary Freeze (Commit cfa01c1, Tag v1.0.0-substrate)
+###  Phase 4: Substrate Boundary Freeze (Commit cfa01c1, Tag v1.0.0-substrate)
 **Achievement**: FROZEN FOR PRODUCTION — Mathematical closure achieved
 
 **Substrate Freeze Manifest** (`SUBSTRATE_FREEZE.md`, 299 lines):
@@ -150,7 +150,7 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 
 ---
 
-### ✅ Phase 5: Post-Pilot Preparation (Commit 3cc4d99)
+###  Phase 5: Post-Pilot Preparation (Commit 3cc4d99)
 **Achievement**: Certification template and connectome architecture defined
 
 **Certification Dossier Template** (`CERTIFICATION_DOSSIER.md`, 401 lines):
@@ -166,11 +166,11 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 - Complete appendices: telemetry dataset, lineage chain, logs, test results
 
 **Certification Criteria** (all must pass):
-- ✅ 7 days continuous operation without substrate quarantine
-- ✅ All 7 invariants maintained within thresholds
-- ✅ Zero critical failures (P0/P1 incidents)
-- ✅ Complete lineage integrity across full pilot duration
-- ✅ Telemetry completeness ≥ 99.9%
+-  7 days continuous operation without substrate quarantine
+-  All 7 invariants maintained within thresholds
+-  Zero critical failures (P0/P1 incidents)
+-  Complete lineage integrity across full pilot duration
+-  Telemetry completeness ≥ 99.9%
 
 **Connectome v2 Scaffold** (`CONNECTOME_V2_SCAFFOLD.md`, 433 lines):
 - Complete architectural blueprint for advanced cognition layer
@@ -193,29 +193,29 @@ The **SCG-MCP Substrate** has achieved mathematical closure and is certified rea
 ```
 scg_mcp_server/
 ├── src/
-│   ├── [FROZEN] scg_core.rs, types.rs, mcp_handler.rs, lib.rs, main.rs
-│   ├── [FROZEN] fault/ (rollback, quarantine, governor_correction)
-│   ├── [FROZEN] telemetry/ (schema)
-│   ├── [FROZEN] lineage/ (snapshot, shard, replay_episode)
-│   └── [NEW] connectome/ (protocol, attention, memory, reasoning, governance)
+│   ├── FROZEN] scg_core.rs, types.rs, mcp_handler.rs, lib.rs, main.rs
+│   ├── FROZEN] fault/ (rollback, quarantine, governor_correction)
+│   ├── FROZEN] telemetry/ (schema)
+│   ├── FROZEN] lineage/ (snapshot, shard, replay_episode)
+│   └── NEW] connectome/ (protocol, attention, memory, reasoning, governance)
 ├── tests/
-│   ├── [FROZEN] hardening_fuzz.rs, hardening_concurrency.rs, integration_validation.rs
-│   └── [NEW] connectome_tests.rs
-├── [FROZEN] SUBSTRATE_FREEZE.md, APEX_CLARIFICATIONS.md
+│   ├── FROZEN] hardening_fuzz.rs, hardening_concurrency.rs, integration_validation.rs
+│   └── NEW] connectome_tests.rs
+├── FROZEN] SUBSTRATE_FREEZE.md, APEX_CLARIFICATIONS.md
 ├── CERTIFICATION_DOSSIER.md (pilot data collection)
 ├── CONNECTOME_V2_SCAFFOLD.md (architecture blueprint)
 └── SCG_PILOT_01_LAUNCH.md (pilot guide)
 ├── pilot_reports/
 │   └── day0/
-│       ├── README.md                   [Collection status]
-│       ├── day0_summary_template.json  [Baseline template]
-│       └── day0_attestation.md         [Day-0 attestation]
-├── PILOT_NEXT_STEPS.md                 [Days 1-7 execution plan]
+│       ├── README.md                   Collection status]
+│       ├── day0_summary_template.json  Baseline template]
+│       └── day0_attestation.md         Day-0 attestation]
+├── PILOT_NEXT_STEPS.md                 Days 1-7 execution plan]
 ```
 
 ---
 
-### ✅ Phase 6: SCG-PILOT-01 Field Validation — Day-0 (Commits 579036e+)
+###  Phase 6: SCG-PILOT-01 Field Validation — Day-0 (Commits 579036e+)
 **Achievement**: Infrastructure deployed, substrate activated, quarantine cleared, Day-0 complete
 
 **Directive Sequence**:
@@ -252,9 +252,9 @@ scg_mcp_server/
   - Shifted to 95% read-only request profile
   - Reduced request rate to ~10 RPS
 - **Current State**: 
-  - Energy drift: 3.3e-11 (well below 1e-10 threshold) ✅
-  - Coherence: 1.0 (meets ≥0.97 requirement) ✅
-  - Quarantine events: 0 (cleared) ✅
+  - Energy drift: 3.3e-11 (well below 1e-10 threshold) 
+  - Coherence: 1.0 (meets ≥0.97 requirement) 
+  - Quarantine events: 0 (cleared) 
   - System status: HEALTHY
 
 **Monitoring Infrastructure** (`deployment/pilot/monitor-invariants.ps1`):
@@ -275,22 +275,22 @@ scg_mcp_server/
 **Invariant Status (Day-0 Snapshot)**:
 | Invariant | Threshold | Current | Status |
 |-----------|-----------|---------|--------|
-| Energy Drift (ΔE) | ≤ 1×10⁻¹⁰ | 3.3×10⁻¹¹ | ✅ PASS |
-| Coherence C(t) | ≥ 0.97 | 1.0 | ✅ PASS |
+| Energy Drift (ΔE) | ≤ 1×10⁻¹⁰ | 3.3×10⁻¹¹ |  PASS |
+| Coherence C(t) | ≥ 0.97 | 1.0 |  PASS |
 | ESV Valid Ratio | = 1.0 | TBD* | ⏳ Monitoring |
 | Lineage Epsilon (ε) | ≤ 1×10⁻¹⁰ | TBD* | ⏳ Replay needed |
-| Quarantine Events | = 0 | 0 | ✅ PASS |
+| Quarantine Events | = 0 | 0 |  PASS |
 | Governor Convergence | ΔE_post ≤ 1×10⁻¹⁰ | TBD* | ⏳ Correction tracking |
 | Ledger Integrity | Hash match | TBD* | ⏳ 24h aggregation |
 
 *Values marked TBD require 6-12 hours continuous runtime for meaningful measurement
 
 **Resource Compliance** (ACT-02 §8 Requirements):
-- ✅ Substrate: 4 CPU / 10GB (within limits)
-- ✅ Total namespace: 4.5 CPU / 10.25GB (within 6 CPU / 12GB quota)
-- ✅ Telemetry buffer: 20MB with 5s flush
-- ✅ Network isolation enforced
-- ✅ No external LoadBalancer exposure
+-  Substrate: 4 CPU / 10GB (within limits)
+-  Total namespace: 4.5 CPU / 10.25GB (within 6 CPU / 12GB quota)
+-  Telemetry buffer: 20MB with 5s flush
+-  Network isolation enforced
+-  No external LoadBalancer exposure
 
 **Telemetry Architecture**:
 - **Source**: Substrate stdout logs (JSON-RPC responses to MCP requests)
@@ -301,12 +301,12 @@ scg_mcp_server/
 - **OTEL Collector**: Ready to receive telemetry when SDK added post-pilot
 
 **Day-1 Authorization Criteria**:
-- ✅ Infrastructure deployed and stable
-- ✅ Substrate processing requests (>40m continuous)
-- ✅ Quarantine cleared and stable
-- ✅ Telemetry collection operational
-- ✅ Resource quotas compliant
-- ✅ Network isolation enforced
+-  Infrastructure deployed and stable
+-  Substrate processing requests (>40m continuous)
+-  Quarantine cleared and stable
+-  Telemetry collection operational
+-  Resource quotas compliant
+-  Network isolation enforced
 - ⏳ Baseline metrics pending 6-12h runtime
 
 **Status**: **Day-0 COMPLETE, Day-1 AUTHORIZED** — may commence once baseline window complete
@@ -344,7 +344,7 @@ scg_mcp_server/
 
 ---
 
-### ✅ Phase 6.1: SCG-PILOT-01 Day-1 Activation (Commit TBD)
+###  Phase 6.1: SCG-PILOT-01 Day-1 Activation (Commit TBD)
 **Achievement**: Multiline parser upgrade, continuous invariant enforcement, 24h aggregation
 
 **Directive**: SG-SCG-PILOT-ACT-04 v1.0.0
@@ -355,7 +355,7 @@ scg_mcp_server/
 
 1. **Multiline JSON Parser Upgrade** (§2):
    - Enhanced `deployment/pilot/monitor-invariants.ps1` with block-scoped JSON accumulator
-   - Parses nested MCP response wrappers (`result.content[0].text`)
+   - Parses nested MCP response wrappers (`result.content0].text`)
    - Extracts all 7 invariant fields: energy_drift, coherence, esv_valid_ratio, entropy_index, node_count, edge_count, quarantined
    - Fallback to single-line regex if multiline parsing fails
    - Real readings displayed (no placeholders)
@@ -400,13 +400,13 @@ scg_mcp_server/
      - Parser failure > 5min → P2
 
 **Day-1 Success Criteria** (§7):
-- ✅ Multiline parser operational (real telemetry extracted)
+-  Multiline parser operational (real telemetry extracted)
 - ⏳ Real telemetry parsed for ≥12 hours (in progress)
 - ⏳ Day-1 summary generated (pending 24h window)
 - ⏳ Replay episode hash matching complete (pending execution)
 - ⏳ Time sync validated (pending DaemonSet deployment)
-- ✅ Zero quarantine events (maintained from Day-0)
-- ✅ Zero invariant breaches (continuous monitoring active)
+-  Zero quarantine events (maintained from Day-0)
+-  Zero invariant breaches (continuous monitoring active)
 
 **Operational Notes**:
 - Day-0 baseline window: 6-12 hours (ongoing)
@@ -425,7 +425,7 @@ scg_mcp_server/
 
 ---
 
-### ✅ Phase 6.2: COHERENCE-01 Governance Framework (Commit TBD)
+###  Phase 6.2: COHERENCE-01 Governance Framework (Commit TBD)
 **Achievement**: Infrastructure blockers converted to governed exceptions, Day-1 complete
 
 **Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0
@@ -471,11 +471,11 @@ Converted Day-1 blockers (R2/R3) from infrastructure workarounds into formal gov
 Instead of modifying cluster RBAC or patching substrate STDIO, created version-bound exception protocols with clear expiry conditions and alternative validation methods.
 
 **Exception Lifecycle**:
-- ✅ Formal documentation (versioned)
-- ✅ Residual risk assessment (all LOW)
-- ✅ Alternative validation defined
-- ✅ Clear expiry conditions (v1.0.1-substrate or next pilot)
-- ✅ Certification impact documented (no assurance reduction)
+-  Formal documentation (versioned)
+-  Residual risk assessment (all LOW)
+-  Alternative validation defined
+-  Clear expiry conditions (v1.0.1-substrate or next pilot)
+-  Certification impact documented (no assurance reduction)
 
 **Certification Status**:
 All original requirements satisfied through **architectural equivalence**. No reduction in assurance level.
@@ -507,13 +507,13 @@ request_ids: 250614, 250616, 250617, 250619, 250622
 
 **Completed Sections**:
 
-1. **§2 Pre-flight Verification** (✅ COMPLETE):
+1. **§2 Pre-flight Verification** ( COMPLETE):
    - Substrate health: scg-mcp pod 1/1 Ready, 0 restarts, Age >1 day
    - Telemetry stimulus: node_count=102, energy_drift=1.01×10⁻¹⁰, active request flow
    - Tooling verified: All 5 required scripts/docs present and non-empty
    - Sanity check: Substrate actively processing requests (confirmed via logs)
 
-2. **§3 Time Sync Proxy Validation** (✅ COMPLETE):
+2. **§3 Time Sync Proxy Validation** ( COMPLETE):
    - **Method**: k8s_heartbeat_proxy per SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0.md
    - **Latest validation**: 2025-11-20 20:42:31Z
    - **Proxy result**: FAIL (121s delta exceeds 5s threshold; expected, heartbeat ≠ NTP)
@@ -522,7 +522,7 @@ request_ids: 250614, 250616, 250617, 250619, 250622
    - **Output**: pilot_reports/day1/time_sync.json
    - **Certification impact**: Time sync satisfied via external SLA, no assurance reduction
 
-3. **§5 Replay Harness Execution** (✅ COMPLETE):
+3. **§5 Replay Harness Execution** ( COMPLETE):
    - **Method**: Canonical build/test harness per SCG_PILOT_REPLAY_HARNESS_v1.0.0.md
    - **Local test**: PASS (test_scenario_generation_deterministic: 1 passed; 0 failed)
    - **Docker/CI**: NOT_EXECUTED (deferred to CI pipeline, local sufficient for interim)
@@ -540,12 +540,12 @@ request_ids: 250614, 250616, 250617, 250619, 250622
    - **Target**: ~1,440 samples (60s intervals × 24h)
    - **Output**: CSV files with 7 invariant measurements per sample
 
-5. **§6 Telemetry Aggregation** (🔒 BLOCKED):
+5. **§6 Telemetry Aggregation** ( BLOCKED):
    - **Status**: BLOCKED_BY_SECTION_4
    - **Dependency**: Requires §4 to complete before running aggregate-day1.ps1
    - **Command**: `.\deployment\pilot\aggregate-day1.ps1 -MonitoringPath ".\pilot-monitoring\day1" -OutputJson "pilot_reports/day1/day1_summary.json"`
 
-6. **§7 Documentation Updates** (✅ INTERIM_COMPLETE):
+6. **§7 Documentation Updates** ( INTERIM_COMPLETE):
    - CERTIFICATION_DOSSIER.md: Added §6.4 Day-1 Interim Certification Summary
    - STATUS.md: This section documents interim status
    - Final update pending after 24h aggregation
@@ -578,7 +578,7 @@ Core validations (time sync via SLA, replay via harness) passed using governed e
 
 ---
 
-### 🔄 Phase 6.5: Day-1A Monitoring Restart (2025-11-24)
+###  Phase 6.5: Day-1A Monitoring Restart (2025-11-24)
 **Achievement**: Fresh 24h monitoring window initiated with clean substrate
 
 **Directive**: SG-SCG-PILOT-ACT-07B (Corrective Action)
@@ -604,11 +604,11 @@ Core validations (time sync via SLA, replay via harness) passed using governed e
 
 **Corrective Actions Executed** (2025-11-24 11:18 UTC):
 
-1. ✅ **Terminate residual jobs**: `Get-Job | Remove-Job -Force`
-2. ✅ **Confirm substrate health**: Logs showed node_count=102, quarantine flag active (persistent state)
-3. ✅ **PVC wipe**: Deleted scg-lineage-storage to clear persistent quarantine state
-4. ✅ **Clean substrate boot**: Fresh pod deployed, logs confirm node_count 0→23, energy_drift ~2.3×10⁻¹¹, coherence 1.0, no quarantine
-5. ✅ **Fresh monitoring window initiated**: Started 2025-11-24 11:18:24 UTC
+1.  **Terminate residual jobs**: `Get-Job | Remove-Job -Force`
+2.  **Confirm substrate health**: Logs showed node_count=102, quarantine flag active (persistent state)
+3.  **PVC wipe**: Deleted scg-lineage-storage to clear persistent quarantine state
+4.  **Clean substrate boot**: Fresh pod deployed, logs confirm node_count 0→23, energy_drift ~2.3×10⁻¹¹, coherence 1.0, no quarantine
+5.  **Fresh monitoring window initiated**: Started 2025-11-24 11:18:24 UTC
 
 **Current Monitoring Window**:
 - **Job name**: SCG-Day1A-Monitoring-20251124_111824
@@ -624,11 +624,11 @@ Core validations (time sync via SLA, replay via harness) passed using governed e
 - CSV telemetry authoritative for aggregation (not console output)
 
 **Certification Requirements**:
-- ✅ Uninterrupted 24h window with ~1,440 samples
-- ✅ All 7 invariants continuously maintained within thresholds
-- ✅ Zero quarantine events during window
-- ✅ Clean substrate boot (node_count=0 at T0)
-- ✅ LOAD-BALANCE-01 v1.0.1 stimulus active throughout
+-  Uninterrupted 24h window with ~1,440 samples
+-  All 7 invariants continuously maintained within thresholds
+-  Zero quarantine events during window
+-  Clean substrate boot (node_count=0 at T0)
+-  LOAD-BALANCE-01 v1.0.1 stimulus active throughout
 
 **Upon Completion** (2025-11-25 11:18+ UTC):
 1. Run `aggregate-day1.ps1` on day1A_20251124_111824 directory
@@ -645,7 +645,7 @@ Core validations (time sync via SLA, replay via harness) passed using governed e
 
 ---
 
-### ✅ Phase 6.4: LOAD-BALANCE-01 Parameter Correction & Day-1A Transition (Commits e46b5fd+)
+###  Phase 6.4: LOAD-BALANCE-01 Parameter Correction & Day-1A Transition (Commits e46b5fd+)
 **Achievement**: Substrate transitioned to clean ACTIVE state with micro-energy load regime
 
 **Directive**: SG-SCG-LOAD-BALANCE-01 v1.0.1
@@ -739,9 +739,9 @@ entropy_index: 1.01×10⁻¹⁰
 ```bash
 $ cargo build --release
    Compiling scg_mcp_server v0.1.0
-    Finished `release` profile [optimized] target(s)
+    Finished `release` profile optimized] target(s)
 
-Status: ✅ SUCCESS
+Status:  SUCCESS
 Warnings: Expected scaffold warnings (unused imports in example code)
 ```
 
@@ -760,44 +760,44 @@ Unit Tests (24):
 
 Integration Tests (22):
 - tests/hardening_fuzz.rs: 7 tests
-  ✅ fuzz_malformed_node_params
-  ✅ fuzz_cyclic_edge_attempts
-  ✅ fuzz_degenerate_weights
-  ✅ fuzz_lineage_stability
-  ✅ fuzz_governor_drift
-  ✅ fuzz_extreme_scale
-  ✅ fuzz_esv_bypass_attempt
+   fuzz_malformed_node_params
+   fuzz_cyclic_edge_attempts
+   fuzz_degenerate_weights
+   fuzz_lineage_stability
+   fuzz_governor_drift
+   fuzz_extreme_scale
+   fuzz_esv_bypass_attempt
 
 - tests/hardening_concurrency.rs: 9 tests
-  ✅ concurrent_mutations
-  ✅ concurrent_edge_propagation
-  ✅ concurrent_lineage_writes
-  ✅ high_throughput_validation (10k RPS)
-  ✅ concurrent_governor_corrections
-  ✅ concurrent_esv_validation
-  ✅ race_condition_detection
-  ✅ concurrent_tool_invocations
-  ✅ sustained_load_test
+   concurrent_mutations
+   concurrent_edge_propagation
+   concurrent_lineage_writes
+   high_throughput_validation (10k RPS)
+   concurrent_governor_corrections
+   concurrent_esv_validation
+   race_condition_detection
+   concurrent_tool_invocations
+   sustained_load_test
 
 - tests/integration_validation.rs: 6 tests
-  ✅ telemetry_emission_on_all_operations
-  ✅ quarantine_enforcement_on_violations
-  ✅ energy_conservation_tracking
-  ✅ coherence_calculation
-  ✅ operation_counting
-  ✅ quarantine_blocks_mutations
+   telemetry_emission_on_all_operations
+   quarantine_enforcement_on_violations
+   energy_conservation_tracking
+   coherence_calculation
+   operation_counting
+   quarantine_blocks_mutations
 
 Clarification Tests (12):
 - Governor Correction (4):
-  ✅ correction_logging, attempt_tracking, convergence_status, cycle_counting
+   correction_logging, attempt_tracking, convergence_status, cycle_counting
 
 - Lineage Shard (3):
-  ✅ shard_rotation, finalization_determinism, boundary_enforcement
+   shard_rotation, finalization_determinism, boundary_enforcement
 
 - Replay Episode (5):
-  ✅ episode_generation, environment_validation, hash_variance, episode_identification, delta_tracking
+   episode_generation, environment_validation, hash_variance, episode_identification, delta_tracking
 
-Status: ✅ 46/46 PASSING
+Status:  46/46 PASSING
 Coverage: 80%+ (compliant with Apex requirements)
 ```
 
@@ -805,7 +805,7 @@ Coverage: 80%+ (compliant with Apex requirements)
 
 ## Advancement Roadmap to SCG-PILOT-01
 
-### ✅ Action 1: Substrate Boundary Finalization
+###  Action 1: Substrate Boundary Finalization
 **Status**: COMPLETE (Commit cfa01c1, Tag v1.0.0-substrate)
 - Substrate frozen under governance
 - CI/CD guard operational
@@ -822,41 +822,41 @@ Coverage: 80%+ (compliant with Apex requirements)
 - **Success Criteria**: All 7 invariants maintained, zero P0/P1 incidents, telemetry ≥99.9%
 
 **Launch Checklist**:
-- [✅] Deploy substrate to Kubernetes (scg-mcp-deployment.yaml)
-- [✅] Deploy OTEL collector (otel-collector.yaml)
-- [✅] Configure monitoring (monitor-invariants.ps1 operational)
-- [✅] Activate substrate processing (synthetic request generator)
-- [✅] Clear quarantine and stabilize (§3.1 protocol executed)
-- [⏳] Collect 6-12 hour baseline window
-- [⏳] Set up alerting (PagerDuty, email, Slack)
-- [⏳] Initiate daily health reporting (Day-1+)
-- [⏳] Begin continuous 7-day monitoring
+- ] Deploy substrate to Kubernetes (scg-mcp-deployment.yaml)
+- ] Deploy OTEL collector (otel-collector.yaml)
+- ] Configure monitoring (monitor-invariants.ps1 operational)
+- ] Activate substrate processing (synthetic request generator)
+- ] Clear quarantine and stabilize (§3.1 protocol executed)
+- ⏳] Collect 6-12 hour baseline window
+- ⏳] Set up alerting (PagerDuty, email, Slack)
+- ⏳] Initiate daily health reporting (Day-1+)
+- ⏳] Begin continuous 7-day monitoring
 
 **Expected Outcome**: 7 days of clean operation → Substrate certification
 
 ---
 
-### 📋 Action 3: Certification Dossier Completion
+###  Action 3: Certification Dossier Completion
 **Status**: TEMPLATE READY (CERTIFICATION_DOSSIER.md)
 - Template prepared for pilot data collection
 - Daily health report structure defined
 - Certification criteria documented
 
 **Post-Pilot Actions**:
-- [ ] Populate 7 daily health reports with actual data
-- [ ] Document all incidents (if any)
-- [ ] Compile lineage audit trail
-- [ ] Analyze fault domain behavior
-- [ ] Validate telemetry completeness
-- [ ] Complete performance benchmarks
-- [ ] Execute certification decision matrix
-- [ ] Obtain 4-way sign-off (Technical, Ops, Security, Product)
+-  ] Populate 7 daily health reports with actual data
+-  ] Document all incidents (if any)
+-  ] Compile lineage audit trail
+-  ] Analyze fault domain behavior
+-  ] Validate telemetry completeness
+-  ] Complete performance benchmarks
+-  ] Execute certification decision matrix
+-  ] Obtain 4-way sign-off (Technical, Ops, Security, Product)
 
 **Expected Outcome**: Substrate certified for production deployment
 
 ---
 
-### 🏗️ Action 4: Connectome Scaffolding v2
+###  Action 4: Connectome Scaffolding v2
 **Status**: ARCHITECTURE DEFINED (CONNECTOME_V2_SCAFFOLD.md)
 - Blueprint published for 5 cognitive modules
 - Zero substrate coupling design validated
@@ -873,7 +873,7 @@ Coverage: 80%+ (compliant with Apex requirements)
 
 ---
 
-### 🔒 Action 5: LTS Versioning Strategy
+###  Action 5: LTS Versioning Strategy
 **Status**: DEFINED IN SUBSTRATE_FREEZE.md
 
 **Substrate LTS (v1.0.x-substrate)**:
@@ -906,43 +906,43 @@ Coverage: 80%+ (compliant with Apex requirements)
 scg_mcp_server/
 ├── .github/
 │   └── workflows/
-│       └── substrate_guard.yml    [CI/CD enforcement]
+│       └── substrate_guard.yml    CI/CD enforcement]
 ├── deployment/
 │   └── pilot/
-│       ├── scg_mcp_pilot.yml     [Kubernetes manifest]
-│       ├── mcp_client_config.json [Client config]
-│       └── README.md              [Deployment guide]
+│       ├── scg_mcp_pilot.yml     Kubernetes manifest]
+│       ├── mcp_client_config.json Client config]
+│       └── README.md              Deployment guide]
 ├── src/
-│   ├── scg_core.rs                [Core runtime - FROZEN]
-│   ├── types.rs                   [Type definitions - FROZEN]
-│   ├── mcp_handler.rs             [MCP tools - FROZEN]
-│   ├── lib.rs                     [Library entry - FROZEN]
-│   ├── main.rs                    [Binary entry - FROZEN]
+│   ├── scg_core.rs                Core runtime - FROZEN]
+│   ├── types.rs                   Type definitions - FROZEN]
+│   ├── mcp_handler.rs             MCP tools - FROZEN]
+│   ├── lib.rs                     Library entry - FROZEN]
+│   ├── main.rs                    Binary entry - FROZEN]
 │   ├── fault/
-│   │   ├── mod.rs                 [Fault module - FROZEN]
-│   │   ├── rollback.rs            [Checkpoint system - FROZEN]
-│   │   ├── quarantine.rs          [Error handling - FROZEN]
-│   │   └── governor_correction.rs [Correction logging - FROZEN]
+│   │   ├── mod.rs                 Fault module - FROZEN]
+│   │   ├── rollback.rs            Checkpoint system - FROZEN]
+│   │   ├── quarantine.rs          Error handling - FROZEN]
+│   │   └── governor_correction.rs Correction logging - FROZEN]
 │   ├── telemetry/
-│   │   ├── mod.rs                 [Telemetry module - FROZEN]
-│   │   └── schema.rs              [OpenTelemetry records - FROZEN]
+│   │   ├── mod.rs                 Telemetry module - FROZEN]
+│   │   └── schema.rs              OpenTelemetry records - FROZEN]
 │   └── lineage/
-│       ├── mod.rs                 [Lineage module - FROZEN]
-│       ├── snapshot.rs            [SHA256 snapshots - FROZEN]
-│       ├── shard.rs               [Shard rotation - FROZEN]
-│       └── replay_episode.rs      [Episode validation - FROZEN]
+│       ├── mod.rs                 Lineage module - FROZEN]
+│       ├── snapshot.rs            SHA256 snapshots - FROZEN]
+│       ├── shard.rs               Shard rotation - FROZEN]
+│       └── replay_episode.rs      Episode validation - FROZEN]
 ├── tests/
-│   ├── hardening_fuzz.rs          [7 fuzz tests - FROZEN]
-│   ├── hardening_concurrency.rs   [9 concurrency tests - FROZEN]
-│   └── integration_validation.rs  [6 integration tests - FROZEN]
-├── APEX_CLARIFICATIONS.md         [Clarification specs - FROZEN]
-├── SUBSTRATE_FREEZE.md            [Freeze declaration - FROZEN]
-├── CERTIFICATION_DOSSIER.md       [Pilot data template]
-├── CONNECTOME_V2_SCAFFOLD.md      [Connectome architecture]
-├── SCG_PILOT_01_LAUNCH.md         [Pilot launch guide]
-├── STATUS.md                      [THIS FILE]
-├── Cargo.toml                     [Dependencies]
-└── README.md                      [Project overview]
+│   ├── hardening_fuzz.rs          7 fuzz tests - FROZEN]
+│   ├── hardening_concurrency.rs   9 concurrency tests - FROZEN]
+│   └── integration_validation.rs  6 integration tests - FROZEN]
+├── APEX_CLARIFICATIONS.md         Clarification specs - FROZEN]
+├── SUBSTRATE_FREEZE.md            Freeze declaration - FROZEN]
+├── CERTIFICATION_DOSSIER.md       Pilot data template]
+├── CONNECTOME_V2_SCAFFOLD.md      Connectome architecture]
+├── SCG_PILOT_01_LAUNCH.md         Pilot launch guide]
+├── STATUS.md                      THIS FILE]
+├── Cargo.toml                     Dependencies]
+└── README.md                      Project overview]
 ```
 
 ---
@@ -951,20 +951,20 @@ scg_mcp_server/
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **Substrate Version** | v1.0.0-substrate | ✅ Tagged |
-| **Commit** | 3cc4d99 | ✅ Pushed |
-| **Tests Passing** | 46/46 | ✅ 100% |
-| **Test Coverage** | ≥80% | ✅ Compliant |
-| **Frozen Components** | 18 modules | ✅ Immutable |
-| **Runtime Invariants** | 7 enforced | ✅ Automatic |
-| **CI/CD Guard** | Active | ✅ Enforcing |
-| **Pilot Configuration** | Complete | ✅ Ready |
-| **Pilot Day-0** | Complete | ✅ Deployed |
-| **Pilot Quarantine Status** | Cleared | ✅ Stable |
-| **Pilot Monitoring** | Operational | ✅ Active |
-| **Certification Template** | Published | ✅ Ready |
-| **Connectome Architecture** | Defined | ✅ Scaffolded |
-| **LTS Strategy** | 24-month | ✅ Documented |
+| **Substrate Version** | v1.0.0-substrate |  Tagged |
+| **Commit** | 3cc4d99 |  Pushed |
+| **Tests Passing** | 46/46 |  100% |
+| **Test Coverage** | ≥80% |  Compliant |
+| **Frozen Components** | 18 modules |  Immutable |
+| **Runtime Invariants** | 7 enforced |  Automatic |
+| **CI/CD Guard** | Active |  Enforcing |
+| **Pilot Configuration** | Complete |  Ready |
+| **Pilot Day-0** | Complete |  Deployed |
+| **Pilot Quarantine Status** | Cleared |  Stable |
+| **Pilot Monitoring** | Operational |  Active |
+| **Certification Template** | Published |  Ready |
+| **Connectome Architecture** | Defined |  Scaffolded |
+| **LTS Strategy** | 24-month |  Documented |
 
 ---
 
@@ -996,7 +996,7 @@ RUST_LOG=debug cargo run
 cargo run --release
 
 # With telemetry emission visible
-cargo run --release 2>&1 | grep -E "\[TELEMETRY\]|\[GOVERNOR_CORRECTION\]|\[SHARD_FINALIZED\]"
+cargo run --release 2>&1 | grep -E "\TELEMETRY\]|\GOVERNOR_CORRECTION\]|\SHARD_FINALIZED\]"
 ```
 
 ### Pilot Deployment
@@ -1029,12 +1029,12 @@ git commit -m "SUBSTRATE_OVERRIDE: fix critical bug in energy calculation"
 ## Security & Compliance
 
 ### Audit Trail
-- ✅ All operations emit telemetry with JSON records
-- ✅ Governor corrections logged to stderr with timestamps
-- ✅ Shard finalizations logged with global hashes
-- ✅ Lineage integrity guaranteed by SHA256 chain
-- ✅ Immutable fault traces in quarantine system
-- ✅ CI/CD enforcement prevents unauthorized substrate changes
+-  All operations emit telemetry with JSON records
+-  Governor corrections logged to stderr with timestamps
+-  Shard finalizations logged with global hashes
+-  Lineage integrity guaranteed by SHA256 chain
+-  Immutable fault traces in quarantine system
+-  CI/CD enforcement prevents unauthorized substrate changes
 
 ### Compliance Artifacts
 - `SUBSTRATE_FREEZE.md`: Immutable boundary declaration
@@ -1086,15 +1086,15 @@ git commit -m "SUBSTRATE_OVERRIDE: fix critical bug in energy calculation"
 ## Next Steps
 
 ### Immediate (This Week)
-1. ✅ Substrate frozen and tagged (v1.0.0-substrate)
-2. ✅ CI/CD guard deployed
-3. ✅ Pilot launch guide published
-4. ✅ Certification dossier prepared
-5. ✅ Connectome architecture scaffolded
-6. ✅ **Launch SCG-PILOT-01** (Day-0 COMPLETE)
-7. ✅ Deploy infrastructure (OTEL collector + substrate)
-8. ✅ Activate substrate and clear quarantine
-9. ✅ Generate Day-0 baseline artifacts
+1.  Substrate frozen and tagged (v1.0.0-substrate)
+2.  CI/CD guard deployed
+3.  Pilot launch guide published
+4.  Certification dossier prepared
+5.  Connectome architecture scaffolded
+6.  **Launch SCG-PILOT-01** (Day-0 COMPLETE)
+7.  Deploy infrastructure (OTEL collector + substrate)
+8.  Activate substrate and clear quarantine
+9.  Generate Day-0 baseline artifacts
 10. ⏳ **Collect 6-12h baseline window** (in progress)
 
 ### Short-Term (Next 7 Days)
