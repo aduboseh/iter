@@ -5,10 +5,21 @@
 #
 # Author: Armonti Du-Bose-Hill
 # Organization: Only SG Solutions
-# Version: 1.0.0 (Certified)
+# Version: 1.0.1 (Certified)
 #
 # This script demonstrates the SCG substrate's core capabilities with
 # human-friendly narration between phases. Designed for live presentations.
+#
+# NOTE: This script displays the CERTIFIED SCG demo output with narration.
+#       The output shown is the verified, deterministic baseline from the
+#       certification process. For live substrate execution, run:
+#
+#           docker run --rm scg-demo-package:v1.0 ./demos/scg_demo.sh
+#
+# MODES:
+#   SCG_DEMO_MODE=narrator  (default) - Narrated presentation with certified output
+#   SCG_DEMO_MODE=live      - Execute against live SCG substrate (requires runtime)
+#
 #===============================================================================
 
 set -euo pipefail
@@ -44,7 +55,17 @@ REQUEST_ID=1
 # ║                         HELPER FUNCTIONS                                   ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
+# Demo mode (narrator = certified output with narration, live = real substrate)
+SCG_DEMO_MODE="${SCG_DEMO_MODE:-narrator}"
+
 print_banner() {
+    local mode_label
+    if [[ "$SCG_DEMO_MODE" == "live" ]]; then
+        mode_label="LIVE EXECUTION"
+    else
+        mode_label="CERTIFIED OUTPUT (Narrated)"
+    fi
+    
     echo ""
     echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║${NC}                                                                           ${CYAN}║${NC}"
@@ -52,6 +73,7 @@ print_banner() {
     echo -e "${CYAN}║${NC}   ${DIM}Deterministic Cognitive Engine with MCP Interface${NC}                     ${CYAN}║${NC}"
     echo -e "${CYAN}║${NC}                                                                           ${CYAN}║${NC}"
     echo -e "${CYAN}║${NC}   ${DIM}Author: Armonti Du-Bose-Hill | Only SG Solutions${NC}                       ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}   ${DIM}Mode: ${mode_label}${NC}                                      ${CYAN}║${NC}"
     echo -e "${CYAN}║${NC}                                                                           ${CYAN}║${NC}"
     echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
