@@ -1,0 +1,20 @@
+// SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+// Lineage: MCP_BOUNDARY_V2.0
+// Generated under SCG_Governance_v1.0
+
+//! Sanitizer Module - MCP Boundary Protection
+//!
+//! Ensures no SCG substrate internals leak through the MCP boundary.
+
+pub mod forbidden;
+pub mod response;
+
+// Re-export commonly used items
+pub use forbidden::{
+    contains_forbidden, is_forbidden, normalize_for_matching, FORBIDDEN_PATTERNS,
+    SENSITIVE_PATTERNS,
+};
+pub use response::{
+    ResponseSanitizer, SanitizationResult, SanitizedGovernorStatus, SanitizedNodeState,
+    SanitizedTraceSummary,
+};

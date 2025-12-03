@@ -1,0 +1,32 @@
+# SCG MCP Server CODEOWNERS
+# Defines approval requirements for sensitive files and directories.
+#
+# MCP Hardening v2.0 — Sealed 2025-12-03
+# Authority: SCG Governor / Founder
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROTECTED: Forbidden Pattern Registry
+# Any modification requires founder-level approval.
+# ══════════════════════════════════════════════════════════════════════════════
+/src/services/sanitizer/forbidden.rs    @aduboseh
+/src/services/sanitizer/                @aduboseh
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROTECTED: MCP Integration Tests
+# Changes to boundary tests require review to prevent regression.
+# ══════════════════════════════════════════════════════════════════════════════
+/tests/integration/                     @aduboseh
+/tests/snapshots/                       @aduboseh
+/tests/mcp_integration.rs               @aduboseh
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROTECTED: CI Workflows
+# Prevents bypassing merge gates.
+# ══════════════════════════════════════════════════════════════════════════════
+/.github/workflows/                     @aduboseh
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROTECTED: MCP Handler
+# Core boundary enforcement point.
+# ══════════════════════════════════════════════════════════════════════════════
+/src/mcp_handler.rs                     @aduboseh

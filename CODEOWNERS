@@ -1,0 +1,74 @@
+# SCG MCP Server CODEOWNERS
+# Defines code ownership and review requirements for the SCG MCP boundary layer.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# =============================================================================
+# SUBSTRATE BRIDGE (Founder Approval Required)
+# This is the ONLY import point for the SCG substrate.
+# Any changes require explicit founder review.
+# =============================================================================
+
+/src/scg_core.rs                         @Armonti
+
+# =============================================================================
+# GOVERNANCE MODULE (Founder Approval Required)
+# Governance validation and health endpoints.
+# =============================================================================
+
+/src/governance.rs                       @Armonti
+/governance/**                           @Armonti
+/lineage/**                              @Armonti
+
+# =============================================================================
+# FAULT TOLERANCE (Founder + MCP Team)
+# Quarantine, rollback, and governor correction.
+# =============================================================================
+
+/src/fault/**                            @Armonti @mcp-engineering
+
+# =============================================================================
+# LINEAGE TRACKING (Founder + MCP Team)
+# Replay, snapshots, and sharding.
+# =============================================================================
+
+/src/lineage/**                          @Armonti @mcp-engineering
+
+# =============================================================================
+# MCP HANDLER AND TYPES (MCP Engineering Team)
+# RPC handlers, type definitions, main entry point.
+# =============================================================================
+
+/src/mcp_handler.rs                      @mcp-engineering
+/src/types.rs                            @mcp-engineering
+/src/main.rs                             @mcp-engineering
+/src/lib.rs                              @mcp-engineering
+
+# =============================================================================
+# TELEMETRY (MCP Engineering Team)
+# Observability, metrics, logging.
+# =============================================================================
+
+/src/telemetry/**                        @mcp-engineering
+
+# =============================================================================
+# INFRASTRUCTURE AND DEPLOYMENT
+# =============================================================================
+
+/deploy/**                               @mcp-engineering @devops
+/.github/**                              @Armonti @mcp-engineering
+
+# =============================================================================
+# GOVERNANCE AND CONFIGURATION FILES
+# =============================================================================
+
+WARP.md                                  @Armonti
+.mcp-context                             @Armonti
+/Cargo.toml                              @Armonti @mcp-engineering
+
+# =============================================================================
+# DOCUMENTATION AND SCRIPTS
+# =============================================================================
+
+/docs/**                                 @mcp-engineering
+/scripts/**                              @mcp-engineering
+/audits/**                               @Armonti

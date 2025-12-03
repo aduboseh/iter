@@ -1,0 +1,66 @@
+#!/bin/bash
+# SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+# Lineage: 9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527
+# Generated under SCG_Governance_v1.0
+
+# Pre-commit hook to enforce SCG governance headers
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "SCG Pre-commit: Checking governance compliance..."
+
+# Get staged files
+STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.rs$' || true)
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+
+MISSING_HEADERS=()
+
+# Check Rust files
+for file in $STAGED_RS; do
+    if [ -f "$file" ]; then
+        if ! head -3 "$file" | grep -q "SCG Governance"; then
+            MISSING_HEADERS+=("$file")
+        fi
+    fi
+done
+
+# Check Python files
+for file in $STAGED_PY; do
+    if [ -f "$file" ]; then
+        # Account for potential shebang
+        if ! head -5 "$file" | grep -q "SCG Governance"; then
+            MISSING_HEADERS+=("$file")
+        fi
+    fi
+done
+
+if [ ${#MISSING_HEADERS[@]} -gt 0 ]; then
+    echo ""
+    echo "⚠️  SCG GOVERNANCE WARNING"
+    echo "The following files are missing SCG governance headers:"
+    for file in "${MISSING_HEADERS[@]}"; do
+        echo "  - $file"
+    done
+    echo ""
+    echo "To add headers, run:"
+    echo "  ./scripts/add_scg_header.sh ${MISSING_HEADERS[*]}"
+    echo ""
+    echo "Required header format:"
+    echo "  // SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10"
+    echo "  // Lineage: <SHA256>"
+    echo "  // Generated under SCG_Governance_v1.0"
+    echo ""
+    
+    # Allow commit with warning (change to exit 1 to block)
+    read -p "Continue commit without headers? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Commit aborted. Add headers and try again."
+        exit 1
+    fi
+fi
+
+echo "✓ SCG governance check complete"

@@ -1,0 +1,154 @@
+{
+  "version": "2.0.0",
+  "generated": "2025-12-03T20:00:00Z",
+  "description": "Golden file for MCP response regression detection",
+  "tools": {
+    "node.create": {
+      "expected_fields": [
+        "id",
+        "belief",
+        "energy",
+        "esv_valid"
+      ],
+      "forbidden_fields": [
+        "dag_topology",
+        "adjacency",
+        "internal_state",
+        "esv_raw"
+      ]
+    },
+    "node.query": {
+      "expected_fields": [
+        "id",
+        "belief",
+        "energy",
+        "esv_valid"
+      ],
+      "forbidden_fields": [
+        "dag_topology",
+        "adjacency",
+        "internal_state",
+        "node_internal_state"
+      ]
+    },
+    "node.mutate": {
+      "expected_fields": [
+        "id",
+        "belief",
+        "energy",
+        "esv_valid"
+      ],
+      "forbidden_fields": [
+        "esv_raw",
+        "ethical_gradient",
+        "internal_state"
+      ]
+    },
+    "edge.bind": {
+      "expected_fields": [
+        "id",
+        "src",
+        "dst",
+        "weight"
+      ],
+      "forbidden_fields": [
+        "dag_topology",
+        "adjacency",
+        "topology",
+        "edge_weights",
+        "adjacency_matrix"
+      ]
+    },
+    "edge.propagate": {
+      "expected_fields": [],
+      "forbidden_fields": [
+        "propagation_path",
+        "belief_vector",
+        "energy_redistribution"
+      ]
+    },
+    "governor.status": {
+      "expected_fields": [
+        "energy_drift",
+        "coherence",
+        "node_count",
+        "edge_count"
+      ],
+      "forbidden_fields": [
+        "governor_quorum_state",
+        "drift_correction_vector",
+        "node_energy_deltas",
+        "consensus_votes",
+        "quorum_members"
+      ]
+    },
+    "esv.audit": {
+      "expected_fields": [],
+      "forbidden_fields": [
+        "esv_raw",
+        "esv_matrix",
+        "ethical_gradient",
+        "harm_potential_raw",
+        "truth_confidence_internal"
+      ]
+    },
+    "lineage.replay": {
+      "expected_fields": [
+        "id",
+        "op",
+        "checksum"
+      ],
+      "forbidden_fields": [
+        "lineage_hash_chain",
+        "cascade_hash_internal",
+        "parent_hash",
+        "full_lineage",
+        "lineage_entries"
+      ]
+    },
+    "governance.status": {
+      "expected_fields": [
+        "governance_version",
+        "checksum_valid",
+        "drift_within_bounds",
+        "esv_enabled"
+      ],
+      "forbidden_fields": [
+        "internal_state",
+        "substrate_state",
+        "raw_state"
+      ]
+    }
+  },
+  "protocol": {
+    "initialize": {
+      "expected_fields": [
+        "protocolVersion",
+        "capabilities",
+        "serverInfo"
+      ],
+      "forbidden_fields": [
+        "internal_state",
+        "debug_info"
+      ]
+    },
+    "tools/list": {
+      "expected_fields": [
+        "tools"
+      ],
+      "forbidden_fields": [
+        "internal_implementation",
+        "substrate_internals"
+      ]
+    }
+  },
+  "error_responses": {
+    "forbidden_fields": [
+      "stack_trace",
+      "backtrace",
+      "panic_message",
+      "internal_error",
+      "debug_info"
+    ]
+  }
+}

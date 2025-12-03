@@ -1,0 +1,110 @@
+# SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+# Lineage: 9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527
+# Generated under SCG_Governance_v1.0
+
+name: Verify SCG Rules Consistency
+
+on:
+  push:
+    paths:
+      - 'WARP.md'
+      - 'governance/**'
+  pull_request:
+    paths:
+      - 'WARP.md'
+      - 'governance/**'
+  workflow_dispatch:
+  schedule:
+    # Run weekly integrity check
+    - cron: '0 0 * * 0'
+
+env:
+  # Frozen governance checksum - must match SCG_Governance_v1.0.md
+  EXPECTED_GOVERNANCE_SHA256: "9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527"
+
+jobs:
+  verify-governance-integrity:
+    name: Verify Governance Manifest Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scg_mcp_server
+        uses: actions/checkout@v4
+        with:
+          path: scg_mcp_server
+
+      - name: Checkout SCG
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/SCG
+          path: scg
+          # If private repo, uncomment:
+          # token: ${{ secrets.SCG_CROSS_REPO_TOKEN }}
+
+      - name: Verify MCP governance checksum
+        id: mcp_checksum
+        run: |
+          ACTUAL_SHA=$(sha256sum scg_mcp_server/governance/SCG_Governance_v1.0.md | cut -d' ' -f1 | tr 'a-f' 'A-F')
+          echo "MCP Governance SHA256: $ACTUAL_SHA"
+          echo "mcp_sha=$ACTUAL_SHA" >> $GITHUB_OUTPUT
+          if [ "$ACTUAL_SHA" != "$EXPECTED_GOVERNANCE_SHA256" ]; then
+            echo "::error::MCP governance checksum mismatch!"
+            echo "Expected: $EXPECTED_GOVERNANCE_SHA256"
+            echo "Actual:   $ACTUAL_SHA"
+            exit 1
+          fi
+          echo "✓ MCP governance checksum verified"
+
+      - name: Verify SCG governance checksum
+        id: scg_checksum
+        run: |
+          ACTUAL_SHA=$(sha256sum scg/governance/SCG_Governance_v1.0.md | cut -d' ' -f1 | tr 'a-f' 'A-F')
+          echo "SCG Governance SHA256: $ACTUAL_SHA"
+          echo "scg_sha=$ACTUAL_SHA" >> $GITHUB_OUTPUT
+          if [ "$ACTUAL_SHA" != "$EXPECTED_GOVERNANCE_SHA256" ]; then
+            echo "::error::SCG governance checksum mismatch!"
+            echo "Expected: $EXPECTED_GOVERNANCE_SHA256"
+            echo "Actual:   $ACTUAL_SHA"
+            exit 1
+          fi
+          echo "✓ SCG governance checksum verified"
+
+      - name: Verify cross-repo consistency
+        run: |
+          echo "Comparing governance manifests between repos..."
+          if ! diff -q scg/governance/SCG_Governance_v1.0.md scg_mcp_server/governance/SCG_Governance_v1.0.md; then
+            echo "::error::Governance manifests differ between SCG and scg_mcp_server!"
+            diff scg/governance/SCG_Governance_v1.0.md scg_mcp_server/governance/SCG_Governance_v1.0.md || true
+            exit 1
+          fi
+          echo "✓ Cross-repo governance consistency verified"
+
+      - name: Verify WARP.md rule files
+        run: |
+          echo "Comparing WARP.md project rules..."
+          SCG_WARP_SHA=$(sha256sum scg/WARP.md | cut -d' ' -f1)
+          MCP_WARP_SHA=$(sha256sum scg_mcp_server/WARP.md | cut -d' ' -f1)
+          echo "SCG WARP.md SHA256: $SCG_WARP_SHA"
+          echo "MCP WARP.md SHA256: $MCP_WARP_SHA"
+          
+          # Check that both files exist and are non-empty
+          if [ ! -s scg/WARP.md ]; then
+            echo "::error::SCG WARP.md is missing or empty!"
+            exit 1
+          fi
+          if [ ! -s scg_mcp_server/WARP.md ]; then
+            echo "::error::MCP WARP.md is missing or empty!"
+            exit 1
+          fi
+          
+          echo "✓ WARP.md files present in both repos"
+
+      - name: Generate integrity report
+        if: always()
+        run: |
+          echo "=== SCG Governance Integrity Report ==="
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "MCP Governance SHA256: ${{ steps.mcp_checksum.outputs.mcp_sha }}"
+          echo "SCG Governance SHA256: ${{ steps.scg_checksum.outputs.scg_sha }}"
+          echo "Expected SHA256: $EXPECTED_GOVERNANCE_SHA256"
+          echo "Status: ${{ job.status }}"
+          echo "========================================"

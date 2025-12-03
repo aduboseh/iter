@@ -1,7 +1,9 @@
 pub mod fault;
+pub mod governance;
 pub mod lineage;
 pub mod mcp_handler;
 pub mod scg_core;
+pub mod services;
 pub mod telemetry;
 /// SCG MCP Server - Library Interface
 ///
