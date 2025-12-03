@@ -1,3 +1,4 @@
+use crate::governance::GovernanceValidator;
 use crate::scg_core::ScgRuntime;
 use crate::types::*;
 use serde::Deserialize;
@@ -209,6 +210,17 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                                 }
                             },
                             "required": ["path"]
+                        }
+                    },
+                    {
+                        "name": "governance.status",
+                        "description": "Query SCG governance health status including checksum validity, drift, and ESV status",
+                        "version": "1.0.0",
+                        "sideEffects": [],
+                        "dependencies": [],
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {}
                         }
                     }
                 ]
@@ -516,6 +528,28 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                                 "path": p.path,
                                 "checksum": checksum
                             })).unwrap_or_default()
+                        }
+                    ]
+                }),
+            )
+        }
+
+        "governance.status" => {
+            // Get current drift from governor status
+            let gov_status = runtime.governor_status();
+            
+            // Create governance validator and get status
+            let mut validator = GovernanceValidator::new();
+            validator.set_drift(gov_status.energy_drift);
+            let status = validator.health_status();
+            
+            RpcResponse::success(
+                id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&status).unwrap_or_else(|_| format!("{:?}", status))
                         }
                     ]
                 }),

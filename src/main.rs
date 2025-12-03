@@ -1,7 +1,9 @@
 mod fault;
+mod governance;
 mod lineage;
 mod mcp_handler;
 mod scg_core;
+mod services;
 mod telemetry;
 mod types;
 

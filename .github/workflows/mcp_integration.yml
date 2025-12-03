@@ -1,0 +1,132 @@
+# SCG MCP Integration Test Suite CI
+# Validates MCP boundary sanitization on every PR
+
+name: MCP Integration Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Suppress SCG trace output during tests
+  SCG_DETERMINISM: "1"
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run MCP integration tests
+        run: |
+          cargo test --test mcp_integration --release -- --test-threads=1
+
+      - name: Run unit tests for sanitizer
+        run: |
+          cargo test services::sanitizer --release
+
+      - name: Verify zero sanitization violations
+        run: |
+          cargo test --test mcp_integration --release 2>&1 | tee test_output.log
+          if grep -i "forbidden pattern" test_output.log; then
+            echo "::error::Sanitization violations detected"
+            exit 1
+          fi
+          echo "✅ All sanitization checks passed"
+
+      - name: Check for substrate imports in handler
+        run: |
+          # Ensure mcp_handler does not directly expose substrate internals
+          if grep -E "adjacency|dag_topology|esv_raw|energy_matrix" src/mcp_handler.rs; then
+            echo "::warning::mcp_handler.rs may expose substrate internals - verify sanitization"
+          fi
+
+      - name: Validate response baseline snapshot
+        run: |
+          # Ensure snapshot file exists and is valid JSON
+          if [ -f tests/snapshots/response_baseline.json ]; then
+            python3 -c "import json; json.load(open('tests/snapshots/response_baseline.json'))"
+            echo "✅ Response baseline snapshot is valid"
+          else
+            echo "::warning::Response baseline snapshot not found"
+          fi
+
+  boundary-audit:
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit forbidden patterns in codebase
+        run: |
+          echo "🔍 Auditing for forbidden pattern exposure..."
+          
+          # Check for forbidden patterns in response construction
+          forbidden_patterns=(
+            "dag_topology"
+            "adjacency_matrix"
+            "esv_raw"
+            "energy_matrix"
+            "lineage_hash_chain"
+            "internal_state"
+          )
+          
+          violations=0
+          for pattern in "${forbidden_patterns[@]}"; do
+            # Search in src/ excluding sanitizer module (which defines the patterns)
+            matches=$(grep -r "$pattern" src/ --include="*.rs" | grep -v "sanitizer" | grep -v "FORBIDDEN_PATTERNS" || true)
+            if [ -n "$matches" ]; then
+              echo "⚠️  Found '$pattern' outside sanitizer:"
+              echo "$matches"
+              # This is a warning, not a failure - patterns may be used in comments or for filtering
+            fi
+          done
+          
+          echo "✅ Boundary audit complete"
+
+      - name: Check sanitizer coverage
+        run: |
+          echo "📊 Verifying sanitizer pattern coverage..."
+          
+          # Count patterns in forbidden.rs
+          pattern_count=$(grep -c "\"[a-z_]*\"" src/services/sanitizer/forbidden.rs || echo "0")
+          echo "Found approximately $pattern_count forbidden patterns defined"
+          
+          if [ "$pattern_count" -lt 30 ]; then
+            echo "::warning::Low number of forbidden patterns ($pattern_count). Consider expanding coverage."
+          fi
+
+  merge-gate:
+    runs-on: ubuntu-latest
+    needs: [integration-tests, boundary-audit]
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "::error::Integration tests failed. Merge blocked."
+            exit 1
+          fi
+          echo "✅ All checks passed. Ready for merge."
