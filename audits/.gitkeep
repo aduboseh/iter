@@ -1,0 +1,3 @@
+# SCG Quarterly Audit Reports
+# Structure: /audits/YYYY_QX/audit_report_YYYYMMDD_HHMMSS.md
+# Run: ./scripts/scg_audit.sh

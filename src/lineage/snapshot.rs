@@ -280,7 +280,7 @@ mod tests {
 
         let entries = builder.build();
 
-        let snapshot = LineageSnapshot::create(LineageSnapshot::CreateArgs {
+        let snapshot = LineageSnapshot::create(CreateArgs {
             cluster_id: "SCG-TEST".into(),
             entries,
             node_count: 10,
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_replay_validation() {
-        let snapshot = LineageSnapshot::create(LineageSnapshot::CreateArgs {
+        let snapshot = LineageSnapshot::create(CreateArgs {
             cluster_id: "SCG-TEST".into(),
             entries: vec![],
             node_count: 0,
