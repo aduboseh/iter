@@ -27,7 +27,7 @@ jobs:
         with:
           repository: aduboseh/SCG
           path: SCG
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SCG_PAT }}
 
       - name: Patch Cargo.toml for CI path
         run: |
