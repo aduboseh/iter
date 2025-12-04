@@ -1,1 +1,11 @@
-governance/*.md text eol=lf
+# SCG MCP Server Line Ending Normalization
+# All text files use LF to ensure deterministic SHA256 checksums
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+*.py text eol=lf

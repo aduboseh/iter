@@ -135,6 +135,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify no CRLF line endings
+        run: |
+          echo "🔍 Checking for CRLF line endings..."
+          if grep -rIl $'\r' --include="*.rs" --include="*.md" --include="*.toml" --include="*.yml" --include="*.yaml" --include="*.json" . 2>/dev/null; then
+            echo "::error::CRLF detected — line ending drift invalidates SHA256 checksums"
+            exit 1
+          fi
+          echo "✅ Line endings OK (LF only)"
+
       - name: Verify stability baseline exists
         run: |
           echo "🔒 Verifying stability baseline integrity..."
