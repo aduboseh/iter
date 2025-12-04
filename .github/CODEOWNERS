@@ -26,6 +26,12 @@
 /.github/workflows/                     @aduboseh
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PROTECTED: Stability Baseline
+# Frozen audit artifacts — any modification requires founder approval.
+# ══════════════════════════════════════════════════════════════════════════════
+/audits/stability_v0.2.0/*              @aduboseh
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PROTECTED: MCP Handler
 # Core boundary enforcement point.
 # ══════════════════════════════════════════════════════════════════════════════
