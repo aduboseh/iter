@@ -1,6 +1,6 @@
 // SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
-// Lineage: 9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527
-// Generated under SCG_Governance_v1.0
+// Lineage: 2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46
+// Generated under SCG_Governance_v1.0.1
 
 //! SCG Governance Module for MCP Server
 //!
@@ -11,10 +11,10 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 /// Governance version
-pub const GOVERNANCE_VERSION: &str = "1.0";
+pub const GOVERNANCE_VERSION: &str = "1.0.1";
 
-/// Expected SHA256 checksum of SCG_Governance_v1.0.md
-pub const GOVERNANCE_SHA256: &str = "9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527";
+/// Expected SHA256 checksum of SCG_Governance_v1.0.md (LF-normalized)
+pub const GOVERNANCE_SHA256: &str = "2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46";
 
 /// Maximum allowed deterministic drift (ε)
 pub const DRIFT_EPSILON: f64 = 1e-10;
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_governance_constants() {
-        assert_eq!(GOVERNANCE_VERSION, "1.0");
+        assert_eq!(GOVERNANCE_VERSION, "1.0.1");
         assert_eq!(GOVERNANCE_SHA256.len(), 64);
         assert!(DRIFT_EPSILON < 1e-9);
     }
