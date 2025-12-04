@@ -1,260 +1,321 @@
-<div align="center">
+# 🧠 SCG MCP Server
 
-# 🧠 SCG Substrate
-### Deterministic Cognitive Engine with MCP Interface
+**The secure MCP interface to the SCG cognitive substrate**
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/OnlySGSolutions/scg_mcp_server/releases)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
-[![MCP](https://img.shields.io/badge/MCP-2.0-green.svg)](https://modelcontextprotocol.io)
-[![Certification](https://img.shields.io/badge/certified-cryptographic_determinism-gold.svg)](docs/RUN_CERTIFICATION.md)
-
-**The deterministic reasoning substrate behind the SCG ecosystem**
-
-[Quick Start](#-quick-start) • [Documentation](#-documentation) • [Demo Package](#-certified-demo-package) • [Architecture](#-architecture) • [Examples](#-usage-examples)
-
-</div>
+[![CI](https://github.com/aduboseh/scg-mcp/actions/workflows/mcp_integration.yml/badge.svg)](https://github.com/aduboseh/scg-mcp/actions/workflows/mcp_integration.yml)
+[![Governance](https://github.com/aduboseh/scg-mcp/actions/workflows/verify_rules_consistency.yml/badge.svg)](https://github.com/aduboseh/scg-mcp/actions/workflows/verify_rules_consistency.yml)
+[![MCP](https://img.shields.io/badge/MCP-2024--11--05-blue)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/license-proprietary-red)]()
 
 ---
 
-## 🎯 What is SCG?
+## What is this?
 
-The **SCG Substrate** is a constraint-enforced, safety-critical cognitive engine designed for deterministic reasoning.  
-This repository exposes SCG through a **Model Context Protocol (MCP)** interface with full JSON-RPC 2.0 compliance.
-
-Every operation—node creation, propagation, constraint rejection, lineage export—is **cryptographically verifiable and invariant-controlled**.
-
-SCG's purpose:  
-**Provide mathematically-governed reasoning primitives where stability, explainability, and auditability are mandatory.**
-
----
-
-## 🔬 Key Differentiators
-
-| Property | Traditional Graphs | SCG Substrate |
-|----------|-------------------|---------------|
-| State Model | CRUD | Belief-weighted coherence-tracked state |
-| Cycle Handling | Undefined/manual | Cycle-aware propagation with energy conservation |
-| Safety | Application-level | Substrate-level Ethical State Vector (ESV) |
-| Auditability | Logs/timestamps | Merkle-style lineage receipts |
-| Determinism | Best-effort | Cryptographically proven (dual-run SHA-256) |
-
----
-
-## 👥 Who Uses SCG?
-
-- **Security researchers** evaluating deterministic behavior and drift bounds  
-- **Enterprise engineers** needing predictable reasoning under regulatory constraints  
-- **AI safety researchers** analyzing invariant-governed cognitive systems  
-- **Compliance teams** requiring complete audit chains  
-
----
-
-## 🚫 What SCG Is NOT
-
-- ❌ Not a domain system (no healthcare, mobility, finance logic)  
-- ❌ Not an LLM, RAG, vector DB, agent, or chatbot  
-- ❌ Not a wrapper around a foundation model  
-- ❌ Not a knowledge graph database  
-
-**SCG is a substrate.**  
-Domains attach above it as envelopes.
-
----
-
-## 🏗️ Architecture
-
-### High-Level Diagram
+This repository provides a **Model Context Protocol (MCP)** server that exposes the [SCG cognitive substrate](https://github.com/aduboseh/SCG) to AI assistants like Claude, GPT, and other MCP-compatible clients.
 
 ```
-Application / Domain Envelopes
-            │
-            ▼
-  MCP Interface (JSON-RPC 2.0)
-            │
-            ▼
-      SCG Substrate Core
-┌──────────────────────────────┐
-│ Nodes • Edges • ESV • Lineage │
-└──────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        AI Assistant                             │
+│                   (Claude, GPT, etc.)                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ MCP Protocol (JSON-RPC 2.0)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                      SCG MCP Server                             │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   MCP       │  │  Response   │  │   Forbidden Pattern     │  │
+│  │  Handler    │──│  Sanitizer  │──│   Registry (60+ rules)  │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│         │                                                       │
+│         │ Safe, sanitized operations                            │
+│         ▼                                                       │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              SCG Runtime (scg-connectome)               │    │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐    │    │
+│  │  │  Nodes  │ │  Edges  │ │Governor │ │   Lineage   │    │    │
+│  │  │ (belief)│ │(weights)│ │  (ESV)  │ │  (SHA-256)  │    │    │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Substrate Layer
+**Key insight**: The MCP server acts as a *security boundary* between AI assistants and SCG internals. It prevents substrate reconstruction attacks while still exposing useful cognitive primitives.
 
-**Nodes**  
-Belief-weighted entities with confidence ∈ [0.0, 1.0].
+---
 
-**Edges**  
-Directional relationships supporting:
-- acyclic flows  
-- cycles with energy conservation  
-- bounded self-loops  
+## Why does this exist?
 
-**Governor (ESV)**  
-Constraint enforcement layer ensuring:
-- drift ≤ **1e-10**  
-- deterministic rejection of unsafe operations  
-- fixed error codes (`-32001`)  
+SCG (Substrate Cognitive Graph) is a deterministic reasoning engine with cryptographic auditability. But exposing it directly to AI models is dangerous—an adversary could:
 
-**Lineage**  
-Merkle-style chain with:
-- SHA-256 proof per operation  
-- invariant preservation proofs  
-- episode-based receipts  
+- 🔴 Reconstruct the internal topology to game the system
+- 🔴 Bypass ethical constraints (ESV) by manipulating raw state
+- 🔴 Forge lineage records to hide malicious operations
 
-### MCP Interface (JSON-RPC 2.0)
+This MCP server solves that by providing a **hardened boundary**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     WHAT AI SEES                                │
+├─────────────────────────────────────────────────────────────────┤
+│  ✅ node.create     → Create belief nodes                       │
+│  ✅ node.mutate     → Adjust beliefs (ESV-guarded)              │
+│  ✅ edge.bind       → Connect nodes                             │
+│  ✅ governor.status → Check system health                       │
+│  ✅ lineage.replay  → Audit trail (summaries only)              │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                  WHAT AI NEVER SEES                             │
+├─────────────────────────────────────────────────────────────────┤
+│  ❌ dag_topology        → No internal graph structure           │
+│  ❌ adjacency_matrix    → No connection patterns                │
+│  ❌ esv_raw             → No raw ethical state vectors          │
+│  ❌ energy_matrix       → No energy distribution details        │
+│  ❌ lineage_hash_chain  → No raw merkle chain access            │
+│  ❌ ... 60+ more patterns blocked                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Available MCP Tools
+
+| Tool | Description | Side Effects |
+|------|-------------|--------------|
+| `node.create` | Create a new belief node with initial belief and energy | state_mutation, lineage_append |
+| `node.mutate` | Adjust a node's belief value (ESV-guarded) | state_mutation, esv_validation |
+| `node.query` | Query current state of a node | none |
+| `edge.bind` | Create weighted connection between nodes | topology_change, lineage_append |
+| `edge.propagate` | Propagate belief along an edge | energy_transfer, lineage_append |
+| `governor.status` | Check drift and coherence status | none |
+| `esv.audit` | Audit a node's ethical state vector | esv_validation |
+| `lineage.replay` | Get lineage checksum history | none |
+| `lineage.export` | Export lineage log to file | filesystem_write |
+| `governance.status` | Full governance health check | none |
+
+### Example: Create and Connect Nodes
 
 ```json
+// 1. Create first node
+{"jsonrpc":"2.0","method":"node.create","params":{"belief":0.7,"energy":1.0},"id":1}
+// Response: {"result":{"id":"550e8400-...","belief":0.7,"energy":1.0}}
+
+// 2. Create second node  
+{"jsonrpc":"2.0","method":"node.create","params":{"belief":0.3,"energy":1.0},"id":2}
+
+// 3. Bind them
+{"jsonrpc":"2.0","method":"edge.bind","params":{"src":"<node1>","dst":"<node2>","weight":0.5},"id":3}
+
+// 4. Propagate belief
+{"jsonrpc":"2.0","method":"edge.propagate","params":{"edge_id":"<edge>"},"id":4}
+
+// 5. Check system health
+{"jsonrpc":"2.0","method":"governor.status","params":{},"id":5}
+```
+
+---
+
+## Security Architecture
+
+### The Sanitization Boundary
+
+Every response passes through a hardened sanitizer before reaching the AI:
+
+```
+              Request from AI
+                    │
+                    ▼
+           ┌───────────────┐
+           │  MCP Handler  │
+           └───────────────┘
+                    │
+                    ▼
+           ┌───────────────┐
+           │  SCG Runtime  │  ← Substrate operations happen here
+           └───────────────┘
+                    │
+                    ▼
+           ┌───────────────────────────────────────┐
+           │         RESPONSE SANITIZER            │
+           │  ┌─────────────────────────────────┐  │
+           │  │  Forbidden Pattern Registry     │  │
+           │  │  • 60+ blocked patterns         │  │
+           │  │  • Unicode normalization        │  │
+           │  │  • Zero-width char stripping    │  │
+           │  │  • Cyrillic/Greek lookalike     │  │
+           │  │    detection                    │  │
+           │  └─────────────────────────────────┘  │
+           └───────────────────────────────────────┘
+                    │
+                    ▼
+            Sanitized Response
+                    │
+                    ▼
+               AI Assistant
+```
+
+### Blocked Attack Vectors
+
+| Attack | How it's blocked |
+|--------|------------------|
+| Topology reconstruction | `dag_topology`, `adjacency_*` patterns blocked |
+| ESV bypass | `esv_raw`, `ethical_gradient` never exposed |
+| Energy gaming | `energy_matrix`, `energy_distribution` blocked |
+| Lineage forgery | Only checksums exposed, not hash chains |
+| Unicode obfuscation | Zero-width chars stripped, lookalikes normalized |
+| Prompt injection via response | All substrate internals sanitized |
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Rust 1.70+
+- Access to [SCG](https://github.com/aduboseh/SCG) repo (private)
+
+### Build
+```bash
+git clone https://github.com/aduboseh/scg-mcp.git
+cd scg-mcp
+cargo build --release
+```
+
+### Run (STDIO mode)
+```bash
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | ./target/release/scg_mcp_server
+```
+
+### Configure with Claude Desktop
+
+Add to `claude_desktop_config.json`:
+```json
 {
-  "jsonrpc": "2.0",
-  "method": "governor.status",
-  "id": 1
+  "mcpServers": {
+    "scg": {
+      "command": "/path/to/scg_mcp_server"
+    }
+  }
 }
 ```
 
 ---
 
-## ⚡ Quick Start
-
-### Clone Repository
-
-```bash
-git clone https://github.com/OnlySGSolutions/scg_mcp_server.git
-cd scg_mcp_server
-```
-
-### Download Certified Demo Package
-
-```bash
-wget https://github.com/OnlySGSolutions/scg_mcp_server/releases/download/v1.0_scg_demo_certified/scg_demo_package_v1.0_certified.zip
-sha256sum -c scg_demo_package_v1.0_certified.sha256
-unzip scg_demo_package_v1.0_certified.zip
-cd scg_demo_package
-```
-
----
-
-## 🚀 Run 60-Second Determinism Demo
-
-### Option 1: Docker (Recommended)
-
-```bash
-docker build -t scg-demo-package:v1.0 .
-docker run --rm scg-demo-package:v1.0
-```
-
-### Option 2: Native
-
-```bash
-export SCG_TIMESTAMP_MODE=deterministic
-export SCG_DETERMINISM=1
-./demos/scg_demo.sh
-```
-
-**Expected Output:**
-
-```
-DETERMINISM VERIFIED - All checksums match
-```
-
----
-
-## 💡 Usage Examples
-
-### Create Nodes
-
-```bash
-echo '{"jsonrpc":"2.0","method":"node.create","params":{"belief":0.7,"energy":1.0},"id":1}' | ./target/release/scg_mcp_server
-```
-
-### Bind Edges
-
-```bash
-echo '{"jsonrpc":"2.0","method":"edge.bind","params":{"src":"<node_uuid>","dst":"<node_uuid>","weight":0.5},"id":2}' | ./target/release/scg_mcp_server
-```
-
-### Query Governor Status
-
-```bash
-echo '{"jsonrpc":"2.0","method":"governor.status","params":{},"id":3}' | ./target/release/scg_mcp_server
-```
-
----
-
-## 🔒 Certified Demo Package
-
-| Property     | Value                                                              |
-| ------------ | ------------------------------------------------------------------ |
-| Script Hash  | `588153f3c00a95c3296b576a74f4d8bea8ea556fb2a0366236bd7b21b899d1df` |
-| Package Hash | `9FAEA83409F014066EEA2483E364C83A9AACC3F59BA884206A88D5B0BEF07158` |
-| Determinism  | Dual-run SHA-256 equality                                          |
-| Compliance   | Zero domain logic, zero IP leakage                                 |
-| Git Commit   | `bc59b75`                                                          |
-
----
-
-## 📄 Documentation
-
-- [RUN_CERTIFICATION.md](scg_demo_package/RUN_CERTIFICATION.md)
-- [SUBSTRATE_OVERVIEW.md](scg_demo_package/SUBSTRATE_OVERVIEW.md)
-- [DEMO_WALKTHROUGH.md](scg_demo_package/DEMO_WALKTHROUGH.md)
-- [RUNBOOK.md](scg_demo_package/RUNBOOK.md)
-- [SCG_Demo_Executive_Summary.md](docs/SCG_Demo_Executive_Summary.md)
-- [SCG_Demo_Validation_Report_v1.0.md](docs/SCG_Demo_Validation_Report_v1.0.md)
-
-*All documentation is deterministic, reproducible, and part of the certification record.*
-
----
-
-## 📦 Repository Structure
+## Project Structure
 
 ```
 scg_mcp_server/
-├── src/                      # Substrate core (Rust)
-├── demos/                    # Demo scripts and configs
-├── demo_expected/            # Expected output artifacts
-├── docs/                     # Technical documentation
-├── scg_demo_package/         # Certified demo package
-├── certification/v1.0/       # Certification artifacts
-│   ├── reports/              # Certification reports
-│   ├── directives/           # Architecture directives
-│   ├── harness/              # Test harness scripts
-│   └── expected_results/     # Determinism baselines
-├── Dockerfile                # Container build
-└── README.md                 # This file
+├── src/
+│   ├── main.rs                 # STDIO server entry point
+│   ├── mcp_handler.rs          # JSON-RPC method dispatch
+│   ├── scg_core.rs             # SCG runtime wrapper
+│   ├── governance.rs           # Governance validation
+│   ├── lineage/                # Lineage tracking
+│   └── services/
+│       └── sanitizer/          # 🔒 MCP Boundary
+│           ├── forbidden.rs    # Pattern registry (IMMUTABLE)
+│           ├── response.rs     # Response sanitizer
+│           └── mod.rs
+├── tests/
+│   ├── mcp_integration.rs      # 69 integration tests
+│   └── integration/
+│       ├── boundary_tests.rs   # Sanitization tests
+│       ├── adversarial_tests.rs# Attack simulation
+│       └── ...
+├── governance/
+│   └── SCG_Governance_v1.0.md  # Governance manifest
+├── .github/
+│   ├── workflows/              # CI pipelines
+│   └── CODEOWNERS              # Protected paths
+└── Cargo.toml
 ```
 
 ---
 
-## 🚀 Roadmap
+## Governance & Integrity
 
-### v0.2.0 (Planned)
+This repo enforces strict governance:
 
-- Distributed coherence
-- Streaming propagation
-- GraphQL interface
+- **Dual-checksum verification**: Governance manifest matches SCG repo
+- **CODEOWNERS protection**: Sanitizer changes require founder approval
+- **Immutable pattern registry**: `forbidden.rs` is frozen at v2.0
+- **CI enforcement**: All PRs must pass 132 tests
 
-### v1.0.0 (Future)
+### Governance Flow
 
-- Formal verification (TLA+)
-- GPU propagation
-- Envelope libraries (healthcare, automotive, finance)
+```
+┌──────────────┐     ┌──────────────┐
+│   SCG Repo   │     │  MCP Server  │
+│              │     │              │
+│ governance/  │────▶│ governance/  │
+│ SCG_Gov_v1.0 │     │ SCG_Gov_v1.0 │
+└──────────────┘     └──────────────┘
+       │                    │
+       │    SHA-256 match   │
+       └────────┬───────────┘
+                │
+                ▼
+       ┌────────────────┐
+       │ CI Verification│
+       │  (weekly cron) │
+       └────────────────┘
+```
 
 ---
 
-## 📞 Contact
+## Testing
 
-- **Research:** research@onlysgsolutions.com
-- **Enterprise:** enterprise@onlysgsolutions.com
-- **Security:** security@onlysgsolutions.com
+```bash
+# Run all tests
+cargo test
+
+# Run MCP integration tests only
+cargo test --test mcp_integration
+
+# Run with deterministic mode
+SCG_DETERMINISM=1 cargo test
+```
+
+### Test Coverage
+
+| Category | Tests | Description |
+|----------|-------|--------------|
+| Boundary | 13 | Sanitization pattern matching |
+| Tool Endpoints | 21 | All MCP tools functional |
+| Error Handling | 15 | Invalid inputs, edge cases |
+| Adversarial | 20 | Attack simulation, bypass attempts |
+| Unit | 41+ | Core logic |
 
 ---
 
-<div align="center">
+## Releases
 
-**[⬆ Back to Top](#-scg-substrate)**
+| Version | Description |
+|---------|-------------|
+| [`v0.2.0-mcp-integrity`](https://github.com/aduboseh/scg-mcp/releases/tag/v0.2.0-mcp-integrity) | MCP Hardening v2.0 - Boundary sealed |
+| `v0.1.0` | Initial MCP server |
 
-Made with 🧠 by Only SG Solutions
+---
 
-© 2025 All Rights Reserved
+## Related
 
-</div>
+- [SCG Core](https://github.com/aduboseh/SCG) - The cognitive substrate
+- [Model Context Protocol](https://modelcontextprotocol.io) - MCP specification
+
+---
+
+## Contact
+
+- **Research**: research@onlysgsolutions.com
+- **Enterprise**: enterprise@onlysgsolutions.com  
+- **Security**: security@onlysgsolutions.com
+
+---
+
+<p align="center">
+  <sub>Built with 🧠 by Only SG Solutions</sub><br>
+  <sub>© 2025 All Rights Reserved</sub>
+</p>
