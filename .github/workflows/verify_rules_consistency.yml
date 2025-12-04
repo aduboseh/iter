@@ -1,6 +1,6 @@
 # SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
 # Lineage: 2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46
-# Generated under SCG_Governance_v1.0
+# Generated under SCG_Governance_v1.0.1
 
 name: Verify SCG Rules Consistency
 
@@ -19,7 +19,7 @@ on:
     - cron: '0 0 * * 0'
 
 env:
-  # Frozen governance checksum - must match SCG_Governance_v1.0.md
+  # Frozen governance checksum - must match SCG_Governance_v1.0.md (LF-normalized)
   EXPECTED_GOVERNANCE_SHA256: "2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46"
 
 jobs:
@@ -76,6 +76,20 @@ jobs:
             exit 1
           fi
           echo "✓ Cross-repo governance consistency verified"
+
+      - name: Verify WARP.md is tracked (not untracked)
+        run: |
+          cd scg_mcp_server
+          if ! git ls-files --error-unmatch WARP.md > /dev/null 2>&1; then
+            echo "::error::WARP.md must be tracked — governance violation"
+            exit 1
+          fi
+          cd ../scg
+          if ! git ls-files --error-unmatch WARP.md > /dev/null 2>&1; then
+            echo "::error::SCG WARP.md must be tracked — governance violation"
+            exit 1
+          fi
+          echo "✓ WARP.md tracked in both repos"
 
       - name: Verify WARP.md rule files
         run: |
