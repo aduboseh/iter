@@ -56,7 +56,7 @@ The governance manifest must be identical in both repositories:
 
 **Expected Checksum:**
 ```
-9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527
+2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46
 ```
 
 ### Verification Schedule
