@@ -35,10 +35,9 @@ jobs:
       - name: Checkout SCG
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/SCG
+          repository: aduboseh/SCG
           path: scg
-          # If private repo, uncomment:
-          # token: ${{ secrets.SCG_CROSS_REPO_TOKEN }}
+          token: ${{ secrets.SCG_PAT }}
 
       - name: Verify MCP governance checksum
         id: mcp_checksum
