@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_edge_state.schema.json",
+  "title": "McpEdgeState",
+  "description": "Sanitized edge state for MCP responses",
+  "type": "object",
+  "required": ["id", "src", "dst", "weight"],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Edge identifier (numeric u64)"
+    },
+    "src": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source node ID"
+    },
+    "dst": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Destination node ID"
+    },
+    "weight": {
+      "type": "number",
+      "description": "Edge weight (typically in [0.0, 1.0])"
+    }
+  },
+  "additionalProperties": false
+}

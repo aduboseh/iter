@@ -84,7 +84,7 @@ impl SubstrateRuntime {
         };
 
         let sim = IntegratedSimulation::new(integrated_config)
-            .map_err(|e| McpError::SubstrateError(format!("Failed to initialize simulation: {}", e)))?;
+            .map_err(|e| McpError::SubstrateError { message: format!("Failed to initialize simulation: {}", e) })?;
 
         Ok(Self {
             sim,
@@ -114,7 +114,7 @@ impl SubstrateRuntime {
         let node = SubstrateNodeState::new(node_id, belief, energy);
 
         self.sim.add_node(node.clone())
-            .map_err(|e| McpError::SubstrateError(format!("Failed to add node: {}", e)))?;
+            .map_err(|e| McpError::SubstrateError { message: format!("Failed to add node: {}", e) })?;
 
         Ok(McpNodeState::from(&node))
     }
@@ -132,7 +132,7 @@ impl SubstrateRuntime {
         // IntegratedSimulation exposes graph_mut for testing/internal access
         let graph = self.sim.graph_mut();
         let node = graph.get_node(id)
-            .map_err(|_| McpError::NodeNotFound(node_id))?;
+            .map_err(|_| McpError::NodeNotFound { id: node_id })?;
 
         Ok(McpNodeState::from(node))
     }
@@ -161,7 +161,7 @@ impl SubstrateRuntime {
         
         // Get current state to compute new values
         let node = graph.get_node(id)
-            .map_err(|_| McpError::NodeNotFound(node_id))?;
+            .map_err(|_| McpError::NodeNotFound { id: node_id })?;
         
         let old_belief = node.belief;
         #[allow(deprecated)] // Direct energy access for debug mutation
@@ -175,7 +175,7 @@ impl SubstrateRuntime {
         
         // Apply mutation via get_node_mut
         let node = graph.get_node_mut(id)
-            .map_err(|_| McpError::NodeNotFound(node_id))?;
+            .map_err(|_| McpError::NodeNotFound { id: node_id })?;
         node.belief = new_belief;
         #[allow(deprecated)] // Direct energy access for debug mutation
         {
@@ -185,7 +185,7 @@ impl SubstrateRuntime {
         // Return updated state
         let graph = self.sim.graph_mut();
         let node = graph.get_node(id)
-            .map_err(|_| McpError::NodeNotFound(node_id))?;
+            .map_err(|_| McpError::NodeNotFound { id: node_id })?;
         
         Ok(McpNodeState::from(node))
     }
@@ -210,16 +210,16 @@ impl SubstrateRuntime {
                 let msg = e.to_string();
                 if msg.contains("not found") {
                     if msg.contains(&format!("N{}", src)) {
-                        McpError::NodeNotFound(src)
+                        McpError::NodeNotFound { id: src }
                     } else if msg.contains(&format!("N{}", dst)) {
-                        McpError::NodeNotFound(dst)
+                        McpError::NodeNotFound { id: dst }
                     } else {
-                        McpError::SubstrateError(msg)
+                        McpError::SubstrateError { message: msg }
                     }
                 } else if msg.contains("cycle") {
-                    McpError::SubstrateError(format!("Edge would create cycle: {} -> {}", src, dst))
+                    McpError::SubstrateError { message: format!("Edge would create cycle: {} -> {}", src, dst) }
                 } else {
-                    McpError::SubstrateError(msg)
+                    McpError::SubstrateError { message: msg }
                 }
             })?;
 
@@ -241,7 +241,7 @@ impl SubstrateRuntime {
     /// All physics, energy conservation, and ethics are handled by the substrate.
     pub fn step(&mut self) -> Result<(), McpError> {
         self.sim.step()
-            .map_err(|e| McpError::SubstrateError(format!("Simulation step failed: {}", e)))?;
+            .map_err(|e| McpError::SubstrateError { message: format!("Simulation step failed: {}", e) })?;
         Ok(())
     }
 

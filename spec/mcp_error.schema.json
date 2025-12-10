@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_error.schema.json",
+  "title": "McpError",
+  "description": "MCP Error response with stable numeric and string codes",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "integer",
+      "description": "Stable numeric error code",
+      "enum": [1000, 2000, 3000, 4000, 4004, 5000]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable error message"
+    }
+  },
+  "definitions": {
+    "error_codes": {
+      "description": "Error code taxonomy",
+      "type": "object",
+      "properties": {
+        "1000": {
+          "const": "esv_validation_failed",
+          "description": "ESV/energy conservation check failed"
+        },
+        "2000": {
+          "const": "drift_exceeded",
+          "description": "Thermodynamic drift exceeded threshold"
+        },
+        "3000": {
+          "const": "lineage_corruption",
+          "description": "Lineage hash chain integrity violation"
+        },
+        "4000": {
+          "const": "bad_request",
+          "description": "Invalid request parameters or malformed input"
+        },
+        "4004": {
+          "const": "node_not_found | edge_not_found",
+          "description": "Referenced node or edge does not exist"
+        },
+        "5000": {
+          "const": "substrate_error",
+          "description": "Internal substrate error"
+        }
+      }
+    }
+  }
+}
