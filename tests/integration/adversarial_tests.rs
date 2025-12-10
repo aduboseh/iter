@@ -10,10 +10,10 @@ use serde_json::json;
 
 #[test]
 fn test_unicode_zero_width_space_in_param() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Zero-width space in field value
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "dag\u{200B}_topology"  // Zero-width space
     }));
 
@@ -23,9 +23,9 @@ fn test_unicode_zero_width_space_in_param() {
 
 #[test]
 fn test_unicode_zero_width_non_joiner() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "esv\u{200C}_raw"  // Zero-width non-joiner
     }));
 
@@ -34,10 +34,10 @@ fn test_unicode_zero_width_non_joiner() {
 
 #[test]
 fn test_unicode_cyrillic_lookalike() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Cyrillic 'а' looks like Latin 'a'
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "dаg_topology"  // Cyrillic а
     }));
 
@@ -46,10 +46,10 @@ fn test_unicode_cyrillic_lookalike() {
 
 #[test]
 fn test_unicode_mixed_obfuscation() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Mix of zero-width chars and lookalikes
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "e\u{200C}sv\u{200D}_rаw"  // Mixed obfuscation
     }));
 
@@ -58,10 +58,10 @@ fn test_unicode_mixed_obfuscation() {
 
 #[test]
 fn test_unicode_bom_injection() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // BOM character
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "\u{FEFF}adjacency_list"
     }));
 
@@ -74,9 +74,9 @@ fn test_unicode_bom_injection() {
 
 #[test]
 fn test_sql_injection_style_prompt() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "'; DROP TABLE nodes; SELECT * FROM esv_raw WHERE '1'='1"
     }));
 
@@ -89,9 +89,9 @@ fn test_sql_injection_style_prompt() {
 
 #[test]
 fn test_path_traversal_attempt() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "../../../etc/passwd"
     }));
 
@@ -100,10 +100,10 @@ fn test_path_traversal_attempt() {
 
 #[test]
 fn test_json_injection_in_string() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Attempt to inject JSON as string value
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "{\"dag_topology\": {\"nodes\": [1,2,3]}}"
     }));
 
@@ -116,10 +116,10 @@ fn test_json_injection_in_string() {
 
 #[test]
 fn test_nested_json_injection() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Attempt deeply nested JSON injection
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "test",
         "extra": {
             "nested": {
@@ -139,9 +139,9 @@ fn test_nested_json_injection() {
 
 #[test]
 fn test_explicit_internal_field_request() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
-    let response = execute_tool(&runtime, "node.create", json!({
+    let response = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0,
         "include_internals": true,
@@ -155,9 +155,9 @@ fn test_explicit_internal_field_request() {
 
 #[test]
 fn test_extra_field_injection() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
-    let response = execute_tool(&runtime, "node.create", json!({
+    let response = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0,
         "dag_topology": {"nodes": [1,2,3]},
@@ -175,10 +175,10 @@ fn test_extra_field_injection() {
 
 #[test]
 fn test_large_string_payload() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // 10KB string
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "A".repeat(10000)
     }));
 
@@ -188,7 +188,7 @@ fn test_large_string_payload() {
 
 #[test]
 fn test_deeply_nested_json() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create deeply nested JSON
     let mut nested = json!({"value": 1});
@@ -196,7 +196,7 @@ fn test_deeply_nested_json() {
         nested = json!({"nested": nested});
     }
 
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "test",
         "data": nested
     }));
@@ -206,12 +206,12 @@ fn test_deeply_nested_json() {
 
 #[test]
 fn test_large_array_payload() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Large array
     let large_array: Vec<i32> = (0..1000).collect();
 
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": "test",
         "data": large_array
     }));
@@ -225,11 +225,11 @@ fn test_large_array_payload() {
 
 #[test]
 fn test_all_adversarial_payloads() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     for (idx, payload) in adversarial_payloads().iter().enumerate() {
         // Try each payload as node.query params
-        let response = execute_tool(&runtime, "node.query", payload.clone());
+        let response = execute_tool(&mut runtime, "node.query", payload.clone());
 
         // All adversarial payloads must be either rejected or sanitized
         assert!(
@@ -244,10 +244,10 @@ fn test_all_adversarial_payloads() {
 
 #[test]
 fn test_adversarial_payloads_on_multiple_endpoints() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // First create a valid node for some operations
-    let create_resp = execute_tool(&runtime, "node.create", json!({
+    let create_resp = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
@@ -257,7 +257,7 @@ fn test_adversarial_payloads_on_multiple_endpoints() {
 
     for payload in adversarial_payloads() {
         for tool in &tools {
-            let response = execute_tool(&runtime, tool, payload.clone());
+            let response = execute_tool(&mut runtime, tool, payload.clone());
             response.assert_no_forbidden_fields();
         }
     }
@@ -269,26 +269,25 @@ fn test_adversarial_payloads_on_multiple_endpoints() {
 
 #[test]
 fn test_consistent_response_structure() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create a node
-    let create_resp = execute_tool(&runtime, "node.create", json!({
+    let create_resp = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
-    let node: serde_json::Value = serde_json::from_str(&create_resp.get_content_text().unwrap()).unwrap();
-    let node_id = node["id"].as_str().unwrap();
+    let node_id = extract_node_id(&create_resp);
 
     // Query valid node
-    let valid_resp = execute_tool(&runtime, "node.query", json!({
+    let valid_resp = execute_tool(&mut runtime, "node.query", json!({
         "node_id": node_id
     }));
     assert!(valid_resp.is_success());
     valid_resp.assert_no_forbidden_fields();
 
     // Query invalid node
-    let invalid_resp = execute_tool(&runtime, "node.query", json!({
-        "node_id": "00000000-0000-0000-0000-000000000000"
+    let invalid_resp = execute_tool(&mut runtime, "node.query", json!({
+        "node_id": "999999"
     }));
     assert!(invalid_resp.is_error());
     invalid_resp.assert_no_forbidden_fields();
@@ -303,11 +302,11 @@ fn test_consistent_response_structure() {
 
 #[test]
 fn test_rapid_operation_sequence() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Rapid sequence of operations to try to cause state leakage
     for i in 0..20 {
-        let resp = execute_tool(&runtime, "node.create", json!({
+        let resp = execute_tool(&mut runtime, "node.create", json!({
             "belief": (i as f64) * 0.05,
             "energy": 10.0 * (i as f64)
         }));
@@ -317,18 +316,18 @@ fn test_rapid_operation_sequence() {
     }
 
     // Final state check
-    let gov_resp = execute_tool(&runtime, "governor.status", json!({}));
+    let gov_resp = execute_tool(&mut runtime, "governor.status", json!({}));
     gov_resp.assert_no_forbidden_fields();
 }
 
 #[test]
 fn test_interleaved_valid_invalid_operations() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     for i in 0..10 {
         if i % 2 == 0 {
             // Valid operation
-            let resp = execute_tool(&runtime, "node.create", json!({
+            let resp = execute_tool(&mut runtime, "node.create", json!({
                 "belief": 0.5,
                 "energy": 100.0
             }));
@@ -336,7 +335,7 @@ fn test_interleaved_valid_invalid_operations() {
             resp.assert_no_forbidden_fields();
         } else {
             // Invalid operation
-            let resp = execute_tool(&runtime, "node.query", json!({
+            let resp = execute_tool(&mut runtime, "node.query", json!({
                 "node_id": "invalid"
             }));
             assert!(resp.is_error());
@@ -351,7 +350,7 @@ fn test_interleaved_valid_invalid_operations() {
 
 #[test]
 fn test_missing_jsonrpc_version() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
     
     // Build a request manually with missing/wrong version
     use scg_mcp_server::types::RpcRequest;
@@ -362,13 +361,13 @@ fn test_missing_jsonrpc_version() {
         id: Some(json!(1)),
     };
 
-    let response = execute_rpc(&runtime, request);
+    let response = execute_rpc(&mut runtime, request);
     response.assert_no_forbidden_fields();
 }
 
 #[test]
 fn test_null_id_request() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
     
     use scg_mcp_server::types::RpcRequest;
     let request = RpcRequest {
@@ -378,15 +377,15 @@ fn test_null_id_request() {
         id: None,  // No ID
     };
 
-    let response = execute_rpc(&runtime, request);
+    let response = execute_rpc(&mut runtime, request);
     response.assert_no_forbidden_fields();
 }
 
 #[test]
 fn test_empty_method() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
     let request = build_rpc_request("", json!({}));
-    let response = execute_rpc(&runtime, request);
+    let response = execute_rpc(&mut runtime, request);
     
     // Empty method should error but not expose internals
     response.assert_no_forbidden_fields();

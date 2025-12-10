@@ -149,7 +149,7 @@ pub fn normalize_for_matching(text: &str) -> String {
             '\u{FEFF}' | // BOM / Zero-width no-break space
             '\u{00AD}'   // Soft hyphen
         ))
-        .map(|c| normalize_char(c))
+        .map(normalize_char)
         .collect::<String>()
         .to_lowercase()
 }

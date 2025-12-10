@@ -5,6 +5,10 @@
 //! Sanitizer Module - MCP Boundary Protection
 //!
 //! Ensures no SCG substrate internals leak through the MCP boundary.
+//!
+//! Many items are public API for test code and external crates.
+
+#![allow(dead_code)]
 
 pub mod forbidden;
 pub mod response;

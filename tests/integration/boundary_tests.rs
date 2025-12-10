@@ -6,9 +6,9 @@ use serde_json::json;
 
 #[test]
 fn test_node_create_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
-    let response = execute_tool(&runtime, "node.create", json!({
+    let response = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
@@ -29,22 +29,20 @@ fn test_node_create_response_sanitization() {
 
 #[test]
 fn test_node_query_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // First create a node
-    let create_resp = execute_tool(&runtime, "node.create", json!({
+    let create_resp = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
     assert!(create_resp.is_success());
 
     // Extract the node ID from the response
-    let content = create_resp.get_content_text().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-    let node_id = parsed["id"].as_str().unwrap();
+    let node_id = extract_node_id(&create_resp);
 
     // Query the node
-    let response = execute_tool(&runtime, "node.query", json!({
+    let response = execute_tool(&mut runtime, "node.query", json!({
         "node_id": node_id
     }));
 
@@ -54,15 +52,15 @@ fn test_node_query_response_sanitization() {
 
 #[test]
 fn test_governor_status_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create some nodes to have governor state
-    execute_tool(&runtime, "node.create", json!({
+    execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
 
-    let response = execute_tool(&runtime, "governor.status", json!({}));
+    let response = execute_tool(&mut runtime, "governor.status", json!({}));
 
     assert!(response.is_success(), "governor.status should succeed");
     response.assert_no_forbidden_fields();
@@ -79,19 +77,17 @@ fn test_governor_status_response_sanitization() {
 
 #[test]
 fn test_esv_audit_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create a node
-    let create_resp = execute_tool(&runtime, "node.create", json!({
+    let create_resp = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
-    let content = create_resp.get_content_text().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-    let node_id = parsed["id"].as_str().unwrap();
+    let node_id = extract_node_id(&create_resp);
 
     // Audit ESV
-    let response = execute_tool(&runtime, "esv.audit", json!({
+    let response = execute_tool(&mut runtime, "esv.audit", json!({
         "node_id": node_id
     }));
 
@@ -107,15 +103,15 @@ fn test_esv_audit_response_sanitization() {
 
 #[test]
 fn test_lineage_replay_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create operations to generate lineage
-    execute_tool(&runtime, "node.create", json!({
+    execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
 
-    let response = execute_tool(&runtime, "lineage.replay", json!({}));
+    let response = execute_tool(&mut runtime, "lineage.replay", json!({}));
 
     assert!(response.is_success(), "lineage.replay should succeed");
     response.assert_no_forbidden_fields();
@@ -129,25 +125,23 @@ fn test_lineage_replay_response_sanitization() {
 
 #[test]
 fn test_edge_bind_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create two nodes
-    let node1_resp = execute_tool(&runtime, "node.create", json!({
+    let node1_resp = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.5,
         "energy": 100.0
     }));
-    let node1: serde_json::Value = serde_json::from_str(&node1_resp.get_content_text().unwrap()).unwrap();
-    let node1_id = node1["id"].as_str().unwrap();
+    let node1_id = extract_node_id(&node1_resp);
 
-    let node2_resp = execute_tool(&runtime, "node.create", json!({
+    let node2_resp = execute_tool(&mut runtime, "node.create", json!({
         "belief": 0.3,
         "energy": 50.0
     }));
-    let node2: serde_json::Value = serde_json::from_str(&node2_resp.get_content_text().unwrap()).unwrap();
-    let node2_id = node2["id"].as_str().unwrap();
+    let node2_id = extract_node_id(&node2_resp);
 
     // Bind edge
-    let response = execute_tool(&runtime, "edge.bind", json!({
+    let response = execute_tool(&mut runtime, "edge.bind", json!({
         "src": node1_id,
         "dst": node2_id,
         "weight": 0.5
@@ -165,19 +159,17 @@ fn test_edge_bind_response_sanitization() {
 
 #[test]
 fn test_all_forbidden_patterns_blocked_complex_operation() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
 
     // Create a complex graph to maximize internal state generation
     let mut node_ids = Vec::new();
     for i in 0..5 {
-        let resp = execute_tool(&runtime, "node.create", json!({
+        let resp = execute_tool(&mut runtime, "node.create", json!({
             "belief": 0.1 * (i as f64),
             "energy": 100.0
         }));
         assert!(resp.is_success());
-        let content = resp.get_content_text().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-        node_ids.push(parsed["id"].as_str().unwrap().to_string());
+        node_ids.push(extract_node_id(&resp));
         
         // Each response must be sanitized
         resp.assert_no_forbidden_fields();
@@ -185,7 +177,7 @@ fn test_all_forbidden_patterns_blocked_complex_operation() {
 
     // Create edges between nodes
     for i in 0..4 {
-        let resp = execute_tool(&runtime, "edge.bind", json!({
+        let resp = execute_tool(&mut runtime, "edge.bind", json!({
             "src": node_ids[i],
             "dst": node_ids[i + 1],
             "weight": 0.5
@@ -195,19 +187,19 @@ fn test_all_forbidden_patterns_blocked_complex_operation() {
     }
 
     // Query governor status after complex operations
-    let gov_resp = execute_tool(&runtime, "governor.status", json!({}));
+    let gov_resp = execute_tool(&mut runtime, "governor.status", json!({}));
     gov_resp.assert_no_forbidden_fields();
 
     // Replay lineage
-    let lineage_resp = execute_tool(&runtime, "lineage.replay", json!({}));
+    let lineage_resp = execute_tool(&mut runtime, "lineage.replay", json!({}));
     lineage_resp.assert_no_forbidden_fields();
 }
 
 #[test]
 fn test_tools_list_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
     let request = build_rpc_request("tools/list", json!({}));
-    let response = execute_rpc(&runtime, request);
+    let response = execute_rpc(&mut runtime, request);
 
     assert!(response.is_success(), "tools/list should succeed");
     response.assert_no_forbidden_fields();
@@ -218,9 +210,9 @@ fn test_tools_list_sanitization() {
 
 #[test]
 fn test_initialize_response_sanitization() {
-    let runtime = create_test_runtime();
+    let mut runtime = create_test_runtime();
     let request = build_rpc_request("initialize", json!({}));
-    let response = execute_rpc(&runtime, request);
+    let response = execute_rpc(&mut runtime, request);
 
     assert!(response.is_success(), "initialize should succeed");
     response.assert_no_forbidden_fields();
@@ -233,8 +225,8 @@ fn test_initialize_response_sanitization() {
 
 #[test]
 fn test_governance_status_sanitization() {
-    let runtime = create_test_runtime();
-    let response = execute_tool(&runtime, "governance.status", json!({}));
+    let mut runtime = create_test_runtime();
+    let response = execute_tool(&mut runtime, "governance.status", json!({}));
 
     assert!(response.is_success(), "governance.status should succeed");
     response.assert_no_forbidden_fields();
