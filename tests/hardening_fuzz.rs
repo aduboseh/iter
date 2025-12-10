@@ -1,3 +1,12 @@
+//! Fuzz/stress tests for SCG hardening - scaffold tests to be filled in.
+//!
+//! These are placeholder tests that document intended fuzz testing scenarios.
+//! The `assert!(true)` calls and unused variables are intentional scaffolds.
+
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(clippy::assertions_on_constants)]
+
 const ENERGY_TOLERANCE: f64 = 1e-10;
 
 #[test]

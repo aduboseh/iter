@@ -1,3 +1,12 @@
+//! Concurrency stress tests for SCG hardening - scaffold tests to be filled in.
+//!
+//! These are placeholder tests that document intended concurrency testing scenarios.
+//! The `assert!(true)` calls and unused constants are intentional scaffolds.
+
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(clippy::assertions_on_constants)]
+
 const HIGH_RPS_TARGET: usize = 10_000;
 const TEST_DURATION_SECS: u64 = 5;
 const COHERENCE_THRESHOLD: f64 = 0.97;

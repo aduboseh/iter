@@ -1,7 +1,8 @@
 [package]
 name = "scg_mcp_server"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "MCP gateway for SCG Substrate - secure boundary between AI assistants and cognitive substrate"
 
 [[bin]]
 name = "scg_mcp_server"
@@ -12,20 +13,55 @@ name = "scg_mcp_server"
 path = "src/lib.rs"
 
 [dependencies]
+# Async runtime
 tokio = { version = "1", features = ["full"] }
-warp = "0.3"
+
+# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-uuid = { version = "1", features = ["v4", "serde"] }
+
+# Cryptography
 sha2 = "0.10"
 hex = "0.4"
-thiserror = "1"
+
+# Error handling
+thiserror = "2.0"
+
+# Concurrency
 parking_lot = "0.12"
+
+# Time
 chrono = { version = "0.4", features = ["serde"] }
 
-# SCG Connectome v2 - imported from SCG monorepo
-scg-connectome = { path = "../SCG/crates/scg-connectome" }
+# Tracing (matches SCG monorepo)
+tracing = "0.1"
+
+# ============================================================================
+# SCG Substrate Crates (Real Implementation)
+# ============================================================================
+
+# Core simulation - IntegratedSimulation, CognitiveGraph, NodeState, Edge
+scg-sim = { path = "../SCG/crates/scg-sim" }
+
+# Energy management - EnergyLedger, EnergyModel, conservation tracking
+scg-energy = { path = "../SCG/crates/scg-energy" }
+
+# Governance - GovernanceValidator, drift validation, ESV params
+scg-governance = { path = "../SCG/crates/scg-governance" }
+
+# Ethics kernel - EthicsKernel, harm evaluation, moral capacity
+scg-ethics = { path = "../SCG/crates/scg-ethics" }
+
+# Causal trace - CausalTrace, hash-chained event logging
+scg-trace = { path = "../SCG/crates/scg-trace" }
+
+# Consensus - ConsensusEngine (used by IntegratedSimulation)
+scg-consensus = { path = "../SCG/crates/scg-consensus" }
+
+# Elastic Governor - adaptive stability control
+scg-elasticity = { path = "../SCG/crates/scg-elasticity" }
 
 [dev-dependencies]
 # Integration test dependencies
 unicode-normalization = "0.1"
+approx = "0.5"
