@@ -1,6 +1,6 @@
 [package]
 name = "scg_mcp_server"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "MCP gateway for SCG Substrate - secure boundary between AI assistants and cognitive substrate"
 
@@ -65,3 +65,4 @@ scg-elasticity = { path = "../SCG/crates/scg-elasticity" }
 # Integration test dependencies
 unicode-normalization = "0.1"
 approx = "0.5"
+proptest = "1.4"

@@ -24,11 +24,14 @@
 // Core Modules
 // ============================================================================
 
+pub mod caller_context;
 pub mod governance;
 pub mod mcp_handler;
+pub mod metrics;
 pub mod services;
 pub mod substrate_runtime;
 pub mod types;
+pub mod validation;
 
 // ============================================================================
 // SCG Substrate Re-exports

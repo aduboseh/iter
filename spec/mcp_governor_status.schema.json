@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_governor_status.schema.json",
+  "title": "McpGovernorStatus",
+  "description": "Sanitized governance status for MCP responses. Exposes only high-level health indicators.",
+  "type": "object",
+  "required": ["drift_ok", "energy_drift", "coherence", "node_count", "edge_count", "healthy"],
+  "properties": {
+    "drift_ok": {
+      "type": "boolean",
+      "description": "Whether energy drift is within bounds (ε ≤ 1e-10)"
+    },
+    "energy_drift": {
+      "type": "number",
+      "minimum": 0.0,
+      "description": "Current drift value for diagnostics"
+    },
+    "coherence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Coherence index derived from mean belief stability"
+    },
+    "node_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of nodes in the graph"
+    },
+    "edge_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of edges in the graph"
+    },
+    "healthy": {
+      "type": "boolean",
+      "description": "Overall system health status"
+    }
+  },
+  "additionalProperties": false
+}

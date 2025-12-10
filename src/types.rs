@@ -34,36 +34,41 @@ pub use scg_ethics::{EthicsKernel, EthicsDecision};
 // ============================================================================
 
 /// MCP Error codes aligned with JSON-RPC 2.0 and SCG substrate
+/// 
+/// Each variant has:
+/// - A stable numeric code (for machines)
+/// - A stable string code (for humans/docs)
+/// - Optional details field for diagnostic info
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum McpError {
-    /// Node not found by ID
-    NodeNotFound(u64),
-    /// Edge not found by ID  
-    EdgeNotFound(u64),
-    /// ESV validation failed (code 1000)
+    /// Node not found by ID (code 4004, "node_not_found")
+    NodeNotFound { id: u64 },
+    /// Edge not found by ID (code 4004, "edge_not_found")
+    EdgeNotFound { id: u64 },
+    /// ESV validation failed (code 1000, "esv_validation_failed")
     EsvValidationFailed { reason: String },
-    /// Thermodynamic drift exceeded (code 2000)
+    /// Thermodynamic drift exceeded (code 2000, "drift_exceeded")
     DriftExceeded { drift: f64, threshold: f64 },
-    /// Lineage integrity violation (code 3000)
+    /// Lineage integrity violation (code 3000, "lineage_corruption")
     LineageCorruption { details: String },
-    /// Generic substrate error
-    SubstrateError(String),
-    /// Invalid request parameters
-    BadRequest(String),
+    /// Generic substrate error (code 5000, "substrate_error")
+    SubstrateError { message: String },
+    /// Invalid request parameters (code 4000, "bad_request")
+    BadRequest { message: String },
 }
 
 impl fmt::Display for McpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            McpError::NodeNotFound(id) => write!(f, "Node not found: N{}", id),
-            McpError::EdgeNotFound(id) => write!(f, "Edge not found: E{}", id),
+            McpError::NodeNotFound { id } => write!(f, "Node not found: N{}", id),
+            McpError::EdgeNotFound { id } => write!(f, "Edge not found: E{}", id),
             McpError::EsvValidationFailed { reason } => write!(f, "ESV validation failed: {}", reason),
             McpError::DriftExceeded { drift, threshold } => {
                 write!(f, "Drift exceeded: {} > {}", drift, threshold)
             }
             McpError::LineageCorruption { details } => write!(f, "Lineage corruption: {}", details),
-            McpError::SubstrateError(msg) => write!(f, "Substrate error: {}", msg),
-            McpError::BadRequest(msg) => write!(f, "Bad request: {}", msg),
+            McpError::SubstrateError { message } => write!(f, "Substrate error: {}", message),
+            McpError::BadRequest { message } => write!(f, "Bad request: {}", message),
         }
     }
 }
@@ -71,23 +76,41 @@ impl fmt::Display for McpError {
 impl std::error::Error for McpError {}
 
 impl McpError {
-    /// Convert to JSON-RPC error code
-    pub fn error_code(&self) -> i32 {
+    /// Stable numeric error code (for machines)
+    pub fn code(&self) -> u32 {
         match self {
-            McpError::NodeNotFound(_) => 4004,
-            McpError::EdgeNotFound(_) => 4004,
+            McpError::NodeNotFound { .. } => 4004,
+            McpError::EdgeNotFound { .. } => 4004,
             McpError::EsvValidationFailed { .. } => 1000,
             McpError::DriftExceeded { .. } => 2000,
             McpError::LineageCorruption { .. } => 3000,
-            McpError::SubstrateError(_) => 5000,
-            McpError::BadRequest(_) => 4000,
+            McpError::SubstrateError { .. } => 5000,
+            McpError::BadRequest { .. } => 4000,
         }
+    }
+
+    /// Stable string error code (for humans/docs)
+    pub fn code_string(&self) -> &'static str {
+        match self {
+            McpError::NodeNotFound { .. } => "node_not_found",
+            McpError::EdgeNotFound { .. } => "edge_not_found",
+            McpError::EsvValidationFailed { .. } => "esv_validation_failed",
+            McpError::DriftExceeded { .. } => "drift_exceeded",
+            McpError::LineageCorruption { .. } => "lineage_corruption",
+            McpError::SubstrateError { .. } => "substrate_error",
+            McpError::BadRequest { .. } => "bad_request",
+        }
+    }
+
+    /// Convert to JSON-RPC error code (alias for code() as i32)
+    pub fn error_code(&self) -> i32 {
+        self.code() as i32
     }
 }
 
 impl From<SimError> for McpError {
     fn from(err: SimError) -> Self {
-        McpError::SubstrateError(err.to_string())
+        McpError::SubstrateError { message: err.to_string() }
     }
 }
 

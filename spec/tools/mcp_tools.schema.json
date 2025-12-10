@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scg.nodetic.ai/mcp/v0.3/tools/mcp_tools.schema.json",
+  "title": "MCP Tools",
+  "description": "Schema definitions for all MCP tool requests and responses",
+  "definitions": {
+    "node_create": {
+      "request": {
+        "type": "object",
+        "required": ["belief", "energy"],
+        "properties": {
+          "belief": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Initial belief value [0.0, 1.0]"
+          },
+          "energy": {
+            "type": "number",
+            "minimum": 0.0,
+            "description": "Initial energy value (non-negative)"
+          }
+        }
+      },
+      "response": {
+        "$ref": "../mcp_node_state.schema.json"
+      }
+    },
+    "node_query": {
+      "request": {
+        "type": "object",
+        "required": ["node_id"],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Node ID as numeric string"
+          }
+        }
+      },
+      "response": {
+        "$ref": "../mcp_node_state.schema.json"
+      }
+    },
+    "node_mutate": {
+      "request": {
+        "type": "object",
+        "required": ["node_id", "delta"],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Node ID as numeric string"
+          },
+          "delta": {
+            "type": "number",
+            "description": "Belief delta (result clamped to [0.0, 1.0])"
+          }
+        }
+      },
+      "response": {
+        "$ref": "../mcp_node_state.schema.json"
+      }
+    },
+    "edge_bind": {
+      "request": {
+        "type": "object",
+        "required": ["src", "dst", "weight"],
+        "properties": {
+          "src": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Source node ID as numeric string"
+          },
+          "dst": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Destination node ID as numeric string"
+          },
+          "weight": {
+            "type": "number",
+            "description": "Edge weight"
+          }
+        }
+      },
+      "response": {
+        "$ref": "../mcp_edge_state.schema.json"
+      }
+    },
+    "edge_propagate": {
+      "request": {
+        "type": "object",
+        "required": ["edge_id"],
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "description": "Edge ID (accepted for compatibility, triggers full step)"
+          }
+        }
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "const": "text" },
+                "text": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "governance_status": {
+      "request": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "$ref": "../mcp_governor_status.schema.json"
+      }
+    },
+    "esv_audit": {
+      "request": {
+        "type": "object",
+        "required": ["node_id"],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "description": "Node ID (accepted for compatibility, check is global)"
+          }
+        }
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "const": "text" },
+                "text": {
+                  "type": "string",
+                  "pattern": "^ESV audit result: (VALID|INVALID)$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "lineage_replay": {
+      "request": {
+        "type": "object",
+        "properties": {}
+      },
+      "response": {
+        "type": "array",
+        "items": {
+          "$ref": "../mcp_lineage_entry.schema.json"
+        }
+      }
+    },
+    "lineage_export": {
+      "request": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Filesystem path to write lineage JSON log"
+          }
+        }
+      },
+      "response": {
+        "type": "object",
+        "required": ["status", "path", "checksum"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ok"]
+          },
+          "path": {
+            "type": "string"
+          },
+          "checksum": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}
