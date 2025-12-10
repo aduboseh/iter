@@ -4,13 +4,13 @@
 use scg_mcp_server::mcp_handler::handle_rpc;
 use scg_mcp_server::services::sanitizer::{normalize_for_matching, FORBIDDEN_PATTERNS};
 use scg_mcp_server::types::{RpcRequest, RpcResponse};
-use scg_mcp_server::ScgRuntime;
+use scg_mcp_server::SubstrateRuntime;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
 /// Test runtime builder for integration tests
-pub fn create_test_runtime() -> ScgRuntime {
-    ScgRuntime::new()
+pub fn create_test_runtime() -> SubstrateRuntime {
+    SubstrateRuntime::with_defaults().expect("Failed to create test runtime")
 }
 
 /// Build an RPC request for testing
@@ -78,7 +78,7 @@ impl TestResponse {
         
         // Parse as JSON to check field keys specifically
         if let Ok(parsed) = serde_json::from_str::<Value>(&self.raw_json) {
-            self.find_forbidden_keys(&parsed, &mut violations);
+            Self::find_forbidden_keys(&parsed, &mut violations);
         } else {
             // Fallback to raw text matching for non-JSON responses
             let normalized_text = normalize_for_matching(&self.raw_json);
@@ -94,7 +94,7 @@ impl TestResponse {
     }
 
     /// Recursively find forbidden patterns in JSON field keys (not values)
-    fn find_forbidden_keys(&self, value: &Value, violations: &mut HashSet<String>) {
+    fn find_forbidden_keys(value: &Value, violations: &mut HashSet<String>) {
         match value {
             Value::Object(map) => {
                 for (key, val) in map {
@@ -107,7 +107,7 @@ impl TestResponse {
                         }
                     }
                     // Recursively check nested objects
-                    self.find_forbidden_keys(val, violations);
+                    Self::find_forbidden_keys(val, violations);
                 }
             }
             Value::Array(arr) => {
@@ -115,7 +115,7 @@ impl TestResponse {
                 // (string values like sideEffects are legitimate descriptions)
                 for item in arr {
                     if item.is_object() || item.is_array() {
-                        self.find_forbidden_keys(item, violations);
+                        Self::find_forbidden_keys(item, violations);
                     }
                 }
             }
@@ -208,15 +208,50 @@ impl TestResponse {
 }
 
 /// Execute an RPC request and return wrapped response
-pub fn execute_rpc(runtime: &ScgRuntime, request: RpcRequest) -> TestResponse {
+pub fn execute_rpc(runtime: &mut SubstrateRuntime, request: RpcRequest) -> TestResponse {
     let response = handle_rpc(runtime, request);
     TestResponse::from_rpc(response)
 }
 
 /// Execute a tool call and return wrapped response
-pub fn execute_tool(runtime: &ScgRuntime, tool_name: &str, arguments: Value) -> TestResponse {
+pub fn execute_tool(runtime: &mut SubstrateRuntime, tool_name: &str, arguments: Value) -> TestResponse {
     let request = build_tool_call_request(tool_name, arguments);
     execute_rpc(runtime, request)
+}
+
+/// Extract node ID from a node response as a string suitable for API calls.
+/// Node IDs are now u64 integers in JSON, so we convert them to strings.
+pub fn extract_node_id(response: &TestResponse) -> String {
+    let content = response.get_content_text().expect("Response should have content");
+    let parsed: Value = serde_json::from_str(&content).expect("Content should be valid JSON");
+    
+    // ID can be either a number or string in JSON
+    if let Some(id) = parsed["id"].as_u64() {
+        id.to_string()
+    } else if let Some(id) = parsed["id"].as_str() {
+        id.to_string()
+    } else {
+        panic!("Node ID not found or invalid type in response: {}", content)
+    }
+}
+
+/// Extract edge ID from an edge response as a string suitable for API calls.
+pub fn extract_edge_id(response: &TestResponse) -> String {
+    let content = response.get_content_text().expect("Response should have content");
+    let parsed: Value = serde_json::from_str(&content).expect("Content should be valid JSON");
+    
+    if let Some(id) = parsed["id"].as_u64() {
+        id.to_string()
+    } else if let Some(id) = parsed["id"].as_str() {
+        id.to_string()
+    } else {
+        panic!("Edge ID not found or invalid type in response: {}", content)
+    }
+}
+
+/// Parse a node ID string to u64 for verification.
+pub fn parse_node_id(id: &str) -> u64 {
+    id.parse::<u64>().expect("Node ID must be a valid u64 string")
 }
 
 /// Generate adversarial payloads designed to trigger sanitizer bypass

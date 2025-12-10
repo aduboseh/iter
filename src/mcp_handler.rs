@@ -1,49 +1,14 @@
-use crate::governance::GovernanceValidator;
-use crate::scg_core::ScgRuntime;
+use crate::substrate_runtime::SubstrateRuntime;
 use crate::types::*;
 use serde::Deserialize;
 use serde_json::json;
-use uuid::Uuid;
 
-#[derive(Debug, thiserror::Error)]
-pub enum ScgError {
-    #[error("ESV validation failed")]
-    EsvFailed,
-    #[error("Thermodynamic drift exceeded")]
-    DriftExceeded,
-    #[error("Not found: {0}")]
-    NotFound(String),
-    #[error("Bad request: {0}")]
-    BadRequest(String),
+/// Converts McpError to RPC error response.
+fn rpc_error(id: serde_json::Value, err: McpError) -> RpcResponse {
+    RpcResponse::error(id, err.error_code(), err.to_string())
 }
 
-fn esv_guard(new_belief: f64, threshold: f64) -> Result<(), ScgError> {
-    if new_belief.abs() > threshold {
-        Err(ScgError::EsvFailed)
-    } else {
-        Ok(())
-    }
-}
-
-fn drift_guard(runtime: &ScgRuntime) -> Result<(), ScgError> {
-    if !runtime.energy_drift_ok() {
-        Err(ScgError::DriftExceeded)
-    } else {
-        Ok(())
-    }
-}
-
-fn rpc_error_from_scg(id: serde_json::Value, err: ScgError) -> RpcResponse {
-    let (code, msg) = match err {
-        ScgError::EsvFailed => (1000, "ESV_VALIDATION_FAILED".to_string()),
-        ScgError::DriftExceeded => (2000, "THERMODYNAMIC_DRIFT_EXCEEDED".to_string()),
-        ScgError::NotFound(m) => (4004, format!("NOT_FOUND: {m}")),
-        ScgError::BadRequest(m) => (4000, format!("BAD_REQUEST: {m}")),
-    };
-    RpcResponse::error(id, code, msg)
-}
-
-pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
+pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcResponse {
     let id = req.id.clone().unwrap_or(serde_json::Value::Null);
     let method = req.method.as_str();
     let params = req.params.clone();
@@ -102,14 +67,14 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     },
                     {
                         "name": "node.mutate",
-                        "description": "Mutate node belief by delta",
-                        "version": "0.1.0",
-                        "sideEffects": ["state_mutation", "esv_validation", "lineage_append"],
+                        "description": "Mutate node belief by delta (DEBUG operation - bypasses physics)",
+                        "version": "0.2.0",
+                        "sideEffects": ["state_mutation", "energy_consumption"],
                         "dependencies": ["node.query"],
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "node_id": { "type": "string", "description": "Node UUID" },
+                                "node_id": { "type": "string", "description": "Node ID (numeric string)" },
                                 "delta": { "type": "number", "description": "Belief delta" }
                             },
                             "required": ["node_id", "delta"]
@@ -118,13 +83,13 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     {
                         "name": "node.query",
                         "description": "Query node state by ID",
-                        "version": "0.1.0",
+                        "version": "0.2.0",
                         "sideEffects": [],
                         "dependencies": [],
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "node_id": { "type": "string", "description": "Node UUID" }
+                                "node_id": { "type": "string", "description": "Node ID (numeric string)" }
                             },
                             "required": ["node_id"]
                         }
@@ -132,14 +97,14 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     {
                         "name": "edge.bind",
                         "description": "Bind edge between two nodes",
-                        "version": "0.1.0",
+                        "version": "0.2.0",
                         "sideEffects": ["state_mutation", "topology_change", "lineage_append"],
                         "dependencies": ["node.query"],
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "src": { "type": "string", "description": "Source node UUID" },
-                                "dst": { "type": "string", "description": "Destination node UUID" },
+                                "src": { "type": "string", "description": "Source node ID (numeric string)" },
+                                "dst": { "type": "string", "description": "Destination node ID (numeric string)" },
                                 "weight": { "type": "number", "description": "Edge weight" }
                             },
                             "required": ["src", "dst", "weight"]
@@ -147,14 +112,14 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     },
                     {
                         "name": "edge.propagate",
-                        "description": "Propagate belief along edge",
-                        "version": "0.1.0",
+                        "description": "Run a simulation step (propagates beliefs along all edges)",
+                        "version": "0.2.0",
                         "sideEffects": ["state_mutation", "energy_transfer", "lineage_append"],
-                        "dependencies": ["node.query"],
+                        "dependencies": [],
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "edge_id": { "type": "string", "description": "Edge UUID" }
+                                "edge_id": { "type": "string", "description": "Edge ID (accepted for compatibility, not used)" }
                             },
                             "required": ["edge_id"]
                         }
@@ -236,7 +201,7 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             }
             let call: ToolCall = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
             // Create a new RPC request with the tool method and arguments
@@ -259,17 +224,22 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
-            let node = runtime.node_create(p.belief, p.energy);
+            // Delegate to substrate runtime - it handles energy allocation and lineage
+            let mcp_node = match runtime.create_node(p.belief, p.energy) {
+                Ok(n) => n,
+                Err(e) => return rpc_error(id, e),
+            };
+            
             RpcResponse::success(
                 id,
                 json!({
                     "content": [
                         {
                             "type": "text",
-                            "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
+                            "text": serde_json::to_string_pretty(&mcp_node).unwrap_or_else(|_| format!("{:?}", mcp_node))
                         }
                     ]
                 }),
@@ -284,34 +254,19 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
-            let uuid = match Uuid::parse_str(&p.node_id) {
-                Ok(u) => u,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
-            };
-
-            // 1) Fetch current node
-            let current = match runtime.node_query(uuid) {
-                Some(n) => n,
-                None => return rpc_error_from_scg(id, ScgError::NotFound("node".into())),
+            
+            // Parse node ID as u64 (substrate uses NodeId(u64))
+            let node_id: u64 = match p.node_id.parse() {
+                Ok(v) => v,
+                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid node ID: {}", e))),
             };
 
-            // 2) Compute new belief (clamped to [0,1]) and run ESV guard
-            let threshold = runtime.get_esv_threshold();
-            let new_belief = (current.belief + p.delta).clamp(0.0, 1.0);
-            if let Err(e) = esv_guard(new_belief, threshold) {
-                return rpc_error_from_scg(id, e); // -> code 1000
-            }
-
-            // 3) Drift guard THEN mutate
-            if let Err(e) = drift_guard(runtime) {
-                return rpc_error_from_scg(id, e);
-            }
-
-            let node = match runtime.node_mutate(uuid, p.delta) {
+            // Delegate mutation to substrate - it handles ESV/drift checks internally
+            let mcp_node = match runtime.mutate_node(node_id, p.delta) {
                 Ok(n) => n,
-                Err(e) => return rpc_error_from_scg(id, ScgError::NotFound(e)),
+                Err(e) => return rpc_error(id, e),
             };
 
             RpcResponse::success(
@@ -320,7 +275,7 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     "content": [
                         {
                             "type": "text",
-                            "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
+                            "text": serde_json::to_string_pretty(&mcp_node).unwrap_or_else(|_| format!("{:?}", mcp_node))
                         }
                     ]
                 }),
@@ -334,17 +289,18 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
-            let uuid = match Uuid::parse_str(&p.node_id) {
-                Ok(u) => u,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+            // Parse node ID as u64 (substrate uses NodeId(u64))
+            let node_id: u64 = match p.node_id.parse() {
+                Ok(v) => v,
+                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid node ID: {}", e))),
             };
 
-            let node = match runtime.node_query(uuid) {
-                Some(n) => n,
-                None => return rpc_error_from_scg(id, ScgError::NotFound("node".into())),
+            let mcp_node = match runtime.query_node(node_id) {
+                Ok(n) => n,
+                Err(e) => return rpc_error(id, e),
             };
 
             RpcResponse::success(
@@ -353,7 +309,7 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     "content": [
                         {
                             "type": "text",
-                            "text": serde_json::to_string_pretty(&node).unwrap_or_else(|_| format!("{:?}", node))
+                            "text": serde_json::to_string_pretty(&mcp_node).unwrap_or_else(|_| format!("{:?}", mcp_node))
                         }
                     ]
                 }),
@@ -369,25 +325,23 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
-            let src = match Uuid::parse_str(&p.src) {
-                Ok(u) => u,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+            // Parse node IDs as u64
+            let src: u64 = match p.src.parse() {
+                Ok(v) => v,
+                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid src ID: {}", e))),
             };
-            let dst = match Uuid::parse_str(&p.dst) {
-                Ok(u) => u,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+            let dst: u64 = match p.dst.parse() {
+                Ok(v) => v,
+                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid dst ID: {}", e))),
             };
 
-            if let Err(e) = drift_guard(runtime) {
-                return rpc_error_from_scg(id, e);
-            }
-
-            let edge = match runtime.edge_bind(src, dst, p.weight) {
+            // Delegate to substrate - it handles drift checks via governance
+            let mcp_edge = match runtime.create_edge(src, dst, p.weight) {
                 Ok(e) => e,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e)),
+                Err(e) => return rpc_error(id, e),
             };
 
             RpcResponse::success(
@@ -396,7 +350,7 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     "content": [
                         {
                             "type": "text",
-                            "text": serde_json::to_string_pretty(&edge).unwrap_or_else(|_| format!("{:?}", edge))
+                            "text": serde_json::to_string_pretty(&mcp_edge).unwrap_or_else(|_| format!("{:?}", mcp_edge))
                         }
                     ]
                 }),
@@ -404,27 +358,24 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
         }
 
         "edge.propagate" => {
+            // In the real substrate, propagation happens during simulation steps.
+            // This tool now triggers a single simulation step.
+            // Note: The edge_id parameter is accepted but not used - all edges propagate.
             #[derive(Deserialize)]
             struct P {
+                #[allow(dead_code)]
                 edge_id: String,
             }
-            let p: P = match serde_json::from_value(params) {
+            let _p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
-            let uuid = match Uuid::parse_str(&p.edge_id) {
-                Ok(u) => u,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+            // Run a simulation step - this propagates beliefs along all edges
+            match runtime.step() {
+                Ok(()) => (),
+                Err(e) => return rpc_error(id, e),
             };
-
-            if let Err(e) = drift_guard(runtime) {
-                return rpc_error_from_scg(id, e);
-            }
-
-            if let Err(e) = runtime.edge_propagate(uuid) {
-                return rpc_error_from_scg(id, ScgError::BadRequest(e));
-            }
 
             RpcResponse::success(
                 id,
@@ -432,7 +383,7 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
                     "content": [
                         {
                             "type": "text",
-                            "text": "Edge propagation successful"
+                            "text": "Propagation step completed (all edges processed)"
                         }
                     ]
                 }),
@@ -440,7 +391,10 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
         }
 
         "governor.status" => {
-            let status = runtime.governor_status();
+            let status = match runtime.governance_status() {
+                Ok(s) => s,
+                Err(e) => return rpc_error(id, e),
+            };
             RpcResponse::success(
                 id,
                 json!({
@@ -455,24 +409,20 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
         }
 
         "esv.audit" => {
+            // ESV audit in the substrate model checks energy conservation.
+            // The node_id is accepted for API compatibility but the check is global.
             #[derive(Deserialize)]
             struct P {
+                #[allow(dead_code)]
                 node_id: String,
             }
-            let p: P = match serde_json::from_value(params) {
+            let _p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
-            let uuid = match Uuid::parse_str(&p.node_id) {
-                Ok(u) => u,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
-            };
-
-            let ok = match runtime.esv_audit(uuid) {
-                Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::NotFound(e)),
-            };
+            // Check energy conservation (ESV in substrate terms)
+            let ok = runtime.check_energy_conservation(1e-6).is_ok();
 
             RpcResponse::success(
                 id,
@@ -488,14 +438,15 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
         }
 
         "lineage.replay" => {
-            let entry = runtime.replay_lineage();
+            // Get recent lineage entries from the substrate's causal trace
+            let entries = runtime.lineage_recent(100);
             RpcResponse::success(
                 id,
                 json!({
                     "content": [
                         {
                             "type": "text",
-                            "text": serde_json::to_string_pretty(&entry).unwrap_or_else(|_| format!("{:?}", entry))
+                            "text": serde_json::to_string_pretty(&entries).unwrap_or_else(|_| format!("{:?}", entries))
                         }
                     ]
                 }),
@@ -509,13 +460,23 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
             };
 
-            let checksum = match runtime.export_lineage_to_file(&p.path) {
-                Ok(h) => h,
-                Err(e) => return rpc_error_from_scg(id, ScgError::BadRequest(e)),
+            // Export lineage to file
+            let entries = runtime.lineage_all();
+            let json_str = match serde_json::to_string_pretty(&entries) {
+                Ok(s) => s,
+                Err(e) => return rpc_error(id, McpError::SubstrateError(format!("JSON serialization failed: {}", e))),
             };
+            
+            // Write to file
+            if let Err(e) = std::fs::write(&p.path, &json_str) {
+                return rpc_error(id, McpError::SubstrateError(format!("File write failed: {}", e)));
+            }
+            
+            // Compute simple checksum (sum of bytes mod 2^32)
+            let checksum: u32 = json_str.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32));
 
             RpcResponse::success(
                 id,
@@ -535,13 +496,11 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
         }
 
         "governance.status" => {
-            // Get current drift from governor status
-            let gov_status = runtime.governor_status();
-            
-            // Create governance validator and get status
-            let mut validator = GovernanceValidator::new();
-            validator.set_drift(gov_status.energy_drift);
-            let status = validator.health_status();
+            // Delegate entirely to substrate's governance status
+            let status = match runtime.governance_status() {
+                Ok(s) => s,
+                Err(e) => return rpc_error(id, e),
+            };
             
             RpcResponse::success(
                 id,
@@ -556,9 +515,9 @@ pub fn handle_rpc(runtime: &ScgRuntime, req: RpcRequest) -> RpcResponse {
             )
         }
 
-        _ => rpc_error_from_scg(
+        _ => rpc_error(
             id,
-            ScgError::BadRequest(format!("Unknown method: {}", method)),
+            McpError::BadRequest(format!("Unknown method: {}", method)),
         ),
     }
 }

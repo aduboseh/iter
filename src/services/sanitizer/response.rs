@@ -150,11 +150,11 @@ impl ResponseSanitizer {
     /// Check if a response contains any forbidden fields
     pub fn check_for_leakage(&self, value: &Value) -> Vec<String> {
         let mut leaks = Vec::new();
-        self.find_leaks(value, "", &mut leaks);
+        Self::find_leaks(value, "", &mut leaks);
         leaks
     }
 
-    fn find_leaks(&self, value: &Value, path: &str, leaks: &mut Vec<String>) {
+    fn find_leaks(value: &Value, path: &str, leaks: &mut Vec<String>) {
         match value {
             Value::Object(map) => {
                 for (key, val) in map {
@@ -168,13 +168,13 @@ impl ResponseSanitizer {
                         leaks.push(full_path.clone());
                     }
 
-                    self.find_leaks(val, &full_path, leaks);
+                    Self::find_leaks(val, &full_path, leaks);
                 }
             }
             Value::Array(arr) => {
                 for (i, val) in arr.iter().enumerate() {
                     let full_path = format!("{}[{}]", path, i);
-                    self.find_leaks(val, &full_path, leaks);
+                    Self::find_leaks(val, &full_path, leaks);
                 }
             }
             _ => {}
@@ -238,8 +238,8 @@ mod tests {
         
         assert!(result.fields_removed.contains(&"adjacency_list".to_string()));
         assert!(result.fields_removed.contains(&"esv_raw".to_string()));
-        assert!(!result.sanitized.get("adjacency_list").is_some());
-        assert!(!result.sanitized.get("esv_raw").is_some());
+        assert!(result.sanitized.get("adjacency_list").is_none());
+        assert!(result.sanitized.get("esv_raw").is_none());
         assert!(result.sanitized.get("id").is_some());
         assert!(result.sanitized.get("belief").is_some());
         assert!(result.sanitized.get("esv_valid").is_some());
@@ -307,7 +307,7 @@ mod tests {
 
         let result = sanitizer.sanitize(input);
         assert!(result.fields_removed.contains(&"dag\u{200B}_topology".to_string()));
-        assert!(!result.sanitized.get("dag\u{200B}_topology").is_some());
+        assert!(result.sanitized.get("dag\u{200B}_topology").is_none());
     }
 
     #[test]

@@ -1,14 +1,11 @@
-mod fault;
 mod governance;
-mod lineage;
 mod mcp_handler;
-mod scg_core;
 mod services;
-mod telemetry;
+mod substrate_runtime;
 mod types;
 
 use crate::mcp_handler::handle_rpc;
-use crate::scg_core::ScgRuntime;
+use crate::substrate_runtime::SubstrateRuntime;
 use crate::types::RpcRequest;
 use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
@@ -18,7 +15,7 @@ fn main() {
 }
 
 fn run_stdio_server() {
-    let runtime = ScgRuntime::new();
+    let mut runtime = SubstrateRuntime::with_defaults().expect("Failed to initialize substrate runtime");
     let stdin = std::io::stdin();
     let mut reader = BufReader::new(stdin.lock());
     let mut stdout = std::io::stdout();
@@ -37,7 +34,7 @@ fn run_stdio_server() {
 
                 match serde_json::from_str::<RpcRequest>(line) {
                     Ok(req) => {
-                        let resp = handle_rpc(&runtime, req);
+                        let resp = handle_rpc(&mut runtime, req);
                         if let Ok(json) = serde_json::to_string(&resp) {
                             writeln!(stdout, "{}", json).expect("stdout write failed");
                             stdout.flush().expect("stdout flush failed");

@@ -3,6 +3,10 @@
 // Generated under SCG_Governance_v1.0
 
 //! Services module - MCP boundary protection and response handling
+//!
+//! These components are public APIs for external crates and test code.
+
+#![allow(unused_imports)] // Re-exports for external use
 
 pub mod sanitizer;
 
