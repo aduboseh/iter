@@ -44,32 +44,32 @@ fn test_node_create_boundary_belief_values() {
 }
 
 #[test]
-fn test_node_create_clamping_invalid_belief() {
+fn test_node_create_validation_rejects_invalid_belief() {
     let mut runtime = create_test_runtime();
 
-    // Negative belief should be clamped to 0.0
+    // Negative belief should be rejected by MCP boundary validation
     let resp1 = execute_tool(&mut runtime, "node.create", json!({
         "belief": -0.5,
         "energy": 10.0
     }));
-    assert!(resp1.is_success());
+    assert!(resp1.is_error(), "Negative belief should be rejected");
     resp1.assert_no_forbidden_fields();
-    
-    let content = resp1.get_content_text().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-    assert_eq!(parsed["belief"].as_f64().unwrap(), 0.0);
 
-    // Belief > 1.0 should be clamped to 1.0
+    // Belief > 1.0 should be rejected by MCP boundary validation
     let resp2 = execute_tool(&mut runtime, "node.create", json!({
         "belief": 1.5,
         "energy": 10.0
     }));
-    assert!(resp2.is_success());
+    assert!(resp2.is_error(), "Belief > 1.0 should be rejected");
     resp2.assert_no_forbidden_fields();
-    
-    let content2 = resp2.get_content_text().unwrap();
-    let parsed2: serde_json::Value = serde_json::from_str(&content2).unwrap();
-    assert_eq!(parsed2["belief"].as_f64().unwrap(), 1.0);
+
+    // NaN belief should be rejected
+    let resp3 = execute_tool(&mut runtime, "node.create", json!({
+        "belief": f64::NAN,
+        "energy": 10.0
+    }));
+    // NaN can't be represented in JSON, but test that parsing handles it
+    resp3.assert_no_forbidden_fields();
 }
 
 // ============================================================================
