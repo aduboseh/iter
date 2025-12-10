@@ -363,5 +363,5 @@ fn extract_node_id(resp: &scg_mcp_server::types::RpcResponse) -> Option<u64> {
     
     // Parse JSON from text content
     let json: serde_json::Value = serde_json::from_str(text).ok()?;
-    json.get("node_id")?.as_u64()
+    json.get("id")?.as_u64()
 }
