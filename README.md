@@ -74,7 +74,13 @@ git clone https://github.com/aduboseh/scg-mcp.git
 cd scg-mcp
 cargo build --release
 
-# Test the server
+# Run the cognitive physics demo (recommended first experience)
+cargo run --release --example cognitive_physics_demo
+
+# Or run the reference client
+cargo run --release --example mcp_client
+
+# Test raw MCP protocol
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | ./target/release/scg_mcp_server
 ```
 
@@ -105,7 +111,7 @@ Every outbound response passes through a **deterministic Response Sanitizer** ba
 - **SHA-256 dual-manifest verification** — parity between SCG and MCP repos
 - **CODEOWNERS protection** — sanitizer changes require founder approval
 - **Immutable forbidden registry** — sealed at v2.0
-- **CI enforcement** — 132 tests must pass
+- **CI enforcement** — 180 tests must pass
 
 > Full governance documentation: [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md)
 
@@ -139,6 +145,7 @@ SCG_DETERMINISM=1 cargo test            # Deterministic mode
 
 | Version | Description |
 |---------|-------------|
+| [`v0.3.0`](https://github.com/aduboseh/scg-mcp/releases/tag/v0.3.0) | Final Polish — Validation wired, 180 tests |
 | [`v0.2.0-mcp-integrity`](https://github.com/aduboseh/scg-mcp/releases/tag/v0.2.0-mcp-integrity) | MCP Hardening v2.0 — Boundary sealed |
 
 ---
