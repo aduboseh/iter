@@ -142,6 +142,11 @@ impl SubstrateRuntime {
         self.sim.node_count()
     }
 
+    /// Get the total number of edges in the substrate.
+    pub fn edge_count(&mut self) -> usize {
+        self.sim.graph_mut().edge_count()
+    }
+
     /// Mutate a node's belief by a delta amount.
     /// 
     /// **WARNING**: This is a DEBUG/TEST operation that bypasses normal substrate physics.
@@ -282,12 +287,15 @@ impl SubstrateRuntime {
         let mean_belief = self.sim.mean_belief();
         let coherence = 1.0 - (mean_belief - 0.5).abs() * 2.0; // Centered belief = high coherence
 
+        // Get edge count from substrate graph
+        let edge_count = self.sim.graph_mut().edge_count();
+
         Ok(McpGovernorStatus {
             drift_ok,
             energy_drift: drift,
             coherence: coherence.clamp(0.0, 1.0),
             node_count: self.sim.node_count(),
-            edge_count: 0, // TODO: expose edge count from substrate
+            edge_count,
             healthy: drift_ok,
         })
     }

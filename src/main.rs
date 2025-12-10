@@ -3,6 +3,7 @@ mod mcp_handler;
 mod services;
 mod substrate_runtime;
 mod types;
+mod validation;
 
 use crate::mcp_handler::handle_rpc;
 use crate::substrate_runtime::SubstrateRuntime;

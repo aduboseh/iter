@@ -26,6 +26,8 @@ pub const MIN_ENERGY: f64 = 0.0;
 pub const MAX_WEIGHT: f64 = 1e6;
 
 /// Maximum JSON payload size in bytes
+/// Reserved for future payload size validation at MCP boundary.
+#[allow(dead_code)]
 pub const MAX_PAYLOAD_SIZE: usize = 1024 * 1024; // 1MB
 
 // ============================================================================
@@ -105,6 +107,8 @@ pub fn validate_node_id(node_id: &str) -> Result<u64, McpError> {
 }
 
 /// Validate payload size is within limits.
+/// Reserved for future payload size validation at MCP boundary.
+#[allow(dead_code)]
 pub fn validate_payload_size(payload: &[u8]) -> Result<(), McpError> {
     if payload.len() > MAX_PAYLOAD_SIZE {
         return Err(McpError::BadRequest {
