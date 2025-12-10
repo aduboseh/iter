@@ -1,5 +1,6 @@
 use crate::substrate_runtime::SubstrateRuntime;
 use crate::types::*;
+use crate::validation::{validate_belief, validate_energy, validate_node_id, validate_weight};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -53,7 +54,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "node.create",
                         "description": "Create SCG node with belief and energy values",
-                        "version": "0.1.0",
+                        "version": "0.3.0",
                         "sideEffects": ["state_mutation", "energy_allocation", "lineage_append"],
                         "dependencies": [],
                         "inputSchema": {
@@ -68,7 +69,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "node.mutate",
                         "description": "Mutate node belief by delta (DEBUG operation - bypasses physics)",
-                        "version": "0.2.0",
+                        "version": "0.3.0",
                         "sideEffects": ["state_mutation", "energy_consumption"],
                         "dependencies": ["node.query"],
                         "inputSchema": {
@@ -83,7 +84,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "node.query",
                         "description": "Query node state by ID",
-                        "version": "0.2.0",
+                        "version": "0.3.0",
                         "sideEffects": [],
                         "dependencies": [],
                         "inputSchema": {
@@ -97,7 +98,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "edge.bind",
                         "description": "Bind edge between two nodes",
-                        "version": "0.2.0",
+                        "version": "0.3.0",
                         "sideEffects": ["state_mutation", "topology_change", "lineage_append"],
                         "dependencies": ["node.query"],
                         "inputSchema": {
@@ -113,7 +114,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "edge.propagate",
                         "description": "Run a simulation step (propagates beliefs along all edges)",
-                        "version": "0.2.0",
+                        "version": "0.3.0",
                         "sideEffects": ["state_mutation", "energy_transfer", "lineage_append"],
                         "dependencies": [],
                         "inputSchema": {
@@ -127,7 +128,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "governor.status",
                         "description": "Query governor drift and coherence status",
-                        "version": "0.1.0",
+                        "version": "0.3.0",
                         "sideEffects": [],
                         "dependencies": [],
                         "inputSchema": {
@@ -138,7 +139,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "esv.audit",
                         "description": "Audit node ethical state vector",
-                        "version": "0.1.0",
+                        "version": "0.3.0",
                         "sideEffects": ["esv_validation"],
                         "dependencies": ["node.query"],
                         "inputSchema": {
@@ -152,7 +153,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "lineage.replay",
                         "description": "Replay lineage checksum history",
-                        "version": "0.1.0",
+                        "version": "0.3.0",
                         "sideEffects": [],
                         "dependencies": [],
                         "inputSchema": {
@@ -163,7 +164,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "lineage.export",
                         "description": "Export lineage log to file and return checksum",
-                        "version": "0.1.0",
+                        "version": "0.3.0",
                         "sideEffects": ["filesystem_write"],
                         "dependencies": [],
                         "inputSchema": {
@@ -180,7 +181,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     {
                         "name": "governance.status",
                         "description": "Query SCG governance health status including checksum validity, drift, and ESV status",
-                        "version": "1.0.0",
+                        "version": "0.3.0",
                         "sideEffects": [],
                         "dependencies": [],
                         "inputSchema": {
@@ -227,6 +228,14 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                 Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
+            // Validate inputs at MCP boundary before substrate engagement
+            if let Err(e) = validate_belief(p.belief) {
+                return rpc_error(id, e);
+            }
+            if let Err(e) = validate_energy(p.energy) {
+                return rpc_error(id, e);
+            }
+
             // Delegate to substrate runtime - it handles energy allocation and lineage
             let mcp_node = match runtime.create_node(p.belief, p.energy) {
                 Ok(n) => n,
@@ -257,10 +266,10 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                 Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
             
-            // Parse node ID as u64 (substrate uses NodeId(u64))
-            let node_id: u64 = match p.node_id.parse() {
-                Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid node ID: {}", e) }),
+            // Validate inputs at MCP boundary
+            let node_id = match validate_node_id(&p.node_id) {
+                Ok(id) => id,
+                Err(e) => return rpc_error(id, e),
             };
 
             // Delegate mutation to substrate - it handles ESV/drift checks internally
@@ -292,10 +301,10 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                 Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
-            // Parse node ID as u64 (substrate uses NodeId(u64))
-            let node_id: u64 = match p.node_id.parse() {
-                Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid node ID: {}", e) }),
+            // Validate node ID at MCP boundary
+            let node_id = match validate_node_id(&p.node_id) {
+                Ok(id) => id,
+                Err(e) => return rpc_error(id, e),
             };
 
             let mcp_node = match runtime.query_node(node_id) {
@@ -328,15 +337,18 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                 Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
-            // Parse node IDs as u64
-            let src: u64 = match p.src.parse() {
-                Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid src ID: {}", e) }),
+            // Validate inputs at MCP boundary
+            let src = match validate_node_id(&p.src) {
+                Ok(id) => id,
+                Err(e) => return rpc_error(id, e),
             };
-            let dst: u64 = match p.dst.parse() {
-                Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid dst ID: {}", e) }),
+            let dst = match validate_node_id(&p.dst) {
+                Ok(id) => id,
+                Err(e) => return rpc_error(id, e),
             };
+            if let Err(e) = validate_weight(p.weight) {
+                return rpc_error(id, e);
+            }
 
             // Delegate to substrate - it handles drift checks via governance
             let mcp_edge = match runtime.create_edge(src, dst, p.weight) {
