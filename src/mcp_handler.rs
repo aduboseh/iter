@@ -25,7 +25,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                 },
                 "serverInfo": {
                     "name": "scg_mcp_server",
-                    "version": "0.1.0"
+                    "version": "0.3.0"
                 }
             });
             RpcResponse::success(id, response)
@@ -201,7 +201,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let call: ToolCall = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Create a new RPC request with the tool method and arguments
@@ -224,7 +224,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Delegate to substrate runtime - it handles energy allocation and lineage
@@ -254,13 +254,13 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
             
             // Parse node ID as u64 (substrate uses NodeId(u64))
             let node_id: u64 = match p.node_id.parse() {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid node ID: {}", e))),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid node ID: {}", e) }),
             };
 
             // Delegate mutation to substrate - it handles ESV/drift checks internally
@@ -289,13 +289,13 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Parse node ID as u64 (substrate uses NodeId(u64))
             let node_id: u64 = match p.node_id.parse() {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid node ID: {}", e))),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid node ID: {}", e) }),
             };
 
             let mcp_node = match runtime.query_node(node_id) {
@@ -325,17 +325,17 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Parse node IDs as u64
             let src: u64 = match p.src.parse() {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid src ID: {}", e))),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid src ID: {}", e) }),
             };
             let dst: u64 = match p.dst.parse() {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(format!("Invalid dst ID: {}", e))),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: format!("Invalid dst ID: {}", e) }),
             };
 
             // Delegate to substrate - it handles drift checks via governance
@@ -368,7 +368,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let _p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Run a simulation step - this propagates beliefs along all edges
@@ -418,7 +418,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let _p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Check energy conservation (ESV in substrate terms)
@@ -460,19 +460,19 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
-                Err(e) => return rpc_error(id, McpError::BadRequest(e.to_string())),
+                Err(e) => return rpc_error(id, McpError::BadRequest { message: e.to_string() }),
             };
 
             // Export lineage to file
             let entries = runtime.lineage_all();
             let json_str = match serde_json::to_string_pretty(&entries) {
                 Ok(s) => s,
-                Err(e) => return rpc_error(id, McpError::SubstrateError(format!("JSON serialization failed: {}", e))),
+                Err(e) => return rpc_error(id, McpError::SubstrateError { message: format!("JSON serialization failed: {}", e) }),
             };
             
             // Write to file
             if let Err(e) = std::fs::write(&p.path, &json_str) {
-                return rpc_error(id, McpError::SubstrateError(format!("File write failed: {}", e)));
+                return rpc_error(id, McpError::SubstrateError { message: format!("File write failed: {}", e) });
             }
             
             // Compute simple checksum (sum of bytes mod 2^32)
@@ -517,7 +517,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
 
         _ => rpc_error(
             id,
-            McpError::BadRequest(format!("Unknown method: {}", method)),
+            McpError::BadRequest { message: format!("Unknown method: {}", method) },
         ),
     }
 }

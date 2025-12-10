@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_lineage_entry.schema.json",
+  "title": "McpLineageEntry",
+  "description": "Sanitized lineage entry for MCP responses. Exposes only checksum, not full hash chain or internal state.",
+  "type": "object",
+  "required": ["sequence", "operation", "checksum", "tick"],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Entry sequence number (event_id from CausalEvent)"
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["tick", "decision", "ethics", "energy"],
+      "description": "Operation type (sanitized from EventType)"
+    },
+    "checksum": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 checksum (64 hex characters)"
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Simulation tick when event was recorded"
+    }
+  },
+  "additionalProperties": false
+}
