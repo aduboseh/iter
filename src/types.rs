@@ -5,29 +5,32 @@
 //! 2. Sanitized MCP response types (safe for external exposure)
 //! 3. Adapters from SCG substrate types to MCP types
 //!
-//! SECURITY: MCP types expose ONLY sanitized views of substrate state.
+//! # Security
+//!
+//! MCP types expose ONLY sanitized views of substrate state.
 //! Internal fields (topology, raw ESV, energy matrices) are never exposed.
 //!
-//! Many re-exports and types here are public API for external crates/tests.
+//! # Boundary Invariant
+//!
+//! All substrate types are imported as `pub(crate)` - they are NOT
+//! re-exported to external consumers. Only MCP DTOs cross the boundary.
 
 #![allow(dead_code)]
-#![allow(unused_imports)]
+#![allow(unused_imports)] // Substrate types used conditionally across modules
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // ============================================================================
-// SCG Substrate Type Re-exports (for internal use)
+// SCG Substrate Types (INTERNAL USE ONLY - not re-exported)
 // ============================================================================
 
-pub use scg_sim::{NodeId, EdgeId, NodeState as SubstrateNodeState, Edge as SubstrateEdge};
-pub use scg_sim::{IntegratedSimulation, IntegratedConfig, SimError};
-pub use scg_governance::{GovernanceValidator, GovernanceStatus as SubstrateGovernanceStatus, DRIFT_EPSILON};
-pub use scg_trace::{CausalTrace, CausalEvent};
-#[allow(unused_imports)] // Re-exported for external use
-pub use scg_energy::{EnergyLedger, EnergyConfig};
-#[allow(unused_imports)] // Re-exported for external use
-pub use scg_ethics::{EthicsKernel, EthicsDecision};
+pub(crate) use scg_sim::{NodeId, EdgeId, NodeState as SubstrateNodeState, Edge as SubstrateEdge};
+pub(crate) use scg_sim::{IntegratedSimulation, IntegratedConfig, SimError};
+pub(crate) use scg_governance::{GovernanceValidator, GovernanceStatus as SubstrateGovernanceStatus, DRIFT_EPSILON};
+pub(crate) use scg_trace::{CausalTrace, CausalEvent};
+pub(crate) use scg_energy::{EnergyLedger, EnergyConfig};
+pub(crate) use scg_ethics::{EthicsKernel, EthicsDecision};
 
 // ============================================================================
 // MCP Error Types
