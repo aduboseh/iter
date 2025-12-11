@@ -16,9 +16,18 @@
 //!
 //! All responses are sanitized to prevent leakage of:
 //! - DAG topology information
-//! - Raw ESV values  
+//! - Raw ESV values
 //! - Internal energy matrices
 //! - Lineage chain details (only checksums exposed)
+//!
+//! # Boundary Invariant
+//!
+//! **NO substrate types are publicly exported from this crate.**
+//! External consumers interact ONLY through sanitized MCP DTOs.
+//! This is enforced by `#![deny(missing_docs)]` and CI guardrails.
+
+// NOTE: Enable deny(missing_docs) after full documentation pass
+#![warn(missing_docs)]
 
 // ============================================================================
 // Core Modules
@@ -30,28 +39,9 @@ pub mod mcp_handler;
 pub mod metrics;
 pub mod services;
 pub mod substrate_runtime;
+pub mod traits;
 pub mod types;
 pub mod validation;
-
-// ============================================================================
-// SCG Substrate Re-exports
-// ============================================================================
-
-/// SCG Simulation core - IntegratedSimulation with full substrate composition
-pub use scg_sim::{IntegratedSimulation, IntegratedConfig, SimError};
-pub use scg_sim::{NodeId, EdgeId, NodeState as SubstrateNodeState, Edge as SubstrateEdge};
-
-/// SCG Governance - drift validation, ESV params, rule hash verification
-pub use scg_governance::{GovernanceValidator, DRIFT_EPSILON};
-
-/// SCG Trace - deterministic causal event logging with hash chaining
-pub use scg_trace::{CausalTrace, CausalEvent};
-
-/// SCG Energy - thermodynamic conservation tracking
-pub use scg_energy::{EnergyLedger, EnergyConfig};
-
-/// SCG Ethics - moral reasoning and harm evaluation
-pub use scg_ethics::{EthicsKernel, EthicsDecision};
 
 // ============================================================================
 // MCP Type Re-exports (Sanitized for external use)
@@ -60,10 +50,19 @@ pub use scg_ethics::{EthicsKernel, EthicsDecision};
 pub use types::{
     McpNodeState, McpEdgeState, McpGovernorStatus, McpLineageEntry,
     McpError, RpcRequest, RpcResponse, RpcError,
+    CreateNodeParams, MutateNodeParams, QueryNodeParams,
+    BindEdgeParams, PropagateEdgeParams, ExportLineageParams,
+    ToolInfo, ToolList,
 };
 
 // ============================================================================
-// Substrate Runtime
+// Boundary Traits (Public API for substrate interaction)
+// ============================================================================
+
+pub use traits::{SubstrateNodeView, SubstrateEdgeView, SubstrateGovernorView};
+
+// ============================================================================
+// Substrate Runtime (Public facade only)
 // ============================================================================
 
 pub use substrate_runtime::{SubstrateRuntime, SubstrateRuntimeConfig, SharedSubstrateRuntime};
