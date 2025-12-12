@@ -237,6 +237,17 @@ Operation 3 ─────┘
 
 ---
 
+## Binary Configuration
+
+The server exposes two binary names for different contexts:
+
+- **`iter-server`** - User-facing binary alias for public distribution and Marketplace
+- **`scg_mcp_server`** - Internal binary name retained for CI, existing integrations, and internal tooling
+
+Both names point to the same binary and are configured in `Cargo.toml`. **Do not remove the dual-bin setup** — it maintains backward compatibility for internal systems while presenting clean branding externally.
+
+---
+
 ## Module Structure
 
 ```
