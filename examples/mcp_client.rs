@@ -1,6 +1,6 @@
-//! SCG MCP Reference Client
+//! Iter Reference Client
 //!
-//! Demonstrates all MCP tools available via the scg_mcp_server.
+//! Demonstrates all MCP tools available via the server.
 //!
 //! # Usage
 //!
@@ -10,7 +10,7 @@
 //!
 //! # Tools Demonstrated
 //!
-//! - `node.create` - Create SCG node with belief and energy
+//! - `node.create` - Create node with belief and energy
 //! - `node.query` - Query node state by ID
 //! - `node.mutate` - Mutate node belief (DEBUG operation)
 //! - `edge.bind` - Bind edge between nodes
@@ -27,7 +27,7 @@ use scg_mcp_server::types::RpcRequest;
 use serde_json::json;
 
 fn main() {
-    println!("=== SCG MCP Reference Client ===\n");
+    println!("=== Iter Reference Client ===\n");
 
     // Initialize runtime with default config
     let config = SubstrateRuntimeConfig::default();
@@ -268,7 +268,7 @@ fn main() {
     println!("lineage.replay: {}", extract_content(&replay_resp));
 
     // Lineage export
-    let export_path = std::env::temp_dir().join("scg_lineage_demo.json");
+    let export_path = std::env::temp_dir().join("iter_lineage_demo.json");
     let export_req = RpcRequest {
         jsonrpc: "2.0".to_string(),
         method: "tools/call".to_string(),

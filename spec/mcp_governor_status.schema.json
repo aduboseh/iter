@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_governor_status.schema.json",
+  "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_governor_status.schema.json",
   "title": "McpGovernorStatus",
   "description": "Sanitized governance status for MCP responses. Exposes only high-level health indicators.",
   "type": "object",

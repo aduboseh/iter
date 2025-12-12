@@ -2,7 +2,7 @@
 // Lineage: 2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46
 // Generated under SCG_Governance_v1.0.1
 
-//! SCG Governance Module for MCP Server
+//! Governance Module for Iter Server
 //!
 //! Provides governance validation and health endpoints for the MCP server.
 //!
