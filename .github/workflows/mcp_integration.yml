@@ -31,7 +31,10 @@ jobs:
 
       - name: Patch Cargo.toml for CI path
         run: |
-          sed -i 's|path = "../SCG/crates/scg-connectome"|path = "SCG/crates/scg-connectome"|' Cargo.toml
+          # Replace all ../SCG paths with SCG (CI checkout location)
+          sed -i 's|path = "../SCG/crates/|path = "SCG/crates/|g' Cargo.toml
+          echo "Patched Cargo.toml paths for CI:"
+          grep 'path = "SCG' Cargo.toml || true
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
