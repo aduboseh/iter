@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_node_state.schema.json",
   "title": "McpNodeState",
-  "description": "Sanitized node state for MCP responses. Exposes only belief and validity, not internal substrate state.",
+  "description": "Node state for MCP responses.",
   "type": "object",
   "required": ["id", "belief", "energy", "esv_valid", "stability"],
   "properties": {
@@ -20,17 +20,17 @@
     "energy": {
       "type": "number",
       "minimum": 0.0,
-      "description": "Energy level (summarized from substrate mirror_energy)"
+      "description": "Energy level (summary)"
     },
     "esv_valid": {
       "type": "boolean",
-      "description": "ESV compliance status (true if node passes energy/stability checks)"
+      "description": "Compliance status"
     },
     "stability": {
       "type": "number",
       "minimum": 0.0,
       "maximum": 1.0,
-      "description": "Stability indicator from substrate"
+      "description": "Stability indicator (summary)"
     }
   },
   "additionalProperties": false

@@ -1,5 +1,5 @@
-# Iter Determinism Live Experiment
-# Demonstrates deterministic execution paths — not CRUD
+# Iter Demo
+# Demonstrates repeatable tool behavior via MCP
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -7,9 +7,9 @@ $serverPath = Join-Path (Split-Path -Parent $scriptDir) "target\release\iter-ser
 
 # Colors for narrative
 function Write-Narrative { param($text) Write-Host "`n$text" -ForegroundColor Cyan }
-function Write-Physics { param($text) Write-Host "  [PHYSICS] $text" -ForegroundColor Yellow }
+function Write-Info { param($text) Write-Host "  $text" -ForegroundColor Yellow }
 function Write-Result { param($text) Write-Host "  $text" -ForegroundColor Green }
-function Write-Invariant { param($text) Write-Host "  [INVARIANT] $text" -ForegroundColor Magenta }
+function Write-Status { param($text) Write-Host "  $text" -ForegroundColor Magenta }
 
 # Send JSON-RPC to server and parse response
 function Invoke-MCP {
@@ -70,8 +70,7 @@ Write-Host @"
 
 "@ -ForegroundColor White
 
-Write-Host "This is NOT a database demo. This is NOT a graph traversal."
-Write-Host "This is deterministic governed execution." -ForegroundColor Yellow
+Write-Host "This demo exercises the iter-server tool surface." -ForegroundColor Yellow
 Write-Host ""
 Read-Host "Press Enter to begin the experiment"
 
@@ -79,13 +78,13 @@ Read-Host "Press Enter to begin the experiment"
 # PHASE 1: Initialize Runtime
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 1: RUNTIME INITIALIZATION ═══"
-Write-Physics "Initializing IntegratedSimulation with governance constraints..."
+Write-Narrative "═══ STEP 1: INITIALIZE ═══"
+Write-Info "Initializing server session..."
 
 $init = Invoke-MCPDirect -Method "initialize" -Id 0
 Write-Result "Protocol: $($init.result.protocolVersion)"
 Write-Result "Server: $($init.result.serverInfo.name) v$($init.result.serverInfo.version)"
-Write-Invariant "Governance SHA-256 verified. Drift epsilon: 1e-10"
+Write-Status "Initialized"
 
 Read-Host "`nPress Enter to instantiate nodes"
 
@@ -93,36 +92,30 @@ Read-Host "`nPress Enter to instantiate nodes"
 # PHASE 2: Instantiate Nodes
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 2: INSTANTIATE NODE (Node 0) ═══"
-Write-Physics "Creating entity..."
-Write-Physics "  Belief = epistemic position in state space"
-Write-Physics "  Energy = resource constraint = resistance to change"
+Write-Narrative "═══ STEP 2: CREATE NODES ═══"
+Write-Info "Creating Node 0..."
 
 $node0 = Invoke-MCP -Method "tools/call" -ToolName "node.create" -Arguments @{belief=0.5; energy=100.0} -Id 1
 
 $content0 = ($node0.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "Node 0 instantiated:"
 Write-Result "  ID: $($content0.id)"
-Write-Result "  Belief: $($content0.belief) (epistemic position)"
-Write-Result "  Energy: $($content0.energy) (resource level)"
-Write-Result "  ESV Valid: $($content0.esv_valid)"
-Write-Invariant "Energy registered in thermodynamic ledger"
+Write-Result "  Belief: $($content0.belief)"
+Write-Result "  Energy: $($content0.energy)"
+Write-Result "  Compliance: $($content0.esv_valid)"
 
 Read-Host "`nPress Enter to create a second node"
 
 # Create Node 1 (lighter mass)
-Write-Narrative "═══ PHASE 2b: INSTANTIATE LOWER-ENERGY NODE (Node 1) ═══"
-Write-Physics "Creating second node with lower energy..."
-Write-Physics "  Lower energy = more susceptible to belief shifts"
+Write-Info "Creating Node 1..."
 
 $node1 = Invoke-MCP -Method "tools/call" -ToolName "node.create" -Arguments @{belief=0.2; energy=30.0} -Id 2
 
 $content1 = ($node1.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "Node 1 instantiated:"
 Write-Result "  ID: $($content1.id)"
-Write-Result "  Belief: $($content1.belief) (different epistemic position)"
-Write-Result "  Energy: $($content1.energy) (lower resource level)"
-Write-Invariant "Two nodes now exist with different inertia"
+Write-Result "  Belief: $($content1.belief)"
+Write-Result "  Energy: $($content1.energy)"
 
 Read-Host "`nPress Enter to bind conductive pathway"
 
@@ -130,19 +123,15 @@ Read-Host "`nPress Enter to bind conductive pathway"
 # PHASE 3: Bind Conductive Pathway
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 3: BIND CONDUCTIVE PATHWAY (Edge 0→1) ═══"
-Write-Physics "This is NOT a foreign key relationship."
-Write-Physics "This is a CONDUCTIVE WIRE for epistemic flow."
-Write-Physics "  Weight = conductance coefficient"
-Write-Physics "  Direction = information flow direction (DAG enforced)"
+Write-Narrative "═══ STEP 3: BIND EDGE ═══"
+Write-Info "Binding edge 0→1..."
 
 $edge = Invoke-MCP -Method "tools/call" -ToolName "edge.bind" -Arguments @{src="0"; dst="1"; weight=0.8} -Id 3
 
 $edgeContent = ($edge.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "Edge bound:"
 Write-Result "  Source: Node $($edgeContent.src) → Target: Node $($edgeContent.dst)"
-Write-Result "  Conductance: $($edgeContent.weight)"
-Write-Invariant "DAG cycle detection passed. Topology remains acyclic."
+Write-Result "  Weight: $($edgeContent.weight)"
 
 Read-Host "`nPress Enter to attempt THE IMPOSSIBLE PERTURBATION"
 
@@ -150,17 +139,15 @@ Read-Host "`nPress Enter to attempt THE IMPOSSIBLE PERTURBATION"
 # PHASE 4: THE IMPOSSIBLE PERTURBATION (Killer Moment)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 4: THE IMPOSSIBLE PERTURBATION ═══"
+Write-Narrative "═══ STEP 4: MUTATE NODE ═══"
 Write-Host ""
 Write-Host "  ╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Red
-Write-Host "  ║  A database would accept this.                                 ║" -ForegroundColor Red
-Write-Host "  ║  A graph system would accept this.                             ║" -ForegroundColor Red
-Write-Host "  ║  Governance will REFUSE because invariants forbid it.          ║" -ForegroundColor Red
+Write-Host "  ║  This step applies a mutation request via the public tool API. ║" -ForegroundColor Red
+Write-Host "  ║  The server may accept or reject the request.                  ║" -ForegroundColor Red
+Write-Host "  ║  Inspect the response for the observed outcome.                ║" -ForegroundColor Red
 Write-Host "  ╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Red
 Write-Host ""
-Write-Physics "Attempting to perturb belief beyond drift bounds..."
-Write-Physics "  Current belief: 0.5 → Requested: 0.99"
-Write-Physics "  This would violate thermodynamic conservation"
+Write-Info "Submitting mutation request..."
 
 # This should fail validation (belief out of delta range for available energy)
 $badMutate = Invoke-MCP -Method "tools/call" -ToolName "node.mutate" -Arguments @{node_id="0"; delta=0.49} -Id 4
@@ -168,13 +155,11 @@ $badMutate = Invoke-MCP -Method "tools/call" -ToolName "node.mutate" -Arguments 
 $mutateContent = ($badMutate.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "Mutation processed:"
 Write-Result "  New Belief: $($mutateContent.belief)"
-Write-Result "  Energy consumed: $(100.0 - $mutateContent.energy)"
-Write-Invariant "Large delta consumed significant energy (thermodynamic work)"
+Write-Result "  Energy: $($mutateContent.energy)"
 
-# Check governance status to show drift is still OK
 $gov1 = Invoke-MCP -Method "tools/call" -ToolName "governance.status" -Arguments @{} -Id 5
 $govContent1 = ($gov1.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
-Write-Invariant "Drift OK: $($govContent1.drift_ok) | Energy Drift: $($govContent1.energy_drift)"
+Write-Status "Governance status captured"
 
 Read-Host "`nPress Enter to advance time (propagation)"
 
@@ -182,10 +167,8 @@ Read-Host "`nPress Enter to advance time (propagation)"
 # PHASE 5: TEMPORAL DYNAMICS — Propagation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 5: TEMPORAL DYNAMICS — ADVANCING TIME ═══"
-Write-Physics "We are NOT updating database rows."
-Write-Physics "We are ADVANCING TIME in a dynamical system."
-Write-Physics "  Propagation follows: Δb = σ·Σ(w_ij · (b_j - b_i))"
+Write-Narrative "═══ STEP 5: RUN STEPS ═══"
+Write-Info "Running two steps..."
 
 Write-Host "`n  --- TICK 1 ---" -ForegroundColor White
 $prop1 = Invoke-MCP -Method "tools/call" -ToolName "edge.propagate" -Arguments @{edge_id="0"} -Id 6
@@ -198,7 +181,7 @@ $qc0 = ($q0.result.content | Where-Object { $_.type -eq "text" }).text | Convert
 $qc1 = ($q1.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "  Node 0: belief=$($qc0.belief), energy=$($qc0.energy)"
 Write-Result "  Node 1: belief=$($qc1.belief), energy=$($qc1.energy)"
-Write-Invariant "Belief flows through conductive pathway"
+Write-Status "Step complete"
 
 Write-Host "`n  --- TICK 2 ---" -ForegroundColor White
 $prop2 = Invoke-MCP -Method "tools/call" -ToolName "edge.propagate" -Arguments @{edge_id="0"} -Id 9
@@ -210,7 +193,7 @@ $qc0b = ($q0b.result.content | Where-Object { $_.type -eq "text" }).text | Conve
 $qc1b = ($q1b.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "  Node 0: belief=$($qc0b.belief), energy=$($qc0b.energy)"
 Write-Result "  Node 1: belief=$($qc1b.belief), energy=$($qc1b.energy)"
-Write-Invariant "System evolves toward equilibrium via dynamical equations"
+Write-Status "Step complete"
 
 Read-Host "`nPress Enter to examine the audit trail"
 
@@ -218,9 +201,8 @@ Read-Host "`nPress Enter to examine the audit trail"
 # PHASE 6: AUDIT TRAIL — Lineage Replay
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 6: AUDIT TRAIL — LINEAGE REPLAY ═══"
-Write-Physics "Every transition is IMMUTABLY HASH-CHAINED."
-Write-Physics "This is the flight recorder of a reasoning engine."
+Write-Narrative "═══ STEP 6: AUDIT SUMMARY ═══"
+Write-Info "Fetching audit summary..."
 
 $lineage = Invoke-MCP -Method "tools/call" -ToolName "lineage.replay" -Arguments @{} -Id 12
 $lineageContent = ($lineage.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
@@ -229,16 +211,16 @@ Write-Result "Lineage entries:"
 foreach ($entry in $lineageContent | Select-Object -First 5) {
     Write-Result "  seq=$($entry.sequence) | op=$($entry.operation) | checksum=$($entry.checksum.Substring(0,16))..."
 }
-Write-Invariant "Hash chain integrity verified. No gaps. No tampering possible."
+Write-Status "Audit summary captured"
 
-Read-Host "`nPress Enter for final invariant verification"
+Read-Host "`nPress Enter for final status"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 7: FINAL SEAL — Invariant Verification
+# PHASE 7: FINAL STATUS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 7: FINAL SEAL — INVARIANT VERIFICATION ═══"
-Write-Physics "Verifying system vital signs..."
+Write-Narrative "═══ STEP 7: FINAL STATUS ═══"
+Write-Info "Fetching final status..."
 
 $finalGov = Invoke-MCP -Method "tools/call" -ToolName "governance.status" -Arguments @{} -Id 13
 $finalContent = ($finalGov.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
@@ -255,24 +237,17 @@ Write-Host "  ║  Edge Count:    $($finalContent.edge_count.ToString().PadRight
 Write-Host "  ║  Healthy:       $($finalContent.healthy.ToString().PadRight(43))║" -ForegroundColor Green
 Write-Host "  ╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 
-Write-Invariant "Drift ≤ 1e-10: VERIFIED"
-Write-Invariant "Energy Conservation: VERIFIED"
-Write-Invariant "Lineage Integrity: VERIFIED"
+Write-Status "Completed"
 
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                         EXPERIMENT COMPLETE                                  ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  Iter behaved like PHYSICS, not STORAGE.                                     ║
+║  Experiment complete.                                                       ║
 ║                                                                              ║
-║  • Beliefs have MASS (energy)                                                ║
-║  • Edges are CONDUCTIVE PATHWAYS, not foreign keys                           ║
-║  • Propagation follows DYNAMICAL EQUATIONS, not business logic               ║
-║  • The lineage hash is the audit trail                                       ║
-║  • Governance enforces THERMODYNAMIC CONSTRAINTS                             ║
-║                                                                              ║
-║  This is deterministic governed execution for AI tooling.                    ║
+║  This script demonstrates repeatable tool behavior and audit/status surfaces ║
+║  via MCP.                                                                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan

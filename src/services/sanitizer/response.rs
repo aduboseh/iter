@@ -1,20 +1,10 @@
-// Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+// Governance: MCP boundary response sanitization
 // Lineage: MCP_BOUNDARY_V2.0
 
-//! Response Sanitizer Module
+//! Response sanitizer for the MCP boundary.
 //!
-//! This module ensures that no internal engine internals leak through the MCP boundary.
-//! All responses are sanitized to remove:
-//! - DAG topology information
-//! - Raw ESV values
-//! - Internal energy matrices
-//! - Lineage chain details (only hashes are exposed)
-//!
-//! Zero-Touch Zones (from Hardening Directive v2.0):
-//! - ❌ No substrate introspection endpoints
-//! - ❌ No DAG topology logging
-//! - ❌ No ESV/energy matrix exposure
-//! - ❌ No debug interfaces that leak substrate internals
+//! This module removes or truncates sensitive fields from outbound JSON responses.
+//! Visitor-facing documentation intentionally describes guarantees rather than internal rules.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -43,12 +33,12 @@ impl Default for ResponseSanitizer {
 }
 
 impl ResponseSanitizer {
-    /// Create a new sanitizer with default settings
+    /// Create a new sanitizer with default settings.
     pub fn new() -> Self {
         Self {
-            allow_belief_values: true,  // Individual beliefs are OK
-            allow_energy_summary: true, // Aggregate energy metrics are OK
-            max_lineage_entries: 10,    // Limit exposed lineage depth
+            allow_belief_values: true,
+            allow_energy_summary: true,
+            max_lineage_entries: 10,
         }
     }
 
@@ -128,10 +118,7 @@ impl ResponseSanitizer {
                     Value::Array(sanitized)
                 }
             }
-            // For string values, check if they contain forbidden patterns
             Value::String(s) => {
-                // Check if the string value itself contains forbidden patterns
-                // This catches cases like {"prompt": "dag_topology"}
                 let violations = super::forbidden::contains_forbidden(&s);
                 if !violations.is_empty() {
                     warnings.push(format!(
@@ -146,7 +133,7 @@ impl ResponseSanitizer {
         }
     }
 
-    /// Check if a response contains any forbidden fields
+    /// Check if a response contains any forbidden fields.
     pub fn check_for_leakage(&self, value: &Value) -> Vec<String> {
         let mut leaks = Vec::new();
         Self::find_leaks(value, "", &mut leaks);
@@ -180,7 +167,7 @@ impl ResponseSanitizer {
         }
     }
 
-    /// Check raw text for forbidden patterns (with Unicode normalization)
+    /// Check raw text for forbidden patterns.
     pub fn check_raw_text(&self, text: &str) -> Vec<String> {
         let normalized = normalize_for_matching(text);
         FORBIDDEN_PATTERNS
@@ -196,7 +183,7 @@ impl ResponseSanitizer {
 pub struct SanitizedNodeState {
     pub id: String,
     pub belief: f64,
-    pub esv_valid: bool,  // Only validity, not raw values
+    pub esv_valid: bool,
 }
 
 /// Sanitized governor status for external exposure
@@ -212,7 +199,7 @@ pub struct SanitizedGovernorStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SanitizedTraceSummary {
     pub trace_id: String,
-    pub lineage_hash: String,  // Only the hash, not the chain
+    pub lineage_hash: String,
     pub verified: bool,
 }
 
@@ -298,7 +285,6 @@ mod tests {
     fn test_unicode_obfuscated_field_removal() {
         let sanitizer = ResponseSanitizer::new();
         
-        // Using zero-width space in field name
         let input = json!({
             "id": "test",
             "dag\u{200B}_topology": {"nodes": [1, 2, 3]}
@@ -324,7 +310,7 @@ mod tests {
     fn test_check_raw_text_with_unicode_obfuscation() {
         let sanitizer = ResponseSanitizer::new();
         
-        let text = r#"{"dаg_topology": []}"#; // Cyrillic 'а'
+        let text = r#"{"dаg_topology": []}"#;
         let violations = sanitizer.check_raw_text(text);
         
         assert!(violations.contains(&"dag_topology".to_string()));

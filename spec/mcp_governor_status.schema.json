@@ -2,34 +2,34 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_governor_status.schema.json",
   "title": "McpGovernorStatus",
-  "description": "Sanitized governance status for MCP responses. Exposes only high-level health indicators.",
+  "description": "Governance status for MCP responses.",
   "type": "object",
   "required": ["drift_ok", "energy_drift", "coherence", "node_count", "edge_count", "healthy"],
   "properties": {
     "drift_ok": {
       "type": "boolean",
-      "description": "Whether energy drift is within bounds (ε ≤ 1e-10)"
+      "description": "Whether drift is within expected bounds"
     },
     "energy_drift": {
       "type": "number",
       "minimum": 0.0,
-      "description": "Current drift value for diagnostics"
+      "description": "Current drift value (summary)"
     },
     "coherence": {
       "type": "number",
       "minimum": 0.0,
       "maximum": 1.0,
-      "description": "Coherence index derived from mean belief stability"
+      "description": "Coherence index (summary)"
     },
     "node_count": {
       "type": "integer",
       "minimum": 0,
-      "description": "Total number of nodes in the graph"
+      "description": "Total number of nodes"
     },
     "edge_count": {
       "type": "integer",
       "minimum": 0,
-      "description": "Total number of edges in the graph"
+      "description": "Total number of edges"
     },
     "healthy": {
       "type": "boolean",

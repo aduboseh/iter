@@ -1,16 +1,7 @@
-//! Engine Runtime Facade
+//! Runtime facade.
 //!
-//! This module provides a thin facade over the underlying engine runtime (`IntegratedSimulation`).
-//! All MCP handlers interact with the engine exclusively through this facade.
-//!
-//! # Design Principles
-//!
-//! 1. **No local engine logic**: Energy, drift, and ethics logic comes from the engine crates
-//! 2. **Type translation only**: Convert between engine types and MCP types
-//! 3. **Error mapping**: Map engine errors to structured `McpError` variants
-//! 4. **Thin delegation**: Methods are thin wrappers around runtime calls
-//!
-//! Some methods are public API for external crates and not used internally.
+//! Thin wrapper around the underlying engine runtime used by the MCP boundary.
+//! This module focuses on type translation and error mapping.
 
 #![allow(dead_code)]
 
@@ -45,11 +36,7 @@ pub struct SubstrateRuntimeConfig {
 
 /// Facade wrapping the real IntegratedSimulation.
 /// 
-/// All MCP operations route through this facade. The facade:
-/// - Delegates all physics/energy/ethics to the substrate
-/// - Translates substrate types to sanitized MCP types
-/// - Maps substrate errors to structured McpError variants
-/// - Maintains governance validation state
+/// All MCP operations route through this facade.
 pub struct SubstrateRuntime {
     /// The real integrated simulation
     sim: IntegratedSimulation,
@@ -63,13 +50,6 @@ pub struct SubstrateRuntime {
 
 impl SubstrateRuntime {
     /// Create a new SubstrateRuntime with the given configuration.
-    /// 
-    /// This initializes the full engine stack including:
-    /// - Deterministic graph with thermodynamic properties
-    /// - Energy ledger for conservation tracking
-    /// - Ethics kernel for moral reasoning
-    /// - Consensus engine for stability
-    /// - Causal trace for lineage
     pub fn new(config: SubstrateRuntimeConfig) -> Result<Self, McpError> {
         let mut sim_config = config.sim;
         if let Some(seed) = config.seed {
@@ -108,7 +88,6 @@ impl SubstrateRuntime {
     /// Delegates to `IntegratedSimulation::add_node` which:
     /// - Registers the node in the energy ledger
     /// - Adds the node to the cognitive graph
-    /// - All invariants are enforced by the substrate
     pub fn create_node(&mut self, belief: f64, energy: f64) -> Result<McpNodeState, McpError> {
         let node_id = NodeId(self.next_node_id.fetch_add(1, Ordering::SeqCst));
         let node = SubstrateNodeState::new(node_id, belief, energy);
@@ -148,16 +127,8 @@ impl SubstrateRuntime {
     }
 
     /// Mutate a node's belief by a delta amount.
-    /// 
-    /// **WARNING**: This is a DEBUG/TEST operation that bypasses normal engine physics.
-    /// In normal operation, beliefs change through propagation steps, not direct mutation.
-    /// 
-    /// The operation:
-    /// 1. Validates the node exists
-    /// 2. Applies the delta (clamped to [0, 1])
-    /// 3. Energy cost is deducted based on change magnitude
-    /// 
-    /// Returns the updated node state.
+    ///
+    /// Note: this endpoint is intended for testing and demonstration.
     pub fn mutate_node(&mut self, node_id: u64, delta: f64) -> Result<McpNodeState, McpError> {
         let id = NodeId(node_id);
         
@@ -201,10 +172,7 @@ impl SubstrateRuntime {
 
     /// Create a new edge between two nodes.
     /// 
-    /// Delegates to `IntegratedSimulation::add_edge` which:
-    /// - Validates both nodes exist
-    /// - Checks for cycles (DAG invariant)
-    /// - Registers the edge
+    /// Delegates to `IntegratedSimulation::add_edge`.
     pub fn create_edge(&mut self, src: u64, dst: u64, weight: f64) -> Result<McpEdgeState, McpError> {
         let edge_id = EdgeId(self.next_edge_id.fetch_add(1, Ordering::SeqCst));
         let edge = Edge::new(edge_id, NodeId(src), NodeId(dst), weight, true);
@@ -236,14 +204,6 @@ impl SubstrateRuntime {
     // ========================================================================
 
     /// Execute a single simulation step.
-    /// 
-    /// This runs the full SCG pipeline:
-    /// - Phase 0: Observe macrostate
-    /// - Phase 1: Graph step (noise → propagate → update → recover)
-    /// - Phase 2: Governor adaptive control
-    /// - Phase 3: Trace event emission
-    /// 
-    /// All physics, energy conservation, and ethics are handled by the substrate.
     pub fn step(&mut self) -> Result<(), McpError> {
         self.sim.step()
             .map_err(|e| McpError::SubstrateError { message: format!("Simulation step failed: {}", e) })?;
@@ -260,9 +220,8 @@ impl SubstrateRuntime {
     // ========================================================================
 
     /// Get the current governance status.
-    /// 
-    /// Computes drift from the substrate's energy ledger and returns
-    /// a sanitized governance status for MCP.
+    ///
+    /// Returns a sanitized status summary for MCP.
     pub fn governance_status(&mut self) -> Result<McpGovernorStatus, McpError> {
         // Get energy metrics from the substrate
         let ledger = self.sim.ledger();
@@ -270,7 +229,7 @@ impl SubstrateRuntime {
         let current = ledger.total_energy();
         let dissipated = ledger.total_dissipated();
         
-        // Compute drift: |current + dissipated - initial|
+        // Compute drift summary
         let drift = if initial > 0.0 {
             (current + dissipated - initial).abs()
         } else {
@@ -280,12 +239,12 @@ impl SubstrateRuntime {
         // Update governance validator with current drift
         self.governance.set_drift(drift);
 
-        // Check drift against threshold (from scg-governance)
+        // Check against configured threshold
         let drift_ok = drift <= DRIFT_EPSILON;
 
-        // Compute coherence from mean belief (higher stability = higher coherence)
+        // Compute coherence summary
         let mean_belief = self.sim.mean_belief();
-        let coherence = 1.0 - (mean_belief - 0.5).abs() * 2.0; // Centered belief = high coherence
+        let coherence = 1.0 - (mean_belief - 0.5).abs() * 2.0;
 
         // Get edge count from substrate graph
         let edge_count = self.sim.graph_mut().edge_count();
@@ -329,9 +288,7 @@ impl SubstrateRuntime {
             .collect()
     }
 
-    /// Verify the integrity of the lineage hash chain.
-    /// 
-    /// Delegates to substrate's trace verification.
+    /// Verify the integrity of lineage data.
     pub fn verify_lineage(&self) -> Result<(), McpError> {
         self.sim.verify_trace()
             .map_err(|e| McpError::LineageCorruption {
@@ -351,9 +308,6 @@ impl SubstrateRuntime {
 // ============================================================================
 
 /// Thread-safe wrapper around SubstrateRuntime.
-/// 
-/// Uses `parking_lot::RwLock` for efficient read-write locking.
-/// Most MCP operations require write access due to state mutations.
 pub struct SharedSubstrateRuntime {
     inner: RwLock<SubstrateRuntime>,
 }

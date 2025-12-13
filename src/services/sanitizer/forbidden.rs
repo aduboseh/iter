@@ -1,33 +1,20 @@
-// SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+// Governance: MCP boundary sanitization
 // Lineage: MCP_BOUNDARY_V2.0
-// Generated under SCG_Governance_v1.0
 //
 // ╔══════════════════════════════════════════════════════════════════════════╗
-// ║  IMMUTABLE REGISTRY — DO NOT MODIFY WITHOUT FOUNDER-LEVEL OVERRIDE       ║
-// ║  Version: 2.0.0 | Sealed: 2025-12-03 | Authority: SCG Governor           ║
-// ║  Any modification requires CODEOWNERS approval and audit trail entry.    ║
+// ║  IMMUTABLE REGISTRY — DO NOT MODIFY WITHOUT OWNER APPROVAL               ║
+// ║  Version: 2.0.0 | Sealed: 2025-12-03                                     ║
+// ║  Any modification requires CODEOWNERS approval and an audit trail entry. ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 //
-//! Forbidden Pattern Registry for MCP Boundary Sanitization
+//! Forbidden Pattern Registry for MCP boundary sanitization.
 //!
-//! This module defines the canonical list of patterns that must NEVER appear
-//! in MCP responses. It represents internal engine internals that would enable:
-//! - Adversarial model reconstruction
-//! - Ethical constraint bypass
-//! - Lineage forgery
-//!
-//! Zero-Touch Zones (from Hardening Directive v2.0):
-//! - ❌ No substrate introspection endpoints
-//! - ❌ No DAG topology logging
-//! - ❌ No ESV/energy matrix exposure
-//! - ❌ No debug interfaces that leak substrate internals
+//! This registry is security-sensitive. Visitor-facing documentation intentionally
+//! avoids enumerating internal details.
 
-/// Forbidden field patterns that must NEVER appear in MCP responses
-///
-/// These represent internal engine internals that would enable adversarial
-/// model reconstruction, ethical constraint bypass, or lineage forgery.
+/// Forbidden field patterns that must NEVER appear in MCP responses.
 pub const FORBIDDEN_PATTERNS: &[&str] = &[
-    // DAG topology internals
+    // Internal patterns
     "dag_topology",
     "node_ids",
     "edge_weights",
@@ -44,7 +31,7 @@ pub const FORBIDDEN_PATTERNS: &[&str] = &[
     "energy_allocation",
     "propagation_path",
     
-    // ESV (Ethical State Vector) internals
+    // Internal patterns
     "esv_raw",
     "esv_matrix",
     "esv_checksum_internal",
@@ -57,7 +44,7 @@ pub const FORBIDDEN_PATTERNS: &[&str] = &[
     "raw_chi",
     "ethical_potential_raw",
     
-    // Energy system internals
+    // Internal patterns
     "energy_matrix",
     "node_energies",
     "energy_distribution",
@@ -70,7 +57,7 @@ pub const FORBIDDEN_PATTERNS: &[&str] = &[
     "hamiltonian",
     "internal_energy",
     
-    // Lineage ledger internals
+    // Internal patterns
     "lineage_hash_chain",
     "lineage_chain",
     "full_lineage",
@@ -82,20 +69,20 @@ pub const FORBIDDEN_PATTERNS: &[&str] = &[
     "hash_chain",
     "state_snapshots",
     
-    // Elastic Governor internals
+    // Internal patterns
     "governor_quorum_state",
     "consensus_votes",
     "drift_correction_vector",
     "node_energy_deltas",
     "quorum_members",
     
-    // Meta-cognitive layer internals
+    // Internal patterns
     "reflective_state",
     "coherence_raw",
     "meta_cognitive_variance",
     "self_referential_state",
     
-    // Implementation details / Debug
+    // Internal patterns
     "internal_state",
     "debug_info",
     "substrate_state",
@@ -106,15 +93,13 @@ pub const FORBIDDEN_PATTERNS: &[&str] = &[
     "internal_error",
 ];
 
-/// Sensitive field patterns that should only appear in sanitized form
-///
-/// These are acceptable if properly aggregated/summarized but forbidden in raw form.
+/// Sensitive field patterns that should only appear in sanitized form.
 pub const SENSITIVE_PATTERNS: &[&str] = &[
-    "energy",     // OK: "energy_summary", forbidden: "energy_matrix"
-    "coherence",  // OK: "coherence_index", forbidden: "coherence_raw"
-    "drift",      // OK: "drift_status", forbidden: "drift_correction_vector"
-    "checksum",   // OK: "validation_status", forbidden: "esv_checksum_internal"
-    "hash",       // OK: "integrity_verified", forbidden: "lineage_hash_chain"
+    "energy",
+    "coherence",
+    "drift",
+    "checksum",
+    "hash",
 ];
 
 /// Check if a field name matches any forbidden pattern
@@ -135,42 +120,37 @@ pub fn contains_forbidden(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Unicode normalization for pattern matching
-///
-/// Prevents bypass via zero-width characters, lookalike Unicode, etc.
+/// Normalize text for matching.
 pub fn normalize_for_matching(text: &str) -> String {
-    // Remove zero-width characters and normalize
+    // Normalize for matching
     text.chars()
         .filter(|c| !matches!(
             *c,
-            '\u{200B}' | // Zero-width space
-            '\u{200C}' | // Zero-width non-joiner
-            '\u{200D}' | // Zero-width joiner
-            '\u{FEFF}' | // BOM / Zero-width no-break space
-            '\u{00AD}'   // Soft hyphen
+            '\u{200B}' |
+            '\u{200C}' |
+            '\u{200D}' |
+            '\u{FEFF}' |
+            '\u{00AD}'
         ))
         .map(normalize_char)
         .collect::<String>()
         .to_lowercase()
 }
 
-/// Normalize lookalike Unicode characters to ASCII equivalents
+/// Normalize Unicode characters for matching.
 fn normalize_char(c: char) -> char {
     match c {
-        // Cyrillic lookalikes
-        'а' => 'a', // Cyrillic а
-        'е' => 'e', // Cyrillic е
-        'о' => 'o', // Cyrillic о
-        'р' => 'p', // Cyrillic р
-        'с' => 'c', // Cyrillic с
-        'у' => 'y', // Cyrillic у
-        'х' => 'x', // Cyrillic х
-        // Greek lookalikes
-        'α' => 'a', // Greek alpha
-        'ο' => 'o', // Greek omicron
-        // Other lookalikes
-        'ı' => 'i', // Turkish dotless i
-        'ℓ' => 'l', // Script small l
+        'а' => 'a',
+        'е' => 'e',
+        'о' => 'o',
+        'р' => 'p',
+        'с' => 'c',
+        'у' => 'y',
+        'х' => 'x',
+        'α' => 'a',
+        'ο' => 'o',
+        'ı' => 'i',
+        'ℓ' => 'l',
         _ => c,
     }
 }
@@ -191,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_unicode_normalization_zero_width() {
-        let obfuscated = "dag\u{200B}_topology"; // Zero-width space
+        let obfuscated = "dag\u{200B}_topology";
         let normalized = normalize_for_matching(obfuscated);
         assert_eq!(normalized, "dag_topology");
         assert!(is_forbidden(obfuscated));
@@ -199,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_unicode_normalization_cyrillic() {
-        let obfuscated = "dаg_topology"; // Cyrillic 'а'
+        let obfuscated = "dаg_topology";
         let normalized = normalize_for_matching(obfuscated);
         assert_eq!(normalized, "dag_topology");
         assert!(is_forbidden(obfuscated));
@@ -207,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_unicode_normalization_mixed() {
-        let obfuscated = "e\u{200C}sv\u{200D}_rаw"; // Mixed zero-width + Cyrillic
+        let obfuscated = "e\u{200C}sv\u{200D}_rаw";
         let normalized = normalize_for_matching(obfuscated);
         assert_eq!(normalized, "esv_raw");
         assert!(is_forbidden(obfuscated));
