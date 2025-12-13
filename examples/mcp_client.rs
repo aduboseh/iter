@@ -12,12 +12,12 @@
 //!
 //! - `node.create` - Create node with belief and energy
 //! - `node.query` - Query node state by ID
-//! - `node.mutate` - Mutate node belief (DEBUG operation)
+//! - `node.mutate` - Mutate node belief (testing-only)
 //! - `edge.bind` - Bind edge between nodes
 //! - `edge.propagate` - Run simulation step
 //! - `governor.status` - Query governor status
 //! - `governance.status` - Query full governance health
-//! - `esv.audit` - Audit node ethical state vector
+//! - `esv.audit` - Audit node compliance status
 //! - `lineage.replay` - Replay lineage history
 //! - `lineage.export` - Export lineage to file
 

@@ -1,269 +1,41 @@
 # Iter Governance
 
-> Change control, integrity verification, and compliance enforcement
+> Visitor-facing change control and integrity posture for the Iter Server boundary.
 
 ---
 
-## Overview
+## What governance guarantees (high level)
 
-The Iter Server operates under strict governance to ensure:
-- **Integrity**: No unauthorized modifications to security boundaries
-- **Consistency**: Manifest parity between Iter and MCP repos
-- **Auditability**: Complete change history with approval trails
-
----
-
-## Governance Architecture
-
-```
-┌──────────────────┐     ┌──────────────────┐
-│ Sealed engine repo│     │  MCP boundary    │
-│ (private)         │     │  (this repo)     │
-│ governance/       │────▶│ governance/      │
-│ manifest          │     │ manifest         │
-└──────────────────┘     └──────────────────┘
-        │                         │
-        │      SHA-256 match       │
-        └───────────┬─────────────┘
-                    │
-                    ▼
-           ┌────────────────┐
-           │ CI Verification │
-           │  (weekly cron)  │
-           └────────────────┘
-```
+- public-facing surfaces are reviewed and controlled
+- security-critical paths require explicit owner approval
+- automated checks run on every change to enforce baseline integrity
 
 ---
 
-## Dual-Checksum Verification
+## Change control
 
-### Purpose
+This repository uses:
 
-The governance manifest must be identical in both repositories:
-- sealed engine repo (private)
-- MCP boundary repo (public-facing)
-
-### Enforcement
-
-**CI Workflow:** `verify_rules_consistency.yml`
-
-```yaml
-- name: Verify cross-repo consistency
-  run: |
-    diff -q engine/governance/manifest.md \
-            boundary/governance/manifest.md
-```
-
-**Expected Checksum:**
-```
-2CAB34728D6EA82F9C2EAA81A96EF69521B8CB75F254A2750A2BDA6879D5EB46
-```
-
-### Verification Schedule
-
-| Trigger | Description |
-|---------|-------------|
-| `push` | On changes to `WARP.md` or `governance/**` |
-| `pull_request` | On PRs touching governance files |
-| `schedule` | Weekly (Sunday 00:00 UTC) |
-| `workflow_dispatch` | Manual trigger |
+- branch protection on `main`
+- required status checks
+- CODEOWNERS-required review for security-critical paths
 
 ---
 
-## CODEOWNERS Protection
+## Integrity checks
 
-### Protected Paths
+Automated checks verify that:
 
-| Path | Owner | Reason |
-|------|-------|--------|
-| `/src/services/sanitizer/` | @aduboseh | Security boundary |
-| `/tests/integration/` | @aduboseh | Test integrity |
-| `/tests/snapshots/` | @aduboseh | Golden files |
-| `/.github/workflows/` | @aduboseh | CI pipeline |
-| `/src/mcp_handler.rs` | @aduboseh | MCP dispatch |
+- protected artifacts remain consistent and unmodified
+- boundary tests continue to pass
+- governance artifacts remain in an expected state
 
-### CODEOWNERS File
-
-```
-# .github/CODEOWNERS
-
-# Security-critical sanitizer boundary
-/src/services/sanitizer/ @aduboseh
-
-# Integration test suite
-/tests/integration/ @aduboseh
-
-# Response snapshots (golden files)
-/tests/snapshots/ @aduboseh
-
-# CI/CD workflows
-/.github/workflows/ @aduboseh
-
-# MCP handler (tool dispatch)
-/src/mcp_handler.rs @aduboseh
-```
-
-### Effect
-
-Any PR modifying protected paths requires approval from `@aduboseh` before merge.
+Exact checksum values and internal verification details are intentionally not documented publicly.
 
 ---
 
-## Immutable Components
+## Reporting
 
-### Forbidden Pattern Registry
-
-**File:** `src/services/sanitizer/forbidden.rs`
-
-```
-╔══════════════════════════════════════════════════════════════════════════╗
-║  IMMUTABLE REGISTRY — DO NOT MODIFY WITHOUT FOUNDER-LEVEL OVERRIDE       ║
-║  Version: 2.0.0 | Sealed: 2025-12-03 | Authority: Iter Governor           ║
-║  Any modification requires CODEOWNERS approval and audit trail entry.    ║
-╚══════════════════════════════════════════════════════════════════════════╝
-```
-
-**Change Process:**
-1. Document security justification
-2. Add comprehensive test coverage
-3. Submit PR with `security` label
-4. Obtain founder approval
-5. Update version and seal date
-
-### Governance Manifest
-
-**File:** `governance/manifest.md`
-
-**Change Process:**
-1. Modify in both Iter and MCP repos
-2. Ensure SHA-256 checksums match
-3. CI verifies cross-repo consistency
-4. Both repos must pass before merge
-
----
-
-## CI Enforcement
-
-### Required Checks
-
-All PRs must pass:
-
-| Check | Description |
-|-------|-------------|
-| `integration-tests` | 69 MCP integration tests |
-| `boundary-audit` | Forbidden pattern scan |
-| `merge-gate` | Final verification |
-
-### Merge Gate
-
-```yaml
-merge-gate:
-  needs: [integration-tests, boundary-audit]
-  if: always()
-  steps:
-    - name: Check test results
-      run: |
-        if [ "${{ needs.integration-tests.result }}" != "success" ]; then
-          echo "::error::Integration tests failed. Merge blocked."
-          exit 1
-        fi
-```
-
----
-
-## Branch Protection
-
-### Main Branch Rules
-
-- ✅ Require pull request before merging
-- ✅ Require status checks to pass
-- ✅ Require CODEOWNERS approval
-- ✅ Dismiss stale reviews on new commits
-- ❌ Allow force pushes (disabled)
-- ❌ Allow deletions (disabled)
-
----
-
-## Audit Trail
-
-### Lineage Records
-
-Every substrate operation is recorded:
-- Operation type
-- Parameters
-- Timestamp (deterministic mode available)
-- SHA-256 hash
-- Episode grouping
-
-### Export Format
-
-```json
-{
-  "entries": [
-    {
-      "operation": "node.create",
-      "params": {"belief": 0.7, "energy": 1.0},
-      "timestamp": "2025-12-03T00:00:00Z",
-      "hash": "abc123..."
-    }
-  ],
-  "episode_hash": "def456...",
-  "checksum": "..."
-}
-```
-
----
-
-## Compliance Status
-
-### Current State
-
-| Requirement | Status |
-|-------------|--------|
-| Governance manifest parity | ✅ Verified |
-| CODEOWNERS configured | ✅ Active |
-| CI enforcement | ✅ Passing |
-| Immutable registry sealed | ✅ v2.0.0 |
-| Branch protection | ✅ Enabled |
-
-### Release Milestones
-
-| Version | Milestone |
-|---------|-----------|
-| `v0.1.0` | Initial MCP server |
-| `v0.2.0-mcp-integrity` | MCP Hardening v2.0 - Boundary sealed |
-
----
-
-## Governance Violations
-
-### Detection
-
-CI will fail if:
-- Governance checksums don't match
-- Forbidden patterns found in responses
-- Protected files modified without approval
-
-### Resolution
-
-1. Identify violation in CI logs
-2. Revert unauthorized changes
-3. Document incident
-4. Review access controls
-
----
-
-## Contact
-
-**Governance Issues:** governance@onlysgsolutions.com
-
-**Security Issues:** security@onlysgsolutions.com
-
----
-
-## See Also
-
-- [SECURITY.md](./SECURITY.md) - Security architecture
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System design
-- Governance manifest (internal) - Full manifest
+- governance: governance@onlysgsolutions.com
+- security: security@onlysgsolutions.com
 
