@@ -2,19 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_lineage_entry.schema.json",
   "title": "McpLineageEntry",
-  "description": "Sanitized lineage entry for MCP responses. Exposes only checksum, not full hash chain or internal state.",
+  "description": "Lineage entry for MCP responses.",
   "type": "object",
   "required": ["sequence", "operation", "checksum", "tick"],
   "properties": {
     "sequence": {
       "type": "integer",
       "minimum": 0,
-      "description": "Entry sequence number (event_id from CausalEvent)"
+      "description": "Entry sequence number"
     },
     "operation": {
       "type": "string",
       "enum": ["tick", "decision", "ethics", "energy"],
-      "description": "Operation type (sanitized from EventType)"
+      "description": "Operation type"
     },
     "checksum": {
       "type": "string",

@@ -94,7 +94,7 @@
         "properties": {
           "edge_id": {
             "type": "string",
-            "description": "Edge ID (accepted for compatibility, triggers full step)"
+            "description": "Edge identifier"
           }
         }
       },

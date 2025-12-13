@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_edge_state.schema.json",
   "title": "McpEdgeState",
-  "description": "Sanitized edge state for MCP responses",
+  "description": "Edge state for MCP responses",
   "type": "object",
   "required": ["id", "src", "dst", "weight"],
   "properties": {
