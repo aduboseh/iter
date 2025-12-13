@@ -7,4 +7,3 @@ pub mod common;
 pub mod boundary_tests;
 pub mod tool_endpoint_tests;
 pub mod error_handling_tests;
-pub mod adversarial_tests;
