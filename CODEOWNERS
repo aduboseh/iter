@@ -61,7 +61,6 @@
 # GOVERNANCE AND CONFIGURATION FILES
 # =============================================================================
 
-WARP.md                                  @Armonti
 .mcp-context                             @Armonti
 /Cargo.toml                              @Armonti @mcp-engineering
 
@@ -72,3 +71,4 @@ WARP.md                                  @Armonti
 /docs/**                                 @mcp-engineering
 /scripts/**                              @mcp-engineering
 /audits/**                               @Armonti
+
