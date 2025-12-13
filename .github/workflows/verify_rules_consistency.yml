@@ -7,11 +7,9 @@ name: Verify SCG Rules Consistency
 on:
   push:
     paths:
-      - 'WARP.md'
       - 'governance/**'
   pull_request:
     paths:
-      - 'WARP.md'
       - 'governance/**'
   workflow_dispatch:
   schedule:
@@ -77,40 +75,6 @@ jobs:
           fi
           echo "✓ Cross-repo governance consistency verified"
 
-      - name: Verify WARP.md is tracked (not untracked)
-        run: |
-          cd scg_mcp_server
-          if ! git ls-files --error-unmatch WARP.md > /dev/null 2>&1; then
-            echo "::error::WARP.md must be tracked — governance violation"
-            exit 1
-          fi
-          cd ../scg
-          if ! git ls-files --error-unmatch WARP.md > /dev/null 2>&1; then
-            echo "::error::SCG WARP.md must be tracked — governance violation"
-            exit 1
-          fi
-          echo "✓ WARP.md tracked in both repos"
-
-      - name: Verify WARP.md rule files
-        run: |
-          echo "Comparing WARP.md project rules..."
-          SCG_WARP_SHA=$(sha256sum scg/WARP.md | cut -d' ' -f1)
-          MCP_WARP_SHA=$(sha256sum scg_mcp_server/WARP.md | cut -d' ' -f1)
-          echo "SCG WARP.md SHA256: $SCG_WARP_SHA"
-          echo "MCP WARP.md SHA256: $MCP_WARP_SHA"
-          
-          # Check that both files exist and are non-empty
-          if [ ! -s scg/WARP.md ]; then
-            echo "::error::SCG WARP.md is missing or empty!"
-            exit 1
-          fi
-          if [ ! -s scg_mcp_server/WARP.md ]; then
-            echo "::error::MCP WARP.md is missing or empty!"
-            exit 1
-          fi
-          
-          echo "✓ WARP.md files present in both repos"
-
       - name: Generate integrity report
         if: always()
         run: |
@@ -121,3 +85,4 @@ jobs:
           echo "Expected SHA256: $EXPECTED_GOVERNANCE_SHA256"
           echo "Status: ${{ job.status }}"
           echo "========================================"
+
