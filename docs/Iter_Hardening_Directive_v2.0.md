@@ -1,8 +1,8 @@
-# SCG Hardening Directive v2.0 — Complete Engineering Execution Plan
+# Iter Hardening Directive v2.0 — Complete Engineering Execution Plan
 
 **Classification:** Internal — Founder/Chief Architect Only  
 **Owner:** Armonti Du-Bose-Hill  
-**Engine:** SCG Substrate + SCG MCP Server  
+**Engine:** Iter Substrate + Iter Server  
 **Standard:** Top 0.01% Engineering (Physics, Psychology, Graph Theory, Philosophy)  
 **Date:** December 3, 2025
 
@@ -10,9 +10,9 @@
 
 ## Executive Summary
 
-This directive establishes the complete, unambiguous separation of (a) code requiring heavy engineering rigor, (b) operational configuration, (c) maintenance surfaces, and (d) zero-touch zones where no code may be written. It reflects the actual repository structure (SCG and scg_mcp_server/scg-mcp), embeds SCG's foundational invariants as CI gates, operationalizes neuro-mapping specifications, and provides Microsoft Partner Center–ready compliance artifacts.
+This directive establishes the complete, unambiguous separation of (a) code requiring heavy engineering rigor, (b) operational configuration, (c) maintenance surfaces, and (d) zero-touch zones where no code may be written. It reflects the actual repository structure (Iter and iter-server/iter), embeds Iter's foundational invariants as CI gates, operationalizes neuro-mapping specifications, and provides Microsoft Partner Center–ready compliance artifacts.
 
-**Core Principle:** Simplicity over complexity. If a simpler implementation satisfies SCG invariants (ΔE_total ≤ 1e-10, replay ε ≤ 1e-10, ESV checksum = 100%, coherence C ≥ 0.97), choose it. Avoid overengineering.
+**Core Principle:** Simplicity over complexity. If a simpler implementation satisfies Iter invariants (ΔE_total ≤ 1e-10, replay ε ≤ 1e-10, ESV checksum = 100%, coherence C ≥ 0.97), choose it. Avoid overengineering.
 
 ---
 
@@ -20,8 +20,8 @@ This directive establishes the complete, unambiguous separation of (a) code requ
 
 ### Heavy Code (Rust Engineering Required)
 
-- **SCG substrate (SCG repo):** DAG executor, energy model, Elastic Governor, ethics kernel, lineage ledger, replay engine, Hebbian updates, neuro-coherence metrics.
-- **MCP API server (scg_mcp_server repo):** HTTP/gRPC controllers, substrate bridge, auth, rate limiting, sanitization, SDKs (Python/TS/Rust).
+- **Iter substrate (Iter repo):** DAG executor, energy model, Elastic Governor, ethics kernel, lineage ledger, replay engine, Hebbian updates, neuro-coherence metrics.
+- **MCP API server (iter-server repo):** HTTP/gRPC controllers, substrate bridge, auth, rate limiting, sanitization, SDKs (Python/TS/Rust).
 - **Azure containerization:** Dockerfile, Helm charts, K8s manifests, health probes.
 - **Benchmarking/testing:** Invariant test harnesses, determinism validators, performance benchmarks.
 
@@ -46,10 +46,10 @@ This directive establishes the complete, unambiguous separation of (a) code requ
 
 ### Why This Separation Matters
 
-1. **Code = attack surface.** Only code what is necessary for SCG's reasoning engine, replay stability, and MCP delivery. Everything else should be admin/config.
-2. **Substrate = maximum secrecy.** The SCG substrate is a sealed cognitive physics engine. Every extra line of code increases IP exposure risk and nondeterminism.
+1. **Code = attack surface.** Only code what is necessary for Iter's reasoning engine, replay stability, and MCP delivery. Everything else should be admin/config.
+2. **Substrate = maximum secrecy.** The Iter substrate is a sealed cognitive physics engine. Every extra line of code increases IP exposure risk and nondeterminism.
 3. **MCP = safe boundary.** All public-facing functionality lives here—controlled, versioned, observable, and safe. No substrate internals cross this boundary.
-4. **Simplicity doctrine.** SCG foundational principle: "clarity before complexity; ethics before optimization; truth before speed." Choose the simplest implementation that satisfies invariants.
+4. **Simplicity doctrine.** Iter foundational principle: "clarity before complexity; ethics before optimization; truth before speed." Choose the simplest implementation that satisfies invariants.
 5. **Microsoft Partner Center readiness.** Compliance, observability, and documentation must meet or exceed Azure Marketplace standards (NIST AI RMF v1.1, ISO 27001, SOC 2 Type II).
 
 ### Determinism is Non-Negotiable
@@ -68,37 +68,37 @@ All substrate code must enforce:
 
 ### Crate and Workspace Declaration
 
-SCG and scg_mcp_server are **separate crates** and **separate workspaces** to enforce architectural boundaries, prevent cyclic dependencies, and simplify compliance audits. They are not part of a shared Cargo workspace.
+Iter and iter-server are **separate crates** and **separate workspaces** to enforce architectural boundaries, prevent cyclic dependencies, and simplify compliance audits. They are not part of a shared Cargo workspace.
 
-- **Crate name (substrate):** `scg`
-- **Crate name (MCP):** `scg_mcp_server`
+- **Crate name (substrate):** `Iter`
+- **Crate name (MCP):** `iter-server`
 - **Remote repositories:**
-  - `SCG` (private, substrate)
-  - `scg-mcp` (public-facing, MCP boundary)
+  - `Iter` (private, substrate)
+  - `iter` (public-facing, MCP boundary)
 
 ### Import Rules (Non-Negotiable)
 
-1. The `scg` crate does **NOT** import from `scg_mcp_server`.
+1. The `Iter` crate does **NOT** import from `iter-server`.
    (Substrate is pure; no HTTP, no SDKs, no UI dependencies.)
-2. The `scg_mcp_server` crate **MAY** import `scg`, but **ONLY** via `substrate_bridge.rs`.
+2. The `iter-server` crate **MAY** import `Iter`, but **ONLY** via `substrate_bridge.rs`.
    (All substrate interactions are mediated through a single, narrow interface.)
 3. **No cyclic dependencies.**
    (This prevents build graph pollution and maintains determinism.)
 
 ---
 
-### Repository A: SCG (Substrate Repository)
+### Repository A: Iter (Engine Repository)
 
-**Crate Name:** `scg`  
-**Local Directory:** `SCG/`  
-**Remote Repository:** `SCG` (GitHub, private)
+**Crate Name:** `Iter`  
+**Local Directory:** `Iter/`  
+**Remote Repository:** `Iter` (GitHub, private)
 
-**Purpose:** Physics-governed cognition substrate. All DAG execution, energy model, ethics kernel, belief propagation, lineage ledger, neuro-coherence, and deterministic replay logic.
+**Purpose:** Deterministic governed execution engine. All DAG execution, energy model, ethics validation, propagation, audit ledger, coherence, and deterministic replay logic.
 
 **Folder Structure:**
 
 ```
-SCG/
+Iter/
   src/
     core/
       dag_executor.rs         # DAG execution model (acyclicity, topological order)
@@ -121,9 +121,9 @@ SCG/
       neuro_validation.rs     # BEI ≥ 0.95, ACC/DLPFC/OFC coupling metrics
     lib.rs                    # Public API surface (minimal, for MCP only)
   benches/
-    scg_bench.rs              # Performance benchmarks (latency, throughput)
-  Cargo.toml                  # Crate metadata: name = "scg"
-  README.md                   # "SCG Substrate (Physics/Ethics Core)"
+iter_bench.rs              # Performance benchmarks (latency, throughput)
+  Cargo.toml                  # Crate metadata: name = "Iter"
+  README.md                   # "Iter Substrate (Physics/Ethics Core)"
   ARCHITECTURE.md             # Substrate architecture, invariants, module map
   CONTRIBUTING.md             # Developer onboarding, CI expectations
   .warp/
@@ -138,24 +138,24 @@ SCG/
 - HTTP servers, SDKs, UI, Marketplace files, tenant logic, logs revealing DAG internals, vendor adapters.
 
 **Done When:**
-- Every module in `src/core/` and `neuro/` maps to a concept in the SCG specs.
+- Every module in `src/core/` and `neuro/` maps to a concept in the Iter specs.
 - No HTTP, SDK, or UI code exists in the substrate repo.
 - No DAG internals, ESV raw values, or substrate-level logs leak into any external interface.
 
 ---
 
-### Repository B: scg_mcp_server (MCP Boundary Repository)
+### Repository B: iter-server (MCP Boundary Repository)
 
-**Crate Name:** `scg_mcp_server`  
-**Local Directory:** `scg_mcp_server/`  
-**Remote Repository:** `scg-mcp` (GitHub, public-facing)
+**Crate Name:** `iter-server`  
+**Local Directory:** `iter-server/`  
+**Remote Repository:** `iter` (GitHub, public-facing)
 
-**Purpose:** Safe boundary layer around SCG substrate. All HTTP/gRPC endpoints, SDKs, demos, scenarios, Azure packaging, Marketplace assets, and tenant isolation.
+**Purpose:** Safe boundary layer around Iter substrate. All HTTP/gRPC endpoints, SDKs, demos, scenarios, Azure packaging, Marketplace assets, and tenant isolation.
 
 **Folder Structure:**
 
 ```
-scg_mcp_server/
+iter-server/
   src/
     controllers/
       reason.rs               # POST /reason - primary reasoning endpoint
@@ -164,17 +164,17 @@ scg_mcp_server/
       governor.rs             # GET /governor/status - high-level drift metrics
       scenario.rs             # POST /scenario/run - scenario execution
     services/
-      substrate_bridge.rs     # Narrow interface to SCG substrate (ONLY import point)
+      substrate_bridge.rs     # Narrow interface to Iter substrate (ONLY import point)
       auth.rs                 # Lineage-hash-based token validation
       rate_limiter.rs         # Per-tenant rate limiting
       sanitizer.rs            # Response redaction (no ESV internals, no DAG topology)
     middleware/
       logging.rs              # Structured logging (request ID, tenant ID, latency)
       metrics.rs              # Prometheus exporters (request counts, error rates)
-      error_mapping.rs        # SCGError → HTTP status codes
+      error_mapping.rs        # EngineError → HTTP status codes
     sdk/
       python/                 # Python SDK with type hints
-        scg_client.py
+        iter_client.py
         __init__.py
         README.md
       typescript/             # TypeScript SDK with strong types
@@ -216,8 +216,8 @@ scg_mcp_server/
     security/                 # Auth, rate limiting, input validation tests
       test_auth.rs
       test_rate_limit.rs
-  Cargo.toml                  # Crate metadata: name = "scg_mcp_server"
-  README.md                   # "SCG MCP Boundary / API Server"
+  Cargo.toml                  # Crate metadata: name = "iter-server"
+  README.md                   # "Iter Boundary / API Server"
   ARCHITECTURE.md             # MCP architecture, boundary layer, SDKs
   CONTRIBUTING.md             # MCP-specific developer onboarding
   .warp/
@@ -231,7 +231,7 @@ scg_mcp_server/
 - Direct substrate logic, DAG executors, energy models, ethics kernel internals, raw lineage ledger access.
 
 **Done When:**
-- All controllers use `SubstrateClient` exclusively (no direct `scg` module calls).
+- All controllers use `SubstrateClient` exclusively (no direct `Iter` module calls).
 - All responses are sanitized (no DAG internals, no ESV raw values).
 - SDKs (Python, TS, Rust) can call `/reason` and `/governor/status`.
 - Docker build succeeds, Helm chart deploys to AKS.
@@ -242,15 +242,15 @@ scg_mcp_server/
 
 ### 0.1 Repository Security and Access Control
 
-**Objective:** Ensure SCG substrate remains accessible only to authorized personnel, with cryptographic integrity and audit trails.
+**Objective:** Ensure Iter substrate remains accessible only to authorized personnel, with cryptographic integrity and audit trails.
 
 **Actions (Configuration + Maintenance):**
 
 #### GitHub Organization Setup
 
-Create private GitHub organization for SCG with two repositories:
-- `SCG` (substrate only, private)
-- `scg-mcp` (MCP boundary, public-facing or private depending on commercialization stage)
+Create private GitHub organization for Iter with two repositories:
+- `Iter` (substrate only, private)
+- `iter` (MCP boundary, public-facing or private depending on commercialization stage)
 
 Enable branch protection for `main` in both repos:
 - Require pull request reviews (minimum 1)
@@ -267,7 +267,7 @@ Enable security features:
 
 #### CODEOWNERS Files
 
-**File: `SCG/CODEOWNERS`:**
+**File: `Iter/CODEOWNERS`:**
 ```
 # Substrate core modules require founder approval
 /src/core/**         @Armonti
@@ -279,7 +279,7 @@ Enable security features:
 /tests/**            @substrate-core-team
 ```
 
-**File: `scg_mcp_server/CODEOWNERS`:**
+**File: `iter-server/CODEOWNERS`:**
 ```
 # Substrate bridge requires founder approval
 /src/services/substrate_bridge.rs  @Armonti
@@ -294,16 +294,16 @@ Enable security features:
 
 - Enforce 2FA/MFA for all contributors
 - Use SSH keys or GPG-signed commits
-- No forks allowed for SCG (disable in repo settings)
-- `scg-mcp` may allow forks if open-sourcing client SDKs
+- No forks allowed for Iter (disable in repo settings)
+- `iter` may allow forks if open-sourcing client SDKs
 
 #### Zero-Touch Zone (Never Code)
 
 - No adapters, wrappers, debug endpoints, or pseudo-APIs for direct substrate access in either repo.
-- No HTTP servers, SDKs, or UI code in the SCG repo.
+- No HTTP servers, SDKs, or UI code in the Iter repo.
 
 **Done When:**
-- Both repos are private (or `scg-mcp` is public if appropriate), branch-protected, and secret-scanned.
+- Both repos are private (or `iter` is public if appropriate), branch-protected, and secret-scanned.
 - You cannot push to `main` without a PR and passing checks.
 - CODEOWNERS enforces review gates for critical modules.
 - All commits are GPG-signed.
@@ -312,24 +312,24 @@ Enable security features:
 
 ### 0.2 Cargo Configuration and Workspace Declaration
 
-**Objective:** Explicitly declare that SCG and scg_mcp_server are separate crates with no shared workspace, preventing cyclic dependencies and enforcing architectural boundaries.
+**Objective:** Explicitly declare that Iter and iter-server are separate crates with no shared workspace, preventing cyclic dependencies and enforcing architectural boundaries.
 
-#### SCG Crate Configuration
+#### Iter Crate Configuration
 
-**File: `SCG/Cargo.toml`:**
+**File: `Iter/Cargo.toml`:**
 ```toml
 [package]
-name = "scg"
+name = "Iter"
 version = "0.1.0"
 edition = "2021"
 authors = ["Armonti Du-Bose-Hill <your-email@example.com>"]
 license = "Proprietary"
-description = "Synthetic Cognitive Graph (SCG) Substrate - Physics-Governed Cognition Engine"
-repository = "https://github.com/your-org/SCG"
+description = "Iter (Iter) Substrate - Physics-Governed Cognition Engine"
+repository = "https://github.com/your-org/Iter"
 readme = "README.md"
 
 [lib]
-name = "scg"
+name = "Iter"
 path = "src/lib.rs"
 
 [dependencies]
@@ -344,7 +344,7 @@ criterion = "0.5"  # For benchmarking
 proptest = "1.4"   # For property-based testing
 
 [[bench]]
-name = "scg_bench"
+name = "iter_bench"
 harness = false
 
 [profile.release]
@@ -357,23 +357,23 @@ codegen-units = 1
 - No HTTP, no async runtime (tokio/async-std), no web frameworks.
 - All dependencies must be deterministic (no randomness unless explicitly controlled).
 
-#### scg_mcp_server Crate Configuration
+#### iter-server Crate Configuration
 
-**File: `scg_mcp_server/Cargo.toml`:**
+**File: `iter-server/Cargo.toml`:**
 ```toml
 [package]
-name = "scg_mcp_server"
+name = "iter-server"
 version = "0.1.0"
 edition = "2021"
 authors = ["Armonti Du-Bose-Hill <your-email@example.com>"]
 license = "Proprietary"
-description = "SCG MCP Boundary Server - Safe API Layer for SCG Substrate"
-repository = "https://github.com/your-org/scg-mcp"
+description = "Iter Boundary Server - Safe API Layer for Iter Substrate"
+repository = "https://github.com/your-org/iter"
 readme = "README.md"
 
 [dependencies]
-# SCG substrate (imported via path or published crate)
-scg = { path = "../SCG" }  # Or version = "0.1.0" if published
+# Iter substrate (imported via path or published crate)
+Iter = { path = "../Iter" }  # Or version = "0.1.0" if published
 
 # Web framework
 actix-web = "4.4"
@@ -399,7 +399,7 @@ governor = "0.6"
 reqwest = "0.11"  # For integration tests
 
 [[bin]]
-name = "scg-mcp-server"
+name = "iter-server"
 path = "src/main.rs"
 
 [profile.release]
@@ -408,13 +408,13 @@ lto = true
 ```
 
 **Notes:**
-- `scg` is imported via `path = "../SCG"` during development.
-- For production, `scg` should be a private crate published to a private registry (or vendored).
+- `Iter` is imported via `path = "../Iter"` during development.
+- For production, `Iter` should be a private crate published to a private registry (or vendored).
 
 **Done When:**
-- `cargo build` succeeds in both `SCG/` and `scg_mcp_server/` independently.
+- `cargo build` succeeds in both `Iter/` and `iter-server/` independently.
 - No cyclic dependencies exist.
-- `scg_mcp_server` imports `scg`, but `scg` does NOT import `scg_mcp_server`.
+- `iter-server` imports `Iter`, but `Iter` does NOT import `iter-server`.
 
 ---
 
@@ -422,11 +422,11 @@ lto = true
 
 ### 1.1 Core Module Implementation
 
-**Objective:** Implement the foundational SCG substrate modules with provable adherence to thermodynamic, ethical, and topological invariants.
+**Objective:** Implement the foundational Iter substrate modules with provable adherence to thermodynamic, ethical, and topological invariants.
 
 #### Module 1: DAG Executor
 
-**File: `SCG/src/core/dag_executor.rs`:**
+**File: `Iter/src/core/dag_executor.rs`:**
 ```rust
 use std::collections::{HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
@@ -579,7 +579,7 @@ pub enum DagError {
 
 #### Module 2: Energy Model
 
-**File: `SCG/src/core/energy_model.rs`:**
+**File: `Iter/src/core/energy_model.rs`:**
 ```rust
 use crate::core::dag_executor::{DagExecutor, NodeId};
 
@@ -627,7 +627,7 @@ pub enum EnergyError {
 
 #### Module 3: Elastic Governor
 
-**File: `SCG/src/core/governor.rs`:**
+**File: `Iter/src/core/governor.rs`:**
 ```rust
 use crate::core::dag_executor::{DagExecutor, NodeId};
 
@@ -680,7 +680,7 @@ pub enum GovernorError {
 
 #### Module 4: Ethics Kernel
 
-**File: `SCG/src/core/ethics_kernel.rs`:**
+**File: `Iter/src/core/ethics_kernel.rs`:**
 ```rust
 use crate::core::dag_executor::{DagExecutor, EthicalStateVector, NodeId};
 
@@ -736,7 +736,7 @@ pub enum EthicsError {
 
 #### Module 5: Lineage Ledger
 
-**File: `SCG/src/core/lineage_ledger.rs`:**
+**File: `Iter/src/core/lineage_ledger.rs`:**
 ```rust
 use blake3;
 use serde::{Deserialize, Serialize};
@@ -755,7 +755,7 @@ pub struct LineageLedger {
 
 impl LineageLedger {
     pub fn new() -> Self {
-        let genesis_hash = blake3::hash(b"SCG_GENESIS").to_hex().to_string();
+        let genesis_hash = blake3::hash(b"ITER_GENESIS").to_hex().to_string();
         Self {
             entries: vec![LineageEntry {
                 hash: genesis_hash.clone(),
@@ -794,7 +794,7 @@ impl LineageLedger {
 
 #### Module 6: Replay Engine
 
-**File: `SCG/src/core/replay_engine.rs`:**
+**File: `Iter/src/core/replay_engine.rs`:**
 ```rust
 use crate::core::lineage_ledger::{LineageLedger, LineageEntry};
 use crate::core::dag_executor::DagExecutor;
@@ -863,7 +863,7 @@ pub enum ReplayError {
 
 #### Module 7: Hebbian Weight Updates
 
-**File: `SCG/src/core/hebbian.rs`:**
+**File: `Iter/src/core/hebbian.rs`:**
 ```rust
 use crate::core::dag_executor::{DagExecutor, EdgeId};
 
@@ -908,7 +908,7 @@ pub enum HebbianError {
 
 #### Module 8: Neuro-Coherence
 
-**File: `SCG/src/neuro/coherence.rs`:**
+**File: `Iter/src/neuro/coherence.rs`:**
 ```rust
 use crate::core::dag_executor::DagExecutor;
 use std::f64::consts::PI;
@@ -953,14 +953,14 @@ impl CoherenceCalculator {
 
 ### 1.2 Invariant Test Harness
 
-**Objective:** Create executable proofs that SCG respects its foundational invariants.
+**Objective:** Create executable proofs that Iter respects its foundational invariants.
 
 #### Test Suite: Energy Conservation
 
-**File: `SCG/tests/invariants_energy.rs`:**
+**File: `Iter/tests/invariants_energy.rs`:**
 ```rust
-use scg::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
-use scg::core::energy_model::EnergyModel;
+use Iter::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
+use Iter::core::energy_model::EnergyModel;
 
 #[test]
 fn test_energy_conservation_long_run() {
@@ -1007,10 +1007,10 @@ fn initialize_test_dag() -> DagExecutor {
 
 #### Test Suite: Replay Determinism
 
-**File: `SCG/tests/invariants_replay.rs`:**
+**File: `Iter/tests/invariants_replay.rs`:**
 ```rust
-use scg::core::replay_engine::{ReplayEngine, Scenario};
-use scg::core::lineage_ledger::LineageLedger;
+use Iter::core::replay_engine::{ReplayEngine, Scenario};
+use Iter::core::lineage_ledger::LineageLedger;
 
 #[test]
 fn test_deterministic_replay() {
@@ -1033,13 +1033,13 @@ fn test_deterministic_replay() {
     assert!(report3.variance <= 1e-10);
 }
 
-fn run_scenario(scenario: &Scenario) -> scg::core::replay_engine::ReplayReport {
+fn run_scenario(scenario: &Scenario) -> Iter::core::replay_engine::ReplayReport {
     let mut ledger = LineageLedger::new();
     
     // (Scenario execution logic)
     ledger.append("Scenario state".to_string(), 1000);
     
-    scg::core::replay_engine::ReplayReport {
+    Iter::core::replay_engine::ReplayReport {
         success: true,
         hash: ledger.current_hash().to_string(),
         variance: 0.0,
@@ -1049,9 +1049,9 @@ fn run_scenario(scenario: &Scenario) -> scg::core::replay_engine::ReplayReport {
 
 #### Test Suite: Topological Integrity
 
-**File: `SCG/tests/invariants_topology.rs`:**
+**File: `Iter/tests/invariants_topology.rs`:**
 ```rust
-use scg::core::dag_executor::{DagExecutor, Node, Edge, NodeId, EdgeId, EthicalStateVector};
+use Iter::core::dag_executor::{DagExecutor, Node, Edge, NodeId, EdgeId, EthicalStateVector};
 
 #[test]
 fn test_dag_acyclicity_under_dynamic_edges() {
@@ -1102,10 +1102,10 @@ fn initialize_test_dag() -> DagExecutor {
 
 #### Test Suite: Ethical Stability
 
-**File: `SCG/tests/invariants_ethics.rs`:**
+**File: `Iter/tests/invariants_ethics.rs`:**
 ```rust
-use scg::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
-use scg::core::ethics_kernel::EthicsKernel;
+use Iter::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
+use Iter::core::ethics_kernel::EthicsKernel;
 
 #[test]
 fn test_esv_enforcement() {
@@ -1165,10 +1165,10 @@ fn initialize_test_dag() -> DagExecutor {
 
 #### Test Suite: Neuro-Coherence Validation
 
-**File: `SCG/tests/neuro_validation.rs`:**
+**File: `Iter/tests/neuro_validation.rs`:**
 ```rust
-use scg::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
-use scg::neuro::coherence::CoherenceCalculator;
+use Iter::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
+use Iter::neuro::coherence::CoherenceCalculator;
 
 #[test]
 fn test_neuro_coherence() {
@@ -1206,10 +1206,10 @@ fn initialize_test_dag() -> DagExecutor {
 
 ### 1.3 Benchmarking Harness
 
-**File: `SCG/benches/scg_bench.rs`:**
+**File: `Iter/benches/iter_bench.rs`:**
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use scg::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
+use Iter::core::dag_executor::{DagExecutor, Node, NodeId, EthicalStateVector};
 
 fn benchmark_belief_propagation(c: &mut Criterion) {
     let dag = initialize_large_dag(1000);
@@ -1252,35 +1252,35 @@ criterion_main!(benches);
 
 ### 2.1 Substrate Bridge (Narrow and Sealed)
 
-**File: `scg_mcp_server/src/services/substrate_bridge.rs`:**
+**File: `iter-server/src/services/substrate_bridge.rs`:**
 ```rust
-use scg::{ScgCore, ReasonRequest, ScenarioSpec, TraceId};
-use crate::error::ScgError;
+use Iter::{IterCore, ReasonRequest, ScenarioSpec, TraceId};
+use crate::error::IterError;
 
 pub struct SubstrateClient {
-    core: ScgCore,  // Initialized at startup, never exposed
+core: IterCore,  // Initialized at startup, never exposed
 }
 
 impl SubstrateClient {
-    pub fn new(config: SubstrateConfig) -> Result<Self, ScgError> {
-        let core = ScgCore::initialize(config)?;
+pub fn new(config: EngineConfig) -> Result<Self, IterError> {
+let core = IterCore::initialize(config)?;
         Ok(Self { core })
     }
     
     /// Primary reasoning endpoint
-    pub async fn reason(&self, input: ReasonRequest) -> Result<ReasonResponse, ScgError> {
+pub async fn reason(&self, input: ReasonRequest) -> Result<ReasonResponse, IterError> {
         let outcome = self.core.reason(input)?;
         Ok(outcome.into_sanitized_response())
     }
     
     /// Run a predefined scenario
-    pub async fn run_scenario(&self, scenario: ScenarioSpec) -> Result<ScenarioResult, ScgError> {
+pub async fn run_scenario(&self, scenario: ScenarioSpec) -> Result<ScenarioResult, IterError> {
         let result = self.core.execute_scenario(scenario)?;
         Ok(result.into_sanitized_response())
     }
     
     /// High-level governor status (drift metrics only, no raw energy)
-    pub async fn governor_status(&self) -> Result<GovernorStatus, ScgError> {
+pub async fn governor_status(&self) -> Result<GovernorStatus, IterError> {
         let status = self.core.governor_telemetry();
         Ok(GovernorStatus {
             stable: status.drift <= 1e-10,
@@ -1290,7 +1290,7 @@ impl SubstrateClient {
     }
     
     /// Trace summary (lineage hash + metadata, no DAG topology)
-    pub async fn trace(&self, trace_id: TraceId) -> Result<TraceSummary, ScgError> {
+pub async fn trace(&self, trace_id: TraceId) -> Result<TraceSummary, IterError> {
         let trace = self.core.get_trace(trace_id)?;
         Ok(TraceSummary {
             id: trace.id,
@@ -1320,7 +1320,7 @@ pub struct TraceSummary {
 
 ### 2.2 Endpoint Implementation
 
-**File: `scg_mcp_server/src/controllers/reason.rs`:**
+**File: `iter-server/src/controllers/reason.rs`:**
 ```rust
 use actix_web::{post, web, HttpResponse};
 use crate::services::substrate_bridge::SubstrateClient;
@@ -1348,9 +1348,9 @@ async fn reason_handler(
 
 ### 3.1 CI Pipelines
 
-**File: `.github/workflows/substrate-ci.yml` (in SCG repo):**
+**File: `.github/workflows/substrate-ci.yml` (in Iter repo):**
 ```yaml
-name: SCG Substrate CI
+name: Iter Substrate CI
 
 on:
   push:
@@ -1377,7 +1377,7 @@ jobs:
       - run: cargo bench --no-run
 ```
 
-**File: `.github/workflows/mcp-ci.yml` (in scg_mcp_server repo):**
+**File: `.github/workflows/mcp-ci.yml` (in iter-server repo):**
 ```yaml
 name: MCP Boundary CI
 
@@ -1427,11 +1427,12 @@ jobs:
 ### Risk 5: Compliance Docs Lag Behind Code
 **Mitigation:** Phase 5 creates living docs (CONTRIBUTING.md, ARCHITECTURE.md, compliance mappings) that are versioned alongside code and required for Partner Center submission.
 
-### Risk 6: Cyclic Dependencies Between scg and scg_mcp_server
+### Risk 6: Cyclic Dependencies Between Iter and iter-server
 **Mitigation:** Explicit import rules (Phase 0.2) and separate workspaces prevent cyclic dependencies. CI enforces this via build graph validation.
 
 ---
 
 ## One-Line Recommendation
 
-Start with Phase 1.1 + 1.2 (substrate modules + invariant tests) and Phase 2.1 (substrate bridge) this week—once the substrate modules, invariants, and the MCP bridge exist and are under CI, the rest of the hardening becomes incremental instead of heroic, and you'll have a production-ready, acquisition-grade, Microsoft-compliant SCG system that proves morality through physics.
+Start with Phase 1.1 + 1.2 (substrate modules + invariant tests) and Phase 2.1 (substrate bridge) this week—once the substrate modules, invariants, and the MCP bridge exist and are under CI, the rest of the hardening becomes incremental instead of heroic, and you'll have a production-ready, acquisition-grade, Microsoft-compliant Iter system that proves morality through physics.
+

@@ -1,4 +1,4 @@
-# SCG MCP Server Architecture
+# Iter Server Architecture
 
 > Full technical breakdown of the MCP boundary layer
 
@@ -6,7 +6,7 @@
 
 ## System Overview
 
-The SCG MCP Server sits between AI assistants and the SCG cognitive substrate, acting as a **hardened security boundary**.
+The Iter Server sits between AI assistants and the Iter governed execution, acting as a **hardened security boundary**.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -18,7 +18,7 @@ The SCG MCP Server sits between AI assistants and the SCG cognitive substrate, a
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│                      SCG MCP Server                             │
+│                      Iter Server                             │
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │   MCP       │  │  Response   │  │   Forbidden Pattern     │  │
@@ -28,7 +28,7 @@ The SCG MCP Server sits between AI assistants and the SCG cognitive substrate, a
 │         │ Safe, sanitized operations                            │
 │         ▼                                                       │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │              SCG Runtime (scg-connectome)                   ││
+│  │              Iter Runtime (Iter-connectome)                   ││
 │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐        ││
 │  │  │  Nodes  │ │  Edges  │ │Governor │ │   Lineage   │        ││
 │  │  │ (belief)│ │(weights)│ │  (ESV)  │ │  (SHA-256)  │        ││
@@ -49,7 +49,7 @@ The JSON-RPC 2.0 dispatcher. Routes incoming requests to appropriate substrate o
 **Responsibilities:**
 - Parse JSON-RPC requests
 - Validate method names and parameters
-- Dispatch to SCG runtime
+- Dispatch to Iter runtime
 - Format MCP-compliant responses
 
 **Supported Methods:**
@@ -58,9 +58,9 @@ The JSON-RPC 2.0 dispatcher. Routes incoming requests to appropriate substrate o
 - `tools/call` - Execute a tool
 - Direct tool methods (`node.create`, etc.)
 
-### 2. SCG Runtime (`src/scg_core.rs`)
+### 2. Iter Runtime (`src/substrate_runtime.rs`)
 
-Wrapper around `scg-connectome` that manages substrate state.
+Wrapper around `Iter-connectome` that manages substrate state.
 
 **Core Operations:**
 - `node_create(belief, energy)` → Node
@@ -76,7 +76,7 @@ Wrapper around `scg-connectome` that manages substrate state.
 The critical security boundary. Ensures no substrate internals leak to AI.
 
 ```
-              Raw Response from SCG Runtime
+              Raw Response from Iter Runtime
                          │
                          ▼
               ┌─────────────────────┐
@@ -152,7 +152,7 @@ AI Assistant
     │
     ▼
 ┌─────────────────┐
-│  SCG Runtime    │  ← Execute operation
+│  Iter Runtime    │  ← Execute operation
 └─────────────────┘
     │
     ▼
@@ -164,7 +164,7 @@ AI Assistant
 ### Response Flow (Substrate → AI)
 
 ```
-SCG Runtime Result
+Iter Runtime Result
     │
     ▼
 ┌─────────────────┐
@@ -237,6 +237,17 @@ Operation 3 ─────┘
 
 ---
 
+## Binary Configuration
+
+The server exposes two binary names for different contexts:
+
+- **`iter-server`** - User-facing binary alias for public distribution and Marketplace
+- **`scg_mcp_server`** - Internal binary name retained for CI, existing integrations, and internal tooling
+
+Both names point to the same binary and are configured in `Cargo.toml`. **Do not remove the dual-bin setup** — it maintains backward compatibility for internal systems while presenting clean branding externally.
+
+---
+
 ## Module Structure
 
 ```
@@ -244,7 +255,7 @@ src/
 ├── main.rs                 # Entry point, STDIO server loop
 ├── lib.rs                  # Library exports for testing
 ├── mcp_handler.rs          # JSON-RPC dispatcher
-├── scg_core.rs             # SCG runtime wrapper
+├── substrate_runtime.rs     # Iter runtime facade
 ├── governance.rs           # Governance validation
 ├── types.rs                # RPC request/response types
 ├── fault.rs                # Error handling
@@ -271,7 +282,7 @@ src/
 | `uuid` | 1.x | UUID generation |
 | `sha2` | 0.10 | SHA-256 hashing |
 | `parking_lot` | 0.12 | Synchronization |
-| `scg-connectome` | local | SCG substrate |
+| `Iter-connectome` | local | Iter substrate |
 
 ---
 
@@ -280,3 +291,4 @@ src/
 - [SECURITY.md](./SECURITY.md) - Security architecture details
 - [ATTACK_SURFACE.md](./ATTACK_SURFACE.md) - Blocked patterns
 - [GOVERNANCE.md](./GOVERNANCE.md) - Governance system
+

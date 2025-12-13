@@ -1,4 +1,4 @@
-# SCG Substrate Demo - Validation Report v1.0
+# Iter Substrate Demo - Validation Report v1.0
 
 **Certification Date:** 2025-11-26
 **Package Version:** 1.0
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The SCG Substrate demonstration package has passed all validation gates and is certified for enterprise deployment. The package demonstrates deterministic graph operations, constraint enforcement, and cryptographic lineage tracking without any domain-specific content.
+The Iter Substrate demonstration package has passed all validation gates and is certified for enterprise deployment. The package demonstrates deterministic graph operations, constraint enforcement, and cryptographic lineage tracking without any domain-specific content.
 
 ---
 
@@ -16,9 +16,9 @@ The SCG Substrate demonstration package has passed all validation gates and is c
 
 | Property | Value |
 |----------|-------|
-| Primary Script | `demos/scg_demo.sh` |
+| Primary Script | `demos/iter_demo.sh` |
 | Script Hash (SHA-256) | `588153f3c00a95c3296b576a74f4d8bea8ea556fb2a0366236bd7b21b899d1df` |
-| Package File | `scg_demo_package_v1.0_certified.zip` |
+| Package File | `iter_demo_package_v1.0_certified.zip` |
 | Package Size | 21.75 KB |
 | Total Files | 18 |
 | MCP Server Version | 0.1.0 |
@@ -31,9 +31,9 @@ The SCG Substrate demonstration package has passed all validation gates and is c
 
 | File | Status | Size | SHA-256 |
 |------|--------|------|---------|
-| demos/scg_demo.sh | ✓ OK | 21,797 | 588153f3...b899d1df |
+| demos/iter_demo.sh | ✓ OK | 21,797 | 588153f3...b899d1df |
 | demos/prompts_synthetic.txt | ✓ OK | 5,780 | 93bcb444...bca073a |
-| demos/scg_demo.toml | ✓ OK | 1,682 | f045571f...76c0b65 |
+| demos/iter_demo.toml | ✓ OK | 1,682 | f045571f...76c0b65 |
 | demo_expected/01_start.log | ✓ OK | 151 | 69f7f98b...a9eef9 |
 | demo_expected/02_create_nodes.log | ✓ OK | 1,210 | 80f91dc9...dfd0f3 |
 | demo_expected/03_bind_edges.log | ✓ OK | 2,039 | 68eb1622...59252e |
@@ -71,8 +71,8 @@ The demo executes the complete scenario twice sequentially:
 | Layer | Implementation |
 |-------|----------------|
 | 1. Locale | `LC_ALL=C`, `LANG=C`, `TZ=UTC` |
-| 2. Timestamps | `SCG_TIMESTAMP_MODE=deterministic` |
-| 3. Telemetry | `SCG_DETERMINISM=1` (suppresses PIDs/timestamps) |
+| 2. Timestamps | `TIMESTAMP_MODE=deterministic` |
+| 3. Telemetry | `DETERMINISM=1` (suppresses PIDs/timestamps) |
 | 4. JSON-RPC IDs | Sequential integers 1..N, reset per run |
 | 5. JSON Normalization | CRLF→LF, trailing whitespace stripped |
 | 6. Fixed Epoch | `1700000000` in config |
@@ -143,8 +143,8 @@ All invariant artifacts match across runs
 sha256sum -c PACKAGING_MANIFEST.txt
 
 # Docker reproducibility test
-docker build -t scg-demo-package:v1.0 .
-docker run --rm scg-demo-package:v1.0
+docker build -t Iter-demo-package:v1.0 .
+docker run --rm Iter-demo-package:v1.0
 # Expected: "DETERMINISM VERIFIED"
 ```
 
@@ -157,3 +157,5 @@ This package has been validated against all specified quality gates and complian
 **Certified by:** Automated validation pipeline
 **Date:** 2025-11-26
 **Artifact Hash:** `588153f3c00a95c3296b576a74f4d8bea8ea556fb2a0366236bd7b21b899d1df`
+
+

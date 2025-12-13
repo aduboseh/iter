@@ -1,5 +1,5 @@
-# SCG-MCP Substrate v1.0.0 - Production Dockerfile
-# Directive: SG-SCG-PILOT-AUTH-01 v1.2.0
+# Iter Server v1.0.0 - Production Dockerfile
+# Directive: SG-ITER-PILOT-AUTH-01 v1.2.0
 # 
 # Multi-stage build for optimized production image
 
@@ -22,10 +22,10 @@ COPY src ./src
 COPY tests ./tests
 
 # Build release binary
-RUN cargo build --release --bin scg_mcp_server
+RUN cargo build --release --bin iter-server
 
 # Strip binary to reduce size
-RUN strip /build/target/release/scg_mcp_server
+RUN strip /build/target/release/iter-server
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
@@ -37,31 +37,31 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN useradd -m -u 1000 scg && \
-    mkdir -p /var/log/scg /var/lib/scg && \
-    chown -R scg:scg /var/log/scg /var/lib/scg
+RUN useradd -m -u 1000 iter && \
+    mkdir -p /var/log/iter /var/lib/iter && \
+    chown -R iter:iter /var/log/iter /var/lib/iter
 
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /build/target/release/scg_mcp_server /app/scg_mcp_server
+COPY --from=builder /build/target/release/iter-server /app/iter-server
 
 # Switch to non-root user
-USER scg
+USER iter
 
 # Expose port (if needed for HTTP transport in future)
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD pgrep scg_mcp_server || exit 1
+    CMD pgrep iter-server || exit 1
 
 # Labels for traceability
-LABEL scg.version="v1.0.0-substrate" \
-      scg.commit="ab48747" \
-      scg.mission="pilot-01" \
-      scg.directive="SG-SCG-PILOT-AUTH-01-v1.2.0" \
+LABEL iter.version="v1.0.0-server" \
+      iter.commit="ab48747" \
+      iter.mission="pilot-01" \
+      iter.directive="SG-ITER-PILOT-AUTH-01-v1.2.0" \
       maintainer="armonti.dubo.sehill@only-sg.systems"
 
-# Run SCG-MCP server
-ENTRYPOINT ["/app/scg_mcp_server"]
+# Run Iter server
+ENTRYPOINT ["/app/iter-server"]

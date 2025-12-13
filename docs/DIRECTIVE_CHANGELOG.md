@@ -1,10 +1,10 @@
-# SCG Demo Directive Changelog
+# Iter Demo Directive Changelog
 
 ## v2.0 (2025-11-26)
 **Status:** Production deployment
 
 **Changes from v1.0:**
-- Renamed `scg_andrei_demo.sh` to `scg_demo.sh` (audience neutrality)
+- Renamed `legacy_demo.sh` to `iter_demo.sh` (audience neutrality)
 - Added 7-layer determinism stack (locale hardening, JSON normalization)
 - Enhanced packaging with Docker reproducibility bundle
 - Added Microsoft audit compliance section
@@ -43,3 +43,5 @@
 - No Docker packaging
 - No formal attestation documents
 - Personal references in filenames
+
+

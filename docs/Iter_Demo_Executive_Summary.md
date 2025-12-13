@@ -1,4 +1,4 @@
-# SCG Substrate Demo - Executive Summary
+# Iter Substrate Demo - Executive Summary
 
 **Version:** 1.0 | **Date:** 2025-11-26 | **Status:** Production Ready
 
@@ -6,7 +6,7 @@
 
 ## What It Is
 
-A cryptographically-certified demonstration of the SCG substrate's core capabilities: deterministic graph operations, constraint enforcement, and auditable lineage tracking. The package executes in under 60 seconds and proves temporal independence through dual-run SHA-256 verification.
+A cryptographically-certified demonstration of the Iter substrate's core capabilities: deterministic graph operations, constraint enforcement, and auditable lineage tracking. The package executes in under 60 seconds and proves temporal independence through dual-run SHA-256 verification.
 
 ## Key Properties
 
@@ -28,8 +28,8 @@ A cryptographically-certified demonstration of the SCG substrate's core capabili
 ## Verification
 
 ```bash
-docker build -t scg-demo-package:v1.0 .
-docker run --rm scg-demo-package:v1.0
+docker build -t Iter-demo-package:v1.0 .
+docker run --rm Iter-demo-package:v1.0
 ```
 Expected output: `DETERMINISM VERIFIED - All checksums match`
 
@@ -51,4 +51,5 @@ Expected output: `DETERMINISM VERIFIED - All checksums match`
 
 ---
 
-*This package represents the cleanest, most technically rigorous demonstration artifact in the SCG project. The dual-run determinism proof qualifies it for academic-grade reproducibility standards.*
+*This package represents the cleanest, most technically rigorous demonstration artifact in the Iter project. The dual-run determinism proof qualifies it for academic-grade reproducibility standards.*
+
