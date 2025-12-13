@@ -9,7 +9,6 @@
 // - Boundary Tests: Core sanitization validation for all endpoints
 // - Tool Endpoint Tests: Functional tests for MCP tools
 // - Error Handling Tests: Error response sanitization
-// - Adversarial Tests: Attack simulation and Unicode obfuscation
 
 mod integration;
 
