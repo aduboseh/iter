@@ -1,10 +1,9 @@
-// SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+// Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
 // Lineage: MCP_BOUNDARY_V2.0
-// Generated under SCG_Governance_v1.0
 
 //! Response Sanitizer Module
 //!
-//! This module ensures that no substrate internals leak through the MCP boundary.
+//! This module ensures that no internal engine internals leak through the MCP boundary.
 //! All responses are sanitized to remove:
 //! - DAG topology information
 //! - Raw ESV values

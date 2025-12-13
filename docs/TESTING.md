@@ -1,4 +1,4 @@
-# SCG MCP Testing
+# Iter Testing
 
 > Test suite documentation and coverage analysis
 
@@ -14,7 +14,7 @@ cargo test
 cargo test --test mcp_integration
 
 # Run with deterministic mode
-SCG_DETERMINISM=1 cargo test
+DETERMINISM=1 cargo test
 
 # Run specific test category
 cargo test boundary_tests
@@ -228,7 +228,7 @@ Located in `src/` modules with `#[cfg(test)]`.
 | `sanitizer/forbidden.rs` | 8 | Pattern matching |
 | `sanitizer/response.rs` | 6 | Response sanitization |
 | `governance.rs` | 5 | Validation logic |
-| `scg_core.rs` | 10 | Runtime operations |
+| `substrate_runtime.rs` | 10 | Runtime operations |
 | `types.rs` | 4 | Serialization |
 | `lineage/` | 8 | Hash chain |
 
@@ -246,8 +246,8 @@ For reproducible test runs:
 
 ```bash
 # Enable deterministic timestamps
-export SCG_DETERMINISM=1
-export SCG_TIMESTAMP_MODE=deterministic
+export DETERMINISM=1
+export TIMESTAMP_MODE=deterministic
 
 # Run tests
 cargo test
@@ -343,3 +343,5 @@ fn test_example() {
 
 - [SECURITY.md](./SECURITY.md) - Security testing context
 - [ATTACK_SURFACE.md](./ATTACK_SURFACE.md) - Patterns being tested
+
+

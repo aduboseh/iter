@@ -1,9 +1,9 @@
-//! MCP Type Definitions and SCG Substrate Adapters
+//! MCP Type Definitions and Engine Adapters
 //!
 //! This module defines:
 //! 1. JSON-RPC 2.0 request/response types for MCP protocol
 //! 2. Sanitized MCP response types (safe for external exposure)
-//! 3. Adapters from SCG substrate types to MCP types
+//! 3. Adapters from internal engine types to MCP types
 //!
 //! # Security
 //!
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // ============================================================================
-// SCG Substrate Types (INTERNAL USE ONLY - not re-exported)
+// Engine Types (INTERNAL USE ONLY - not re-exported)
 // ============================================================================
 
 pub(crate) use scg_sim::{NodeId, EdgeId, NodeState as SubstrateNodeState, Edge as SubstrateEdge};
@@ -36,7 +36,7 @@ pub(crate) use scg_ethics::{EthicsKernel, EthicsDecision};
 // MCP Error Types
 // ============================================================================
 
-/// MCP Error codes aligned with JSON-RPC 2.0 and SCG substrate
+/// MCP Error codes aligned with JSON-RPC 2.0 and the engine boundary
 /// 
 /// Each variant has:
 /// - A stable numeric code (for machines)

@@ -1,7 +1,7 @@
-# SCG-PILOT-01 Console Hygiene Protocol
+# Iter-PILOT-01 Console Hygiene Protocol
 
 **Document ID**: CONSOLE_HYGIENE  
-**Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0 §5  
+**Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0 §5  
 **Purpose**: Eliminate console friction caused by pasting prose/formatting into shell environments
 
 ---
@@ -43,12 +43,12 @@ All runnable commands MUST include `# RUN THIS` comment:
  **Good**:
 ```powershell
 # RUN THIS
-.\deployment\pilot\monitor-invariants.ps1 -Namespace scg-pilot-01
+.\deployment\pilot\monitor-invariants.ps1 -Namespace Iter-pilot-01
 ```
 
  **Bad** (ambiguous):
 ```powershell
-.\deployment\pilot\monitor-invariants.ps1 -Namespace scg-pilot-01
+.\deployment\pilot\monitor-invariants.ps1 -Namespace Iter-pilot-01
 ```
 
 ---
@@ -73,16 +73,16 @@ Code blocks contain ONLY:
 **PowerShell**:
 ```powershell
 # RUN THIS
-kubectl exec -n scg-pilot-01 scg-mcp-pod `
-  -- cat /var/scg/lineage/ledger.bin `
+kubectl exec -n Iter-pilot-01 iter-pod `
+  -- cat /var/Iter/lineage/ledger.bin `
   > pilot_reports/day1/ledger_export.bin
 ```
 
 **Bash**:
 ```bash
 # RUN THIS
-kubectl exec -n scg-pilot-01 scg-mcp-pod \
-  -- cat /var/scg/lineage/ledger.bin \
+kubectl exec -n Iter-pilot-01 iter-pod \
+  -- cat /var/Iter/lineage/ledger.bin \
   > pilot_reports/day1/ledger_export.bin
 ```
 
@@ -137,7 +137,7 @@ if ($status -eq "PASS") {
  **Bad**:
 ```
 ================================================
-SCG-PILOT-01 Monitoring
+Iter-PILOT-01 Monitoring
 ================================================
 ```
 
@@ -145,7 +145,7 @@ SCG-PILOT-01 Monitoring
 ```powershell
 # RUN THIS
 Write-Host "================================================"
-Write-Host "SCG-PILOT-01 Monitoring"
+Write-Host "Iter-PILOT-01 Monitoring"
 Write-Host "================================================"
 ```
 
@@ -159,7 +159,7 @@ To deploy time sync, run:
 kubectl apply -f time-sync-checker.yaml
 
 Then verify with:
-kubectl get pods -n scg-pilot-01
+kubectl get pods -n Iter-pilot-01
 ```
 
  **Good**:
@@ -168,7 +168,7 @@ kubectl get pods -n scg-pilot-01
 kubectl apply -f time-sync-checker.yaml
 
 # RUN THIS
-kubectl get pods -n scg-pilot-01
+kubectl get pods -n Iter-pilot-01
 ```
 
 ---
@@ -196,7 +196,7 @@ When writing directives:
    kubectl apply -f deployment/pilot/time-sync-checker.yaml
    
    # RUN THIS - Verify pods scheduled
-   kubectl get pods -n scg-pilot-01 -l app=time-sync-checker
+   kubectl get pods -n Iter-pilot-01 -l app=time-sync-checker
    ```
 
 ---
@@ -233,7 +233,7 @@ When executing directives:
 
 **Requirements**:
 - Kubernetes cluster access
-- scg-pilot-01 namespace exists
+- Iter-pilot-01 namespace exists
 - kubectl configured
 
 ---
@@ -242,16 +242,16 @@ When executing directives:
 
 ```powershell
 # RUN THIS - Deploy DaemonSet
-kubectl apply -f deployment/pilot/time-sync-checker.yaml -n scg-pilot-01
+kubectl apply -f deployment/pilot/time-sync-checker.yaml -n Iter-pilot-01
 
 # RUN THIS - Wait for pods
 Start-Sleep -Seconds 10
 
 # RUN THIS - Verify deployment
-kubectl get daemonset time-sync-checker -n scg-pilot-01
+kubectl get daemonset time-sync-checker -n Iter-pilot-01
 
 # RUN THIS - Check pod status
-kubectl get pods -n scg-pilot-01 -l app=time-sync-checker
+kubectl get pods -n Iter-pilot-01 -l app=time-sync-checker
 ```
 
 ---
@@ -287,3 +287,4 @@ daemonset.apps/time-sync-checker created
 **END OF HYGIENE PROTOCOL**
 
 *Console hygiene eliminates 90% of "unknown cmdlet" noise and keeps focus on actual system behavior rather than formatting artifacts.*
+

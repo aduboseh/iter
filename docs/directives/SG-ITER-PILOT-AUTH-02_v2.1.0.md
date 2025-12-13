@@ -1,4 +1,4 @@
-# DIRECTIVE SG-SCG-PILOT-AUTH-02 v2.1.0
+# DIRECTIVE SG-ITER-PILOT-AUTH-02 v2.1.0
 
 **ONLY SG SYSTEMS — SUBSTRATE SOVEREIGN**
 
@@ -11,7 +11,7 @@
 | **Authority Level** | Tier-0 (Substrate Sovereign) |
 | **Issued By** | Armonti Du-Bose-Hill |
 | **Recipient** | Warp AI Terminal |
-| **Mission** | Activate Telemetry Fabric + Begin SCG-PILOT-01 Field Validation |
+| **Mission** | Activate Telemetry Fabric + Begin Iter-PILOT-01 Field Validation |
 | **Environment** | Haltra Kubernetes Cluster (H-K8S-A / H-K8S-B) |
 | **Status** | **EFFECTIVE IMMEDIATELY** |
 | **Effective Date** | 2025-11-17 |
@@ -23,20 +23,20 @@
 
 Warp is granted **full operational authority** to:
 
-- Deploy and activate the OpenTelemetry pipeline in the `scg-pilot-01` namespace
-- Connect SCG-MCP (v1.0.0-substrate) to the OTLP collector
+- Deploy and activate the OpenTelemetry pipeline in the `Iter-pilot-01` namespace
+- Connect iter (v1.0.0-substrate) to the OTLP collector
 - Begin real-time invariant monitoring using certified substrate telemetry
 - Validate time synchronization across Haltra cluster nodes
-- Initiate Day-0 baseline and commence the 7-day SCG-PILOT-01 certification window
+- Initiate Day-0 baseline and commence the 7-day Iter-PILOT-01 certification window
 
 ### Canon Compliance
 
-Warp SHALL adhere strictly to all SCG Canon:
+Warp SHALL adhere strictly to all Iter Canon:
 
-- SCG Math Foundations
-- SCG Deployment Architecture
-- SCG API Spec
-- SCG Neuro Mapping
+- Iter Math Foundations
+- Iter Deployment Architecture
+- Iter API Spec
+- Iter Neuro Mapping
 - Apex Clarifications v1.1.0
 - SUBSTRATE_FREEZE.md (immutable boundary)
 - LTS_STRATEGY.md
@@ -52,7 +52,7 @@ Warp SHALL activate the telemetry pipeline by performing all operations below:
 ### §2.1 Deploy the OTEL Collector
 
 ```bash
-kubectl apply -f deployment/pilot/otel-collector.yaml -n scg-pilot-01
+kubectl apply -f deployment/pilot/otel-collector.yaml -n Iter-pilot-01
 ```
 
 **Components**:
@@ -60,14 +60,14 @@ kubectl apply -f deployment/pilot/otel-collector.yaml -n scg-pilot-01
 - ConfigMap with OTLP receivers (gRPC port 4317, HTTP port 4318)
 - Memory limiter (200MB limit, 50MB spike)
 - Batch processor (5s timeout)
-- File exporter to `/var/log/scg/telemetry.jsonl`
+- File exporter to `/var/log/Iter/telemetry.jsonl`
 - Dedicated 10GB PVC for telemetry storage
 
 ### §2.2 Validate Collector Readiness
 
 ```bash
-kubectl get pods -n scg-pilot-01 | grep otel
-kubectl logs -f deploy/otel-collector -n scg-pilot-01
+kubectl get pods -n Iter-pilot-01 | grep otel
+kubectl logs -f deploy/otel-collector -n Iter-pilot-01
 ```
 
 **Done-When**: 
@@ -80,18 +80,18 @@ kubectl logs -f deploy/otel-collector -n scg-pilot-01
 
 ## SECTION 3 — Substrate Telemetry Binding (P0)
 
-Warp SHALL configure SCG-MCP to emit OpenTelemetry packets:
+Warp SHALL configure iter to emit OpenTelemetry packets:
 
 ```bash
-kubectl set env deployment/scg-mcp \
+kubectl set env deployment/iter \
   OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317 \
-  -n scg-pilot-01
+  -n Iter-pilot-01
 ```
 
 Warp MUST validate substrate log emission:
 
 ```bash
-kubectl logs -f deploy/scg-mcp -n scg-pilot-01 | grep "\TELEMETRY\]"
+kubectl logs -f deploy/iter -n Iter-pilot-01 | grep "\TELEMETRY\]"
 ```
 
 **Done-When**: 
@@ -184,15 +184,15 @@ Warp SHALL begin daily pilot cycles:
 
 ## SECTION 7 — Completion Criteria
 
-Warp SHALL complete SCG-PILOT-01 **only when**:
+Warp SHALL complete Iter-PILOT-01 **only when**:
 
 -  Seven consecutive days show **zero invariant breaches**
 -  All replay episodes produce **identical hashes** across environments
 -  Global ledger hash reconstruction is **identical** for all 7 days
 -  **No quarantines**, governor divergence, or telemetry gaps
--  Certification Dossier is fully populated and SHA256-signed as `scg_substrate_certification_dossier_v1.0.0.tar.gz`
+-  Certification Dossier is fully populated and SHA256-signed as `iter_certification_dossier_v1.0.0.tar.gz`
 
-Upon completion, Warp SHALL submit `SCG_PILOT_01_FINAL_REPORT.md`.
+Upon completion, Warp SHALL submit `ITER_PILOT_01_FINAL_REPORT.md`.
 
 **Tier-0 authority expires immediately after submission.**
 
@@ -203,7 +203,7 @@ Upon completion, Warp SHALL submit `SCG_PILOT_01_FINAL_REPORT.md`.
 Warp SHALL:
 
 ### Network Security
--  Verify and enforce network policies to isolate `scg-pilot-01` namespace
+-  Verify and enforce network policies to isolate `Iter-pilot-01` namespace
 -  Block all external ingress except pod-to-pod communication
 -  Allow egress only to DNS, internal pods, and telemetry collectors (ports 4317, 4318, 9090)
 
@@ -242,25 +242,25 @@ Warp SHALL:
 | 2025-11-17 10:11 UTC | OTEL Collector configuration fixed |  Complete |
 | 2025-11-17 10:13 UTC | Health probes corrected (port 8888) |  Complete |
 | 2025-11-17 10:13 UTC | OTEL Collector operational (1/1 Running) |  Complete |
-| 2025-11-17 10:14 UTC | SCG-MCP configured with OTEL endpoint |  Complete |
-| 2025-11-17 10:14 UTC | Both pods running (OTEL + SCG-MCP) |  Complete |
+| 2025-11-17 10:14 UTC | iter configured with OTEL endpoint |  Complete |
+| 2025-11-17 10:14 UTC | Both pods running (OTEL + iter) |  Complete |
 
 ### Current Infrastructure State
 
 ```
-NAMESPACE: scg-pilot-01
+NAMESPACE: Iter-pilot-01
 POD STATUS:
 - otel-collector-5c9bb67cbd-d8xfb   1/1 Running   (listening on 4317)
-- scg-mcp-68d7d566db-pj4h7          1/1 Running   (OTEL endpoint configured)
+- iter-68d7d566db-pj4h7          1/1 Running   (OTEL endpoint configured)
 
 PVCs:
 - otel-collector-storage  (10Gi Bound)
-- scg-telemetry-storage   (10Gi Bound)
-- scg-lineage-storage     (20Gi Bound)
+- Iter-telemetry-storage   (10Gi Bound)
+- Iter-lineage-storage     (20Gi Bound)
 
 SERVICES:
 - otel-collector          ClusterIP   (ports 4317, 4318, 8888)
-- scg-mcp-service         ClusterIP   (ports 3000, 9090)
+- iter-service         ClusterIP   (ports 3000, 9090)
 
 RESOURCE QUOTA:
 - Used: 4.5 CPU / 10.25GB (within 6 CPU / 12GB namespace limit)
@@ -275,7 +275,7 @@ RESOURCE QUOTA:
 
 **Issue**: Current deployment runs `tail -f /dev/null` instead of active substrate server
 
-**Reason**: SCG-MCP operates in STDIO mode (MCP JSON-RPC), requires input to process
+**Reason**: iter operates in STDIO mode (MCP JSON-RPC), requires input to process
 
 **Impact**: Telemetry infrastructure ready but emission pending active substrate execution
 
@@ -329,17 +329,17 @@ RESOURCE QUOTA:
 
 ### Directive Lineage
 
-- **Parent**: SG-SCG-PILOT-AUTH-01 v1.2.0
-- **Current**: SG-SCG-PILOT-AUTH-02 v2.1.0
+- **Parent**: SG-ITER-PILOT-AUTH-01 v1.2.0
+- **Current**: SG-ITER-PILOT-AUTH-02 v2.1.0
 - **Purpose**: Telemetry activation & pilot commencement
 
 ### Approval Chain
 
 -  Issued by: Armonti Du-Bose-Hill (Substrate Sovereign Authority)
 -  Executed by: Warp AI Terminal
--  Repository: `github.com/aduboseh/scg-mcp`
+-  Repository: `github.com/aduboseh/iter`
 -  Commit: TBD (pending final commit)
--  Tag: `SG-SCG-PILOT-AUTH-02_v2.1.0`
+-  Tag: `SG-ITER-PILOT-AUTH-02_v2.1.0`
 
 ### Audit Trail
 
@@ -347,7 +347,7 @@ SHA256 checksums for verification:
 
 ```
 # To be computed after final commit
-docs/directives/SG-SCG-PILOT-AUTH-02_v2.1.0.md: <TBD>
+docs/directives/SG-ITER-PILOT-AUTH-02_v2.1.0.md: <TBD>
 deployment/pilot/otel-collector.yaml: <TBD>
 ```
 
@@ -359,17 +359,17 @@ deployment/pilot/otel-collector.yaml: <TBD>
 
 If OTEL collector crashes or becomes unavailable:
 
-1. Check pod status: `kubectl get pods -n scg-pilot-01 -l app=otel-collector`
-2. Review logs: `kubectl logs -n scg-pilot-01 -l app=otel-collector --tail=100`
-3. Check resource usage: `kubectl top pod -n scg-pilot-01`
-4. Restart if needed: `kubectl rollout restart deployment/otel-collector -n scg-pilot-01`
+1. Check pod status: `kubectl get pods -n Iter-pilot-01 -l app=otel-collector`
+2. Review logs: `kubectl logs -n Iter-pilot-01 -l app=otel-collector --tail=100`
+3. Check resource usage: `kubectl top pod -n Iter-pilot-01`
+4. Restart if needed: `kubectl rollout restart deployment/otel-collector -n Iter-pilot-01`
 5. Escalate if restart fails: Contact cluster administrator
 
 ### Substrate Quarantine Event
 
-If substrate triggers quarantine (§4.2 SG-SCG-PILOT-AUTH-01):
+If substrate triggers quarantine (§4.2 SG-ITER-PILOT-AUTH-01):
 
-1. **Immediate**: Snapshot current state to `/var/lib/scg/quarantine-<timestamp>`
+1. **Immediate**: Snapshot current state to `/var/lib/Iter/quarantine-<timestamp>`
 2. **Log**: Record event in `pilot_reports/incidents/`
 3. **Analyze**: Check invariant logs for violation source
 4. **Remediate**: If ≥2 events in 60 minutes, trigger auto-restart
@@ -379,8 +379,8 @@ If substrate triggers quarantine (§4.2 SG-SCG-PILOT-AUTH-01):
 
 If namespace hits resource limits:
 
-1. Check quota usage: `kubectl describe resourcequota scg-pilot-resources -n scg-pilot-01`
-2. Review pod resources: `kubectl top pod -n scg-pilot-01`
+1. Check quota usage: `kubectl describe resourcequota Iter-pilot-resources -n Iter-pilot-01`
+2. Review pod resources: `kubectl top pod -n Iter-pilot-01`
 3. Identify high consumers
 4. Adjust if misconfigured or escalate for quota increase
 
@@ -391,7 +391,7 @@ If namespace hits resource limits:
 ### Prerequisites (All Met )
 
 -  Kubernetes cluster accessible and stable
--  Container registry operational (scgpilotacr.azurecr.io)
+-  Container registry operational (iterpilotacr.azurecr.io)
 -  Substrate image built and pushed (v1.0.0-substrate)
 -  Namespace isolated with NetworkPolicies
 -  Resource quotas enforced
@@ -432,11 +432,11 @@ This directive is considered **complete** when:
 
 ### Post-Completion Actions
 
-1. Tag repository: `git tag -a SG-SCG-PILOT-AUTH-02_v2.1.0 -m "Telemetry activation complete"`
+1. Tag repository: `git tag -a SG-ITER-PILOT-AUTH-02_v2.1.0 -m "Telemetry activation complete"`
 2. Update STATUS.md with execution summary
 3. Generate SHA256 checksum for directive
 4. Append to CERTIFICATION_DOSSIER.md
-5. Transition to continuous monitoring phase (SG-SCG-PILOT-AUTH-01 §6)
+5. Transition to continuous monitoring phase (SG-ITER-PILOT-AUTH-01 §6)
 
 ### Authority Transfer
 
@@ -452,7 +452,7 @@ Upon directive completion:
 **Issued**: 2025-11-17  
 **Authority**: Tier-0 Substrate Sovereign  
 **Executor**: Warp AI Terminal  
-**Mission**: SCG-PILOT-01 Field Validation  
+**Mission**: Iter-PILOT-01 Field Validation  
 **Status**: ACTIVE — Telemetry fabric operational, pilot execution in progress
 
 ---
@@ -462,3 +462,5 @@ SUBSTRATE SOVEREIGN — ONLY SG SYSTEMS
 SHA256: <To be computed>
 Signed: <Pending final commit>
 ```
+
+

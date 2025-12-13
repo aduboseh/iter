@@ -1,4 +1,4 @@
-# SCG MCP Governance
+# Iter Governance
 
 > Change control, integrity verification, and compliance enforcement
 
@@ -6,9 +6,9 @@
 
 ## Overview
 
-The SCG MCP Server operates under strict governance to ensure:
+The Iter Server operates under strict governance to ensure:
 - **Integrity**: No unauthorized modifications to security boundaries
-- **Consistency**: Manifest parity between SCG and MCP repos
+- **Consistency**: Manifest parity between Iter and MCP repos
 - **Auditability**: Complete change history with approval trails
 
 ---
@@ -16,21 +16,21 @@ The SCG MCP Server operates under strict governance to ensure:
 ## Governance Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐
-│   SCG Repo   │     │  MCP Server  │
-│              │     │              │
-│ governance/  │────▶│ governance/  │
-│ SCG_Gov_v1.0 │     │ SCG_Gov_v1.0 │
-└──────────────┘     └──────────────┘
-       │                    │
-       │    SHA-256 match   │
-       └────────┬───────────┘
-                │
-                ▼
-       ┌────────────────┐
-       │ CI Verification│
-       │  (weekly cron) │
-       └────────────────┘
+┌──────────────────┐     ┌──────────────────┐
+│ Sealed engine repo│     │  MCP boundary    │
+│ (private)         │     │  (this repo)     │
+│ governance/       │────▶│ governance/      │
+│ manifest          │     │ manifest         │
+└──────────────────┘     └──────────────────┘
+        │                         │
+        │      SHA-256 match       │
+        └───────────┬─────────────┘
+                    │
+                    ▼
+           ┌────────────────┐
+           │ CI Verification │
+           │  (weekly cron)  │
+           └────────────────┘
 ```
 
 ---
@@ -40,8 +40,8 @@ The SCG MCP Server operates under strict governance to ensure:
 ### Purpose
 
 The governance manifest must be identical in both repositories:
-- `aduboseh/SCG` (core substrate)
-- `aduboseh/scg-mcp` (MCP boundary)
+- sealed engine repo (private)
+- MCP boundary repo (public-facing)
 
 ### Enforcement
 
@@ -50,8 +50,8 @@ The governance manifest must be identical in both repositories:
 ```yaml
 - name: Verify cross-repo consistency
   run: |
-    diff -q scg/governance/SCG_Governance_v1.0.md \
-            scg_mcp_server/governance/SCG_Governance_v1.0.md
+    diff -q engine/governance/manifest.md \
+            boundary/governance/manifest.md
 ```
 
 **Expected Checksum:**
@@ -118,7 +118,7 @@ Any PR modifying protected paths requires approval from `@aduboseh` before merge
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  IMMUTABLE REGISTRY — DO NOT MODIFY WITHOUT FOUNDER-LEVEL OVERRIDE       ║
-║  Version: 2.0.0 | Sealed: 2025-12-03 | Authority: SCG Governor           ║
+║  Version: 2.0.0 | Sealed: 2025-12-03 | Authority: Iter Governor           ║
 ║  Any modification requires CODEOWNERS approval and audit trail entry.    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
@@ -132,10 +132,10 @@ Any PR modifying protected paths requires approval from `@aduboseh` before merge
 
 ### Governance Manifest
 
-**File:** `governance/SCG_Governance_v1.0.md`
+**File:** `governance/manifest.md`
 
 **Change Process:**
-1. Modify in both SCG and MCP repos
+1. Modify in both Iter and MCP repos
 2. Ensure SHA-256 checksums match
 3. CI verifies cross-repo consistency
 4. Both repos must pass before merge
@@ -265,4 +265,5 @@ CI will fail if:
 
 - [SECURITY.md](./SECURITY.md) - Security architecture
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System design
-- [SCG_Governance_v1.0.md](../governance/SCG_Governance_v1.0.md) - Full manifest
+- Governance manifest (internal) - Full manifest
+

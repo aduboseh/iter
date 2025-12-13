@@ -1,7 +1,7 @@
-//! SCG Substrate Boundary Traits
+//! Engine Boundary Traits
 //!
 //! These traits define the **minimal, stable interface** between the MCP layer
-//! and the SCG substrate. They serve as an abstraction boundary that:
+//! and the internal engine. They serve as an abstraction boundary that:
 //!
 //! 1. Prevents substrate type leakage into public API
 //! 2. Enables version-stable interaction with substrate internals

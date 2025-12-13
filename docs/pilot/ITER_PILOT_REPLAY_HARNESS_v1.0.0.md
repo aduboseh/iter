@@ -1,7 +1,7 @@
-# SCG-PILOT-01 Replay Determinism Harness
+# Iter-PILOT-01 Replay Determinism Harness
 
-**Document ID**: SCG_PILOT_REPLAY_HARNESS_v1.0.0  
-**Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0  
+**Document ID**: ITER_PILOT_REPLAY_HARNESS_v1.0.0  
+**Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0  
 **Authority**: Substrate Sovereign (Armonti Du-Bose-Hill)  
 **Scope**: v1.0.0-substrate on all environments  
 **Status**: CANONICAL (defines determinism validation protocol)  
@@ -26,7 +26,7 @@
 - kubectl logs parsing is unreliable for canonical determinism proof
 
 **What We Cannot Do**:
--  Run `scg_mcp_server replay` as a standalone command in pod
+-  Run `iter-server replay` as a standalone command in pod
 -  Parse STDOUT for replay hash via kubectl exec
 -  Rely on log scraping for certification-grade evidence
 
@@ -58,7 +58,7 @@ fn replay_episode_deterministic() {
     let seed = "DAY1_EPISODE";
     let cycles = 250;
     
-    let mut substrate = ScgSubstrate::new();
+    let mut substrate = Engine::new();
     
     // Execute replay
     let result = substrate.replay_episode(seed, cycles);
@@ -82,8 +82,8 @@ cargo test replay_episode_deterministic -- --nocapture > pilot_reports/day1/repl
 **ENV2 - Docker**:
 ```bash
 # RUN THIS
-docker build -t scg-replay:v1.0.0 -f Dockerfile.replay .
-docker run --rm scg-replay:v1.0.0 \
+docker build -t Iter-replay:v1.0.0 -f Dockerfile.replay .
+docker run --rm Iter-replay:v1.0.0 \
   cargo test replay_episode_deterministic -- --nocapture \
   > pilot_reports/day1/replay/replay_docker.log
 ```
@@ -167,7 +167,7 @@ ANY hash mismatch  →  variance = 1.0  →  FAIL (non-deterministic)
 
 ```bash
 # RUN THIS
-kubectl cp scg-pilot-01/scg-mcp-<pod>:/var/scg/lineage/ledger.bin \
+kubectl cp Iter-pilot-01/iter-<pod>:/var/Iter/lineage/ledger.bin \
   pilot_reports/day1/ledger_aks.bin
 ```
 
@@ -207,7 +207,7 @@ This method SHALL be documented in `CERTIFICATION_DOSSIER.md` as:
   - CANONICAL: Build/test harness across local, Docker, CI
   - SUPPLEMENTARY: AKS pod ledger export (informational cross-check)
 - **Status**: PASS (variance = 0.0 across all harness environments)
-- **Notes**: v1.0.0-substrate STDIO mode blocks in-pod replay (R2). Canonical proof provided by deterministic test harness per SCG_PILOT_REPLAY_HARNESS_v1.0.0.
+- **Notes**: v1.0.0-substrate STDIO mode blocks in-pod replay (R2). Canonical proof provided by deterministic test harness per ITER_PILOT_REPLAY_HARNESS_v1.0.0.
 ```
 
 ---
@@ -220,7 +220,7 @@ Future substrate releases SHOULD implement:
 
 1. **CLI Replay Subcommand**:
    ```bash
-   scg_mcp_server replay --seed DAY1_EPISODE --cycles 250 --output-hash
+   iter-server replay --seed DAY1_EPISODE --cycles 250 --output-hash
    ```
 
 2. **MCP Replay Tool**:
@@ -257,18 +257,18 @@ Future substrate releases SHOULD implement:
 ## Approvals
 
 **Authorized By**: Armonti Du-Bose-Hill (Substrate Sovereign)  
-**Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0 §3  
+**Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0 §3  
 **Date**: 2025-11-17  
-**Scope**: SCG-PILOT-01 only (Days 1-7)  
+**Scope**: Iter-PILOT-01 only (Days 1-7)  
 **Review Required**: Before v1.0.1-substrate deployment
 
 ---
 
 ## References
 
-- **Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0
+- **Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0
 - **Risk Registry**: R2 (Missing Replay Hash in STDIO Mode)
-- **SCG Math Foundations**: §V (Lineage Integrity & Determinism)
+- **Iter Math Foundations**: §V (Lineage Integrity & Determinism)
 - **SUBSTRATE_FREEZE.md**: Immutable boundary compliance
 
 ---
@@ -276,3 +276,5 @@ Future substrate releases SHOULD implement:
 **END OF HARNESS DOCUMENT**
 
 *This document demonstrates architectural maturity: when substrate capabilities are constrained, we shift validation to a different layer (build/test) rather than fabricating evidence or claiming something works when it doesn't.*
+
+

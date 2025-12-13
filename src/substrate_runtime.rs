@@ -1,14 +1,14 @@
-//! SCG Substrate Runtime Facade
+//! Engine Runtime Facade
 //!
-//! This module provides a thin facade over the real SCG substrate (`IntegratedSimulation`).
-//! All MCP handlers interact with the substrate exclusively through this facade.
+//! This module provides a thin facade over the underlying engine runtime (`IntegratedSimulation`).
+//! All MCP handlers interact with the engine exclusively through this facade.
 //!
 //! # Design Principles
 //!
-//! 1. **No local physics**: All energy, drift, ethics logic comes from SCG crates
-//! 2. **Type translation only**: Convert between substrate types and MCP types
-//! 3. **Error mapping**: Map substrate errors to structured `McpError` variants
-//! 4. **Thin delegation**: Methods are thin wrappers around substrate calls
+//! 1. **No local engine logic**: Energy, drift, and ethics logic comes from the engine crates
+//! 2. **Type translation only**: Convert between engine types and MCP types
+//! 3. **Error mapping**: Map engine errors to structured `McpError` variants
+//! 4. **Thin delegation**: Methods are thin wrappers around runtime calls
 //!
 //! Some methods are public API for external crates and not used internally.
 
@@ -43,7 +43,7 @@ pub struct SubstrateRuntimeConfig {
 }
 
 
-/// Facade wrapping the real SCG IntegratedSimulation.
+/// Facade wrapping the real IntegratedSimulation.
 /// 
 /// All MCP operations route through this facade. The facade:
 /// - Delegates all physics/energy/ethics to the substrate
@@ -51,7 +51,7 @@ pub struct SubstrateRuntimeConfig {
 /// - Maps substrate errors to structured McpError variants
 /// - Maintains governance validation state
 pub struct SubstrateRuntime {
-    /// The real SCG integrated simulation
+    /// The real integrated simulation
     sim: IntegratedSimulation,
     /// Governance validator for drift/ESV checks
     governance: GovernanceValidator,
@@ -64,8 +64,8 @@ pub struct SubstrateRuntime {
 impl SubstrateRuntime {
     /// Create a new SubstrateRuntime with the given configuration.
     /// 
-    /// This initializes the full SCG substrate stack including:
-    /// - Cognitive graph with thermodynamic properties
+    /// This initializes the full engine stack including:
+    /// - Deterministic graph with thermodynamic properties
     /// - Energy ledger for conservation tracking
     /// - Ethics kernel for moral reasoning
     /// - Consensus engine for stability
@@ -149,8 +149,8 @@ impl SubstrateRuntime {
 
     /// Mutate a node's belief by a delta amount.
     /// 
-    /// **WARNING**: This is a DEBUG/TEST operation that bypasses normal substrate physics.
-    /// In proper SCG operation, beliefs change through propagation steps, not direct mutation.
+    /// **WARNING**: This is a DEBUG/TEST operation that bypasses normal engine physics.
+    /// In normal operation, beliefs change through propagation steps, not direct mutation.
     /// 
     /// The operation:
     /// 1. Validates the node exists

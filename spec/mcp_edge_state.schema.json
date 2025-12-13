@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_edge_state.schema.json",
+  "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_edge_state.schema.json",
   "title": "McpEdgeState",
   "description": "Sanitized edge state for MCP responses",
   "type": "object",

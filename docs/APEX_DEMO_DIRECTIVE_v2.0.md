@@ -1,4 +1,4 @@
-# APEX DEMO DIRECTIVE - SCG SUBSTRATE CLI (PRODUCTION EDITION)
+# APEX DEMO DIRECTIVE - Iter SUBSTRATE CLI (PRODUCTION EDITION)
 
 **Version:** 2.0
 **Status:** Executed and Archived
@@ -9,7 +9,7 @@
 
 ## Overview
 
-This directive governed the creation of a cryptographically-certified demonstration package for the SCG substrate. The package validates deterministic graph operations, constraint enforcement, and lineage tracking for enterprise security research.
+This directive governed the creation of a cryptographically-certified demonstration package for the Iter substrate. The package validates deterministic graph operations, constraint enforcement, and lineage tracking for enterprise security research.
 
 ---
 
@@ -31,9 +31,9 @@ This directive governed the creation of a cryptographically-certified demonstrat
 
 | File | Description | Status |
 |------|-------------|--------|
-| `demos/scg_demo.sh` | Main CLI demonstration script | Completed |
+| `demos/iter_demo.sh` | Main CLI demonstration script | Completed |
 | `demos/prompts_synthetic.txt` | Domain-neutral prompt library | Completed |
-| `demos/scg_demo.toml` | Deterministic configuration | Completed |
+| `demos/iter_demo.toml` | Deterministic configuration | Completed |
 
 ### Expected Outputs
 
@@ -108,8 +108,8 @@ This directive governed the creation of a cryptographically-certified demonstrat
 ## Determinism Stack (7 Layers)
 
 1. **Locale:** `LC_ALL=C`, `LANG=C`, `TZ=UTC`
-2. **Timestamps:** `SCG_TIMESTAMP_MODE=deterministic`
-3. **Telemetry:** `SCG_DETERMINISM=1`
+2. **Timestamps:** `TIMESTAMP_MODE=deterministic`
+3. **Telemetry:** `DETERMINISM=1`
 4. **JSON-RPC IDs:** Sequential 1..N, reset per run
 5. **Normalization:** CRLF→LF, trailing whitespace stripped
 6. **Fixed Epoch:** `1700000000`
@@ -143,3 +143,5 @@ This directive governed the creation of a cryptographically-certified demonstrat
 ## Archive Note
 
 This directive has been fully executed. The resulting package is production-ready and certified for enterprise deployment. See `DIRECTIVE_CHANGELOG.md` for version history.
+
+

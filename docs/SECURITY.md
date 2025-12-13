@@ -1,6 +1,6 @@
-# SCG MCP Server Security
+# Iter Server Security
 
-> Hardened boundary between AI assistants and SCG internals
+> Hardened boundary between AI assistants and Iter internals
 
 ---
 
@@ -11,7 +11,7 @@
 We assume an adversary who:
 - Controls the AI assistant's queries
 - Can craft arbitrary JSON-RPC requests
-- Has knowledge of SCG's public documentation
+- Has knowledge of Iter's public documentation
 - May attempt prompt injection via responses
 - May use Unicode obfuscation techniques
 
@@ -43,7 +43,7 @@ Every response passes through a hardened sanitizer:
                     │
                     ▼
            ┌───────────────┐
-           │  SCG Runtime  │  ← Substrate operations happen here
+           │  Iter Runtime  │  ← Substrate operations happen here
            └───────────────┘
                     │
                     ▼
@@ -95,7 +95,7 @@ Pre-operation safety check:
 
 ```rust
 if new_belief.abs() > threshold {
-    return Err(ScgError::EsvFailed); // Code 1000
+return Err(IterError::EsvFailed); // Code 1000
 }
 ```
 
@@ -108,7 +108,7 @@ Energy conservation enforcement:
 
 ```rust
 if !runtime.energy_drift_ok() {
-    return Err(ScgError::DriftExceeded); // Code 2000
+return Err(IterError::DriftExceeded); // Code 2000
 }
 ```
 
@@ -179,7 +179,7 @@ Location: `src/services/sanitizer/forbidden.rs`
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  IMMUTABLE REGISTRY — DO NOT MODIFY WITHOUT FOUNDER-LEVEL OVERRIDE       ║
-║  Version: 2.0.0 | Sealed: 2025-12-03 | Authority: SCG Governor           ║
+║  Version: 2.0.0 | Sealed: 2025-12-03 | Authority: Iter Governor           ║
 ║  Any modification requires CODEOWNERS approval and audit trail entry.    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
@@ -245,3 +245,4 @@ Email: security@onlysgsolutions.com
 - [ATTACK_SURFACE.md](./ATTACK_SURFACE.md) - Complete forbidden pattern list
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System design
 - [GOVERNANCE.md](./GOVERNANCE.md) - Change control
+

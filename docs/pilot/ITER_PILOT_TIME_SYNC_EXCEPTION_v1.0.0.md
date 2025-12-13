@@ -1,7 +1,7 @@
-# SCG-PILOT-01 Time Synchronization Exception
+# Iter-PILOT-01 Time Synchronization Exception
 
-**Document ID**: SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0  
-**Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0  
+**Document ID**: ITER_PILOT_TIME_SYNC_EXCEPTION_v1.0.0  
+**Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0  
 **Authority**: Substrate Sovereign (Armonti Du-Bose-Hill)  
 **Scope**: v1.0.0-substrate on Haltra AKS (haltra-perf-aks)  
 **Status**: ACTIVE (pilot-specific exception)  
@@ -11,11 +11,11 @@
 
 ## Exception Summary
 
-DaemonSet-based time synchronization validation (chrony/ntpdate on host network) fails due to AKS security policy restrictions. For SCG-PILOT-01, time sync validation is **delegated to Azure host NTP**, treated as a trust anchor, with supplementary non-privileged heartbeat coherence checks.
+DaemonSet-based time synchronization validation (chrony/ntpdate on host network) fails due to AKS security policy restrictions. For Iter-PILOT-01, time sync validation is **delegated to Azure host NTP**, treated as a trust anchor, with supplementary non-privileged heartbeat coherence checks.
 
 ---
 
-## Canonical Requirement (SCG Math Foundations §II.2)
+## Canonical Requirement (Iter Math Foundations §II.2)
 
 **NTP/PTP skew ≤ 50ms across all cluster nodes**
 
@@ -88,7 +88,7 @@ kubectl get nodes -o jsonpath='{range .items*]}{.metadata.name}{"\t"}{.status.co
   "heartbeat_max_delta_seconds": 3.2,
   "heartbeat_threshold_seconds": 5,
   "status": "PASS_WITH_EXCEPTION",
-  "exception": "SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0",
+  "exception": "ITER_PILOT_TIME_SYNC_EXCEPTION_v1.0.0",
   "note": "Canonical ≤50ms sync externally assured via Azure SLA; heartbeat used as coarse cross-check."
 }
 ```
@@ -102,11 +102,11 @@ This exception SHALL be documented in `CERTIFICATION_DOSSIER.md` as:
 ```markdown
 ## Day-1 Time Synchronization Validation
 
-- **Canon Requirement**: NTP/PTP skew ≤ 50ms (SCG Math Foundations §II.2)
+- **Canon Requirement**: NTP/PTP skew ≤ 50ms (Iter Math Foundations §II.2)
 - **Method**:
   - EXTERNALLY ASSURED via Azure AKS host NTP SLA
   - Supplemental non-privileged heartbeat proxy (Δt_max ≤ 5s)
-- **Status**: PASS (exception applied: SCG_PILOT_TIME_SYNC_EXCEPTION_v1.0.0)
+- **Status**: PASS (exception applied: ITER_PILOT_TIME_SYNC_EXCEPTION_v1.0.0)
 - **Notes**: Privileged DaemonSet blocked by AKS policy (R3). Future pilots MUST add node-level validator where permitted.
 ```
 
@@ -150,18 +150,18 @@ Future substrate releases or pilot environments MUST implement one of:
 ## Approvals
 
 **Authorized By**: Armonti Du-Bose-Hill (Substrate Sovereign)  
-**Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0 §2  
+**Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0 §2  
 **Date**: 2025-11-17  
-**Scope**: SCG-PILOT-01 only (Days 1-7)  
+**Scope**: Iter-PILOT-01 only (Days 1-7)  
 **Review Required**: Before v1.0.1-substrate deployment
 
 ---
 
 ## References
 
-- **Directive**: SG-SCG-PILOT-COHERENCE-01 v1.0.0
+- **Directive**: SG-ITER-PILOT-COHERENCE-01 v1.0.0
 - **Risk Registry**: R3 (Time Sync DaemonSet Permission Denied)
-- **SCG Math Foundations**: §II.2 (Temporal Coherence Requirements)
+- **Iter Math Foundations**: §II.2 (Temporal Coherence Requirements)
 - **Azure Documentation**: Azure Time Service](https://learn.microsoft.com/en-us/azure/virtual-machines/windows/time-sync)
 
 ---
@@ -169,3 +169,5 @@ Future substrate releases or pilot environments MUST implement one of:
 **END OF EXCEPTION DOCUMENT**
 
 *This exception demonstrates governance maturity: when canonical validation is blocked by infrastructure constraints, we document the gap, provide alternative assurance, and set explicit future requirements rather than pretending the problem doesn't exist.*
+
+

@@ -1,17 +1,17 @@
-//! SCG Cognitive Physics Demo
+//! Determinism Demo
 //!
-//! This demo shows SCG operating as a deterministic cognitive physics engine,
-//! not a CRUD API. It demonstrates:
+//! This demo shows deterministic execution behavior and governed operations.
+//! It demonstrates:
 //!
-//! 1. Cognitive mass (energy as resistance to belief change)
+//! 1. Resource constraints (energy as resistance to belief change)
 //! 2. Energy cost of perturbations (belief changes are not free)
-//! 3. Propagation dynamics (beliefs flow through conductive pathways)
-//! 4. Governance invariants (drift bounds, energy conservation)
-//! 5. Lineage audit trail (hash-chained proof of thought)
+//! 3. Propagation dynamics (beliefs flow through weighted pathways)
+//! 4. Governance invariants (drift bounds, conservation)
+//! 5. Audit trail (hash-chained operation record)
 //!
 //! Run with:
 //! ```bash
-//! cargo run --release --example cognitive_physics_demo
+//! cargo run --release --example determinism_demo
 //! ```
 
 use scg_mcp_server::mcp_handler::handle_rpc;
@@ -21,8 +21,8 @@ use serde_json::json;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║        SCG COGNITIVE PHYSICS DEMONSTRATION v0.3.0                ║");
-    println!("║   A deterministic epistemic substrate — not a CRUD API           ║");
+    println!("║             ITER DETERMINISM DEMONSTRATION v0.3.0                ║");
+    println!("║     Deterministic decision paths & audit — not a CRUD API        ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
     // Initialize runtime with default config
@@ -30,12 +30,12 @@ fn main() {
     let mut runtime = SubstrateRuntime::new(config).expect("Failed to create runtime");
 
     // ========================================================================
-    // PHASE 1: Substrate Initialization
+// PHASE 1: Runtime Initialization
     // ========================================================================
     println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 1: Substrate Initialization                              │");
+println!("│ PHASE 1: Runtime Initialization                                │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Initializing SCG v0.3.0 cognitive substrate...");
+    println!("  Initializing Iter v0.3.0 execution runtime...");
     println!("  ├── Energy ledger: Neumaier summation for drift < 1e-10");
     println!("  ├── Governance: Thermodynamic invariant enforcement");
     println!("  ├── Lineage: SHA-256 hash-chained causal trace");
@@ -48,16 +48,16 @@ fn main() {
         id: Some(json!(1)),
     };
     let _init_resp = handle_rpc(&mut runtime, init_req);
-    println!("  ✓ Substrate initialized\n");
+println!("  ✓ Runtime initialized\n");
 
     // ========================================================================
-    // PHASE 2: Instantiate Cognitive Mass
+// PHASE 2: Instantiate Nodes
     // ========================================================================
     println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 2: Instantiate Cognitive Mass                            │");
+println!("│ PHASE 2: Instantiate Nodes                                     │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Creating synthetic cognitive entities...");
-    println!("  PHYSICS: Energy = cognitive mass = resistance to belief change\n");
+    println!("  Creating entities...\n");
+    println!("  NOTE: Energy acts as a resource constraint on belief change\n");
 
     // Create Node A: High mass (high energy = stable beliefs)
     let create_a = RpcRequest {
@@ -73,7 +73,7 @@ fn main() {
     let node_a = extract_content(&resp_a);
     println!("  Node A (High Mass Concept):");
     println!("  ├── Belief: 0.7 (strong conviction)");
-    println!("  ├── Energy: 100.0 (high cognitive mass)");
+println!("  ├── Energy: 100.0 (high resource level)");
     println!("  └── Interpretation: A well-established, stable belief");
     println!("      Response: {}\n", node_a);
 
@@ -91,7 +91,7 @@ fn main() {
     let node_b = extract_content(&resp_b);
     println!("  Node B (Low Mass Concept):");
     println!("  ├── Belief: 0.3 (weak conviction)");
-    println!("  ├── Energy: 50.0 (lower cognitive mass)");
+println!("  ├── Energy: 50.0 (lower resource level)");
     println!("  └── Interpretation: A tentative, easily influenced belief");
     println!("      Response: {}\n", node_b);
 
@@ -160,7 +160,7 @@ fn main() {
     println!("  OBSERVATION:");
     println!("  ├── Belief changed: 0.7 → 0.8 (as requested)");
     println!("  ├── Energy cost: ~0.105 units (physics tax)");
-    println!("  └── Key insight: In SCG, beliefs cannot change for free.\n");
+    println!("  └── Key insight: Beliefs cannot change for free.\n");
 
     // ========================================================================
     // PHASE 5: Temporal Dynamics — Propagation
@@ -168,7 +168,7 @@ fn main() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 5: Temporal Dynamics — Propagation                       │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Advancing cognitive time by running propagation steps...");
+println!("  Advancing time by running propagation steps...");
     println!("  PHYSICS: Beliefs flow along edges like heat through conductors\n");
 
     // Query Node B before propagation
@@ -224,7 +224,7 @@ fn main() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 6: Governance Invariants                                 │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Querying substrate governance health...\n");
+println!("  Querying governance health...\n");
 
     let gov = RpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -243,17 +243,17 @@ fn main() {
     println!("  ├── drift_ok: Energy conservation within ε = 1e-10");
     println!("  ├── energy_drift: Absolute deviation from initial energy");
     println!("  ├── coherence: Belief alignment metric [0,1]");
-    println!("  ├── node_count: Active cognitive entities");
-    println!("  ├── edge_count: Active conductive pathways");
-    println!("  └── healthy: Overall substrate health (drift_ok && esv_ok)\n");
+println!("  ├── node_count: Active nodes");
+println!("  ├── edge_count: Active pathways");
+    println!("  └── healthy: Overall system health (drift_ok && esv_ok)\n");
 
     // ========================================================================
-    // PHASE 7: Lineage Audit Trail — The Cognitive Black Box
+// PHASE 7: Audit Trail — Lineage Replay
     // ========================================================================
     println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 7: Lineage Audit Trail — Hash-Chained Proof of Thought   │");
+println!("│ PHASE 7: Audit Trail — Hash-Chained Operation Record           │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Replaying the cognitive lineage...\n");
+println!("  Replaying lineage...\n");
 
     let lineage = RpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -268,12 +268,12 @@ fn main() {
     let lineage_data = extract_content(&lineage_resp);
     println!("  Lineage: {}\n", lineage_data);
 
-    println!("  THE COGNITIVE BLACK BOX:");
+println!("  THE AUDIT TRAIL:");
     println!("  ├── Every operation is recorded with a sequence number");
     println!("  ├── Each entry has a SHA-256 checksum");
     println!("  ├── Checksums form a hash chain (like a blockchain)");
     println!("  ├── Tampering breaks the chain — immediately detectable");
-    println!("  └── This is immutable proof of how the substrate evolved\n");
+    println!("  └── This is immutable proof of how state evolved\n");
 
     // ========================================================================
     // PHASE 8: ESV Audit — Ethical State Vector
@@ -281,7 +281,7 @@ fn main() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 8: ESV Audit — Ethical State Vector Validation           │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Auditing Node A's ethical compliance...\n");
+println!("  Auditing Node A's compliance...\n");
 
     let esv = RpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -299,7 +299,7 @@ fn main() {
     println!("  ETHICAL VALIDATION:");
     println!("  ├── Every node carries an Ethical State Vector (ESV)");
     println!("  ├── Operations that violate ethical bounds are rejected");
-    println!("  └── Ethics is not bolted-on — it's substrate-level\n");
+println!("  └── Ethics is enforced at the engine boundary\n");
 
     // ========================================================================
     // SUMMARY
@@ -308,10 +308,10 @@ fn main() {
     println!("║                         SUMMARY                                  ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!("");
-    println!("  SCG is NOT a graph database. It is a COGNITIVE PHYSICS ENGINE:");
+println!("  Iter is NOT a graph database. It is deterministic governed execution:");
     println!("");
     println!("  ┌─────────────────────┬──────────────────┬─────────────────────┐");
-    println!("  │     Aspect          │  CRUD/Graph DB   │        SCG          │");
+println!("  │     Aspect          │  CRUD/Graph DB   │        Iter         │");
     println!("  ├─────────────────────┼──────────────────┼─────────────────────┤");
     println!("  │ State change        │ Instant, free    │ Costs energy        │");
     println!("  │ Constraints         │ Schema only      │ Physics+governance  │");
@@ -326,7 +326,7 @@ fn main() {
     println!("  • Causal integrity: Hash-chained, tamper-evident lineage");
     println!("  • Belief bounds: All beliefs ∈ [0.0, 1.0]");
     println!("");
-    println!("  For an LLM reasoning through SCG:");
+println!("  For an LLM reasoning through Iter:");
     println!("  → The LLM cannot hallucinate state changes");
     println!("  → Every proposed mutation is vetted by physics");
     println!("  → Every operation leaves an auditable trace");

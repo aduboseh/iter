@@ -1,16 +1,16 @@
-# SCG-PILOT-01 Load Balance Protocol v1.0.0
+# Iter-PILOT-01 Load Balance Protocol v1.0.0
 
-**Directive**: SG-SCG-LOAD-BALANCE-01 v1.0.0  
+**Directive**: SG-ITER-LOAD-BALANCE-01 v1.0.0  
 **Authority**: Tier-0 (Substrate Sovereign)  
 **Issuer**: Armonti Du-Bose-Hill  
 **Status**: ACTIVE (Day-1A)  
-**Parent Directives**: ACT-07, COHERENCE-01, SG-SCG-PILOT-AUTH-02
+**Parent Directives**: ACT-07, COHERENCE-01, SG-ITER-PILOT-AUTH-02
 
 ---
 
 ## Executive Summary
 
-This document defines the **canonical synthetic stimulus pattern** for SCG-PILOT-01 Day-1A certification telemetry collection. The LOAD-BALANCE-01 regime provides controlled, repeatable substrate activity that maintains active state while ensuring all 7 invariants remain within certification thresholds.
+This document defines the **canonical synthetic stimulus pattern** for Iter-PILOT-01 Day-1A certification telemetry collection. The LOAD-BALANCE-01 regime provides controlled, repeatable substrate activity that maintains active state while ensuring all 7 invariants remain within certification thresholds.
 
 **Purpose**: Convert substrate from idle state (Nodes=0) to active state (Nodes>0) with meaningful lineage writes, enabling certification-grade telemetry collection during the 24-hour Day-1A monitoring window.
 
@@ -116,19 +116,19 @@ This document defines the **canonical synthetic stimulus pattern** for SCG-PILOT
 
 ```bash
 #!/bin/sh
-echo "SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
+echo "Iter] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
 
 while true; do
   printf '{"jsonrpc":"2.0","id":"1","method":"governor.status","params":{}}\n'
   printf '{"jsonrpc":"2.0","id":"2","method":"node.create","params":{"belief":0.01,"energy":1e-12}}\n'
   printf '{"jsonrpc":"2.0","id":"3","method":"lineage.replay","params":{"limit":1}}\n'
   sleep 0.9
-done | /app/scg_mcp_server
+done | /app/iter-server
 ```
 
-**Execution**: Loop pipes JSON-RPC messages to `scg_mcp_server` STDIO interface at 0.9s intervals
+**Execution**: Loop pipes JSON-RPC messages to `iter-server` STDIO interface at 0.9s intervals
 
-**Startup Banner**: `SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
+**Startup Banner**: `Iter] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
 
 ---
 
@@ -212,7 +212,7 @@ if ($invariants.quarantined -eq $true) {
 
 ### 5.1 Kubernetes Deployment Patch
 
-**File**: `deployment/pilot/scg-mcp-deployment.yaml`
+**File**: `deployment/pilot/iter-deployment.yaml`
 
 **Container Args Modification**:
 ```yaml
@@ -220,39 +220,39 @@ spec:
   template:
     spec:
       containers:
-      - name: scg-mcp
-        image: scg-mcp:v1.0.0-substrate
+      - name: iter
+        image: iter:v1.0.0-substrate
         command: "/bin/sh", "-c"]
         args:
           - |
-            echo "SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
+            echo "Iter] Starting MCP server with LOAD-BALANCE-01 stimulus loop"
             while true; do
               printf '{"jsonrpc":"2.0","id":"1","method":"governor.status","params":{}}\n'
               printf '{"jsonrpc":"2.0","id":"2","method":"node.create","params":{"belief":0.01,"energy":1e-12}}\n'
               printf '{"jsonrpc":"2.0","id":"3","method":"lineage.replay","params":{"limit":1}}\n'
               sleep 0.9
-            done | /app/scg_mcp_server
+            done | /app/iter-server
 ```
 
 ### 5.2 Deployment Commands
 
 ```bash
 # Apply updated deployment
-kubectl apply -f deployment/pilot/scg-mcp-deployment.yaml -n scg-pilot-01
+kubectl apply -f deployment/pilot/iter-deployment.yaml -n Iter-pilot-01
 
 # Restart pod with new configuration
-kubectl rollout restart deployment/scg-mcp -n scg-pilot-01
+kubectl rollout restart deployment/iter -n Iter-pilot-01
 
 # Verify startup banner
-kubectl logs -n scg-pilot-01 deploy/scg-mcp -f | grep "LOAD-BALANCE-01"
+kubectl logs -n Iter-pilot-01 deploy/iter -f | grep "LOAD-BALANCE-01"
 
 # Monitor substrate activity
-kubectl logs -n scg-pilot-01 deploy/scg-mcp --tail=100 | grep "node_count"
+kubectl logs -n Iter-pilot-01 deploy/iter --tail=100 | grep "node_count"
 ```
 
 ### 5.3 Verification Checklist
 
--  Startup banner visible in logs: `SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
+-  Startup banner visible in logs: `Iter] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
 -  Telemetry shows `node_count > 0`
 -  Energy drift remains `< 1×10⁻¹⁰`
 -  Coherence remains `≥ 0.97`
@@ -300,7 +300,7 @@ kubectl logs -n scg-pilot-01 deploy/scg-mcp --tail=100 | grep "node_count"
 **Impact**: LOW (confusion, not technical failure)
 
 **Mitigation**:
-- Startup banner clearly identifies load regime: `SCG] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
+- Startup banner clearly identifies load regime: `Iter] Starting MCP server with LOAD-BALANCE-01 stimulus loop`
 - Load profile embedded in telemetry metadata
 - OPERATOR_INSTRUCTIONS.md updated with load regime explanation
 - CERTIFICATION_DOSSIER.md documents Day-1A load description
@@ -359,7 +359,7 @@ kubectl logs -n scg-pilot-01 deploy/scg-mcp --tail=100 | grep "node_count"
 **Parent Directives**:
 - ACT-07 v1.0.1 (24h monitoring execution)
 - COHERENCE-01 v1.0.0 (exception protocols)
-- SG-SCG-PILOT-AUTH-02 (telemetry fabric authorization)
+- SG-ITER-PILOT-AUTH-02 (telemetry fabric authorization)
 
 **Certification Impact**: LOAD-BALANCE-01 provides controlled, auditable stimulus for valid Day-1A certification telemetry. Load regime is version-bound and documented for reproducibility.
 
@@ -378,9 +378,10 @@ kubectl logs -n scg-pilot-01 deploy/scg-mcp --tail=100 | grep "node_count"
 **Version**: 1.0.0  
 **Effective Date**: 2025-11-19  
 **Valid Until**: End of Day-1A OR replacement by subsequent directive  
-**Owner**: SCG Substrate Team  
+**Owner**: Iter Substrate Team  
 **Classification**: Internal/Operational
 
 ---
 
 **END OF LOAD-BALANCE-01 SPECIFICATION**
+

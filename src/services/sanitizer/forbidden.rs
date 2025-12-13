@@ -11,7 +11,7 @@
 //! Forbidden Pattern Registry for MCP Boundary Sanitization
 //!
 //! This module defines the canonical list of patterns that must NEVER appear
-//! in MCP responses. It represents SCG substrate internals that would enable:
+//! in MCP responses. It represents internal engine internals that would enable:
 //! - Adversarial model reconstruction
 //! - Ethical constraint bypass
 //! - Lineage forgery
@@ -24,7 +24,7 @@
 
 /// Forbidden field patterns that must NEVER appear in MCP responses
 ///
-/// These represent SCG substrate internals that would enable adversarial
+/// These represent internal engine internals that would enable adversarial
 /// model reconstruction, ethical constraint bypass, or lineage forgery.
 pub const FORBIDDEN_PATTERNS: &[&str] = &[
     // DAG topology internals

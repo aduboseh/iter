@@ -1,13 +1,13 @@
 # MCP Context Marker
-# This file identifies this directory as an SCG MCP Server repository.
-# Warp and other tools should activate SCG-specific rules when present.
+# This file identifies this directory as an Iter Server repository.
+# Warp and other tools should activate Iter-specific rules when present.
 
-type: scg-mcp-server
+type: iter-server
 governance_version: 1.0
 governance_checksum: 9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527
 
-# Relationship to SCG substrate
-substrate_binding: SCG
+# Relationship to execution engine
+engine_binding: sealed
 protocol: Model-Context-Protocol
 
 # Active rule categories
@@ -27,9 +27,9 @@ determinism:
 
 # MCP-specific constraints
 mcp_constraints:
-  # MCP server cannot violate substrate physics
-  substrate_physics_binding: strict
-  # MCP cannot leak entropy into SCG
+  # MCP server cannot violate engine invariants
+  engine_invariants_binding: strict
+  # MCP cannot leak entropy into the engine
   entropy_containment: enabled
   # All MCP operations must be traceable
   operation_tracing: required

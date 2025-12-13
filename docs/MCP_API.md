@@ -1,16 +1,16 @@
-# SCG MCP Server API Reference
+# Iter Server API Reference
 
 **Version:** 0.3.0-phase4  
 **Protocol:** MCP 2024-11-05
 
 ## Overview
 
-The SCG MCP Server provides a Model Context Protocol interface to the SCG (Self-Correcting Graph) cognitive substrate. It enables AI assistants to interact with belief networks while maintaining security boundaries and audit capabilities.
+The Iter Server provides a Model Context Protocol interface to the Iter (Self-Correcting Graph) governed execution. It enables AI assistants to interact with belief networks while maintaining security boundaries and audit capabilities.
 
 ### Architecture
 
 ```
-AI Assistant → MCP Protocol → scg_mcp_server → SCG Substrate
+AI Assistant → MCP Protocol → iter-server → Iter Substrate
                                     │
                               Response Sanitizer
                                     │
@@ -51,7 +51,7 @@ Initialize the MCP connection.
       "prompts": {}
     },
     "serverInfo": {
-      "name": "scg_mcp_server",
+      "name": "iter-server",
       "version": "0.3.0"
     }
   },
@@ -79,7 +79,7 @@ List available tools.
 
 #### `node.create`
 
-Create a new SCG node with initial belief and energy values.
+Create a new Iter node with initial belief and energy values.
 
 **Input Schema:**
 ```json
@@ -304,7 +304,7 @@ All errors follow a dual-code system:
 | 3000 | `INVALID_TOOL` | Unknown tool name |
 | 4000 | `NOT_FOUND` | Resource not found |
 | 4004 | `NODE_NOT_FOUND` | Specific node not found |
-| 5000 | `INVARIANT_VIOLATION` | SCG invariant violated |
+| 5000 | `INVARIANT_VIOLATION` | Iter invariant violated |
 
 ### Error Response Format
 
@@ -321,7 +321,7 @@ All errors follow a dual-code system:
 
 ## Invariants
 
-The SCG MCP Server guarantees the following invariants:
+The Iter Server guarantees the following invariants:
 
 ### Energy Conservation
 Total energy in the system is conserved across all operations. Energy can only be transferred, never created or destroyed.
@@ -384,3 +384,4 @@ cargo run --example mcp_client
 | 0.3.0-phase4 | 2024 | API contract freeze, concurrency hardening, fuzzing, observability |
 | 0.2.0-phase3 | 2024 | Substrate consolidation, legacy cleanup |
 | 0.1.0 | 2024 | Initial release |
+

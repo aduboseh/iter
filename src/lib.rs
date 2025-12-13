@@ -1,15 +1,15 @@
-//! SCG MCP Server - Library Interface
+//! Iter Server - Library Interface
 //!
-//! Secure MCP boundary between AI assistants and the SCG cognitive substrate.
+//! Secure MCP boundary for governed execution.
 //!
 //! # Architecture
 //!
 //! ```text
-//! AI Assistant -> MCP Protocol -> scg_mcp_server -> SCG Substrate
-//!                                    |
-//!                             Response Sanitizer
-//!                                    |
-//!                             Safe JSON Output
+//! AI Assistant -> MCP Protocol -> server -> sealed engine
+//!                          |
+//!                    Response Sanitizer
+//!                          |
+//!                    Safe JSON Output
 //! ```
 //!
 //! # Security

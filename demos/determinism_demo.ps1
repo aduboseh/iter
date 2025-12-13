@@ -1,9 +1,9 @@
-# SCG Cognitive Physics Live Experiment
-# Demonstrates SCG as a deterministic cognitive substrate — not CRUD
+# Iter Determinism Live Experiment
+# Demonstrates deterministic execution paths — not CRUD
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$serverPath = Join-Path (Split-Path -Parent $scriptDir) "target\release\scg_mcp_server.exe"
+$serverPath = Join-Path (Split-Path -Parent $scriptDir) "target\release\iter-server.exe"
 
 # Colors for narrative
 function Write-Narrative { param($text) Write-Host "`n$text" -ForegroundColor Cyan }
@@ -64,22 +64,22 @@ function Invoke-MCPDirect {
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    SCG COGNITIVE PHYSICS LIVE EXPERIMENT                     ║
+║                      ITER DETERMINISM LIVE EXPERIMENT                        ║
 ║                              v0.3.0 Release                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor White
 
 Write-Host "This is NOT a database demo. This is NOT a graph traversal."
-Write-Host "This is a deterministic cognitive physics engine." -ForegroundColor Yellow
+Write-Host "This is deterministic governed execution." -ForegroundColor Yellow
 Write-Host ""
 Read-Host "Press Enter to begin the experiment"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 1: Initialize Substrate
+# PHASE 1: Initialize Runtime
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 1: SUBSTRATE INITIALIZATION ═══"
+Write-Narrative "═══ PHASE 1: RUNTIME INITIALIZATION ═══"
 Write-Physics "Initializing IntegratedSimulation with governance constraints..."
 
 $init = Invoke-MCPDirect -Method "initialize" -Id 0
@@ -87,16 +87,16 @@ Write-Result "Protocol: $($init.result.protocolVersion)"
 Write-Result "Server: $($init.result.serverInfo.name) v$($init.result.serverInfo.version)"
 Write-Invariant "Governance SHA-256 verified. Drift epsilon: 1e-10"
 
-Read-Host "`nPress Enter to instantiate cognitive mass"
+Read-Host "`nPress Enter to instantiate nodes"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 2: Instantiate Cognitive Mass
+# PHASE 2: Instantiate Nodes
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 2: INSTANTIATE COGNITIVE MASS (Node 0) ═══"
-Write-Physics "Creating synthetic cognitive entity..."
+Write-Narrative "═══ PHASE 2: INSTANTIATE NODE (Node 0) ═══"
+Write-Physics "Creating entity..."
 Write-Physics "  Belief = epistemic position in state space"
-Write-Physics "  Energy = cognitive mass = thermodynamic resistance to change"
+Write-Physics "  Energy = resource constraint = resistance to change"
 
 $node0 = Invoke-MCP -Method "tools/call" -ToolName "node.create" -Arguments @{belief=0.5; energy=100.0} -Id 1
 
@@ -104,15 +104,15 @@ $content0 = ($node0.result.content | Where-Object { $_.type -eq "text" }).text |
 Write-Result "Node 0 instantiated:"
 Write-Result "  ID: $($content0.id)"
 Write-Result "  Belief: $($content0.belief) (epistemic position)"
-Write-Result "  Energy: $($content0.energy) (cognitive mass)"
+Write-Result "  Energy: $($content0.energy) (resource level)"
 Write-Result "  ESV Valid: $($content0.esv_valid)"
 Write-Invariant "Energy registered in thermodynamic ledger"
 
-Read-Host "`nPress Enter to create second cognitive entity"
+Read-Host "`nPress Enter to create a second node"
 
 # Create Node 1 (lighter mass)
-Write-Narrative "═══ PHASE 2b: INSTANTIATE LIGHTER COGNITIVE MASS (Node 1) ═══"
-Write-Physics "Creating second entity with LESS cognitive mass..."
+Write-Narrative "═══ PHASE 2b: INSTANTIATE LOWER-ENERGY NODE (Node 1) ═══"
+Write-Physics "Creating second node with lower energy..."
 Write-Physics "  Lower energy = more susceptible to belief shifts"
 
 $node1 = Invoke-MCP -Method "tools/call" -ToolName "node.create" -Arguments @{belief=0.2; energy=30.0} -Id 2
@@ -121,8 +121,8 @@ $content1 = ($node1.result.content | Where-Object { $_.type -eq "text" }).text |
 Write-Result "Node 1 instantiated:"
 Write-Result "  ID: $($content1.id)"
 Write-Result "  Belief: $($content1.belief) (different epistemic position)"
-Write-Result "  Energy: $($content1.energy) (lighter cognitive mass)"
-Write-Invariant "Two cognitive masses now exist with different inertia"
+Write-Result "  Energy: $($content1.energy) (lower resource level)"
+Write-Invariant "Two nodes now exist with different inertia"
 
 Read-Host "`nPress Enter to bind conductive pathway"
 
@@ -155,7 +155,7 @@ Write-Host ""
 Write-Host "  ╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Red
 Write-Host "  ║  A database would accept this.                                 ║" -ForegroundColor Red
 Write-Host "  ║  A graph system would accept this.                             ║" -ForegroundColor Red
-Write-Host "  ║  SCG will REFUSE because PHYSICS FORBIDS IT.                   ║" -ForegroundColor Red
+Write-Host "  ║  Governance will REFUSE because invariants forbid it.          ║" -ForegroundColor Red
 Write-Host "  ╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Red
 Write-Host ""
 Write-Physics "Attempting to perturb belief beyond drift bounds..."
@@ -176,13 +176,13 @@ $gov1 = Invoke-MCP -Method "tools/call" -ToolName "governance.status" -Arguments
 $govContent1 = ($gov1.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Invariant "Drift OK: $($govContent1.drift_ok) | Energy Drift: $($govContent1.energy_drift)"
 
-Read-Host "`nPress Enter to advance cognitive time (propagation)"
+Read-Host "`nPress Enter to advance time (propagation)"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHASE 5: TEMPORAL DYNAMICS — Propagation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 5: TEMPORAL DYNAMICS — ADVANCING COGNITIVE TIME ═══"
+Write-Narrative "═══ PHASE 5: TEMPORAL DYNAMICS — ADVANCING TIME ═══"
 Write-Physics "We are NOT updating database rows."
 Write-Physics "We are ADVANCING TIME in a dynamical system."
 Write-Physics "  Propagation follows: Δb = σ·Σ(w_ij · (b_j - b_i))"
@@ -212,14 +212,14 @@ Write-Result "  Node 0: belief=$($qc0b.belief), energy=$($qc0b.energy)"
 Write-Result "  Node 1: belief=$($qc1b.belief), energy=$($qc1b.energy)"
 Write-Invariant "System evolves toward equilibrium via dynamical equations"
 
-Read-Host "`nPress Enter to examine the cognitive black box"
+Read-Host "`nPress Enter to examine the audit trail"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 6: COGNITIVE BLACK BOX — Lineage Replay
+# PHASE 6: AUDIT TRAIL — Lineage Replay
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Write-Narrative "═══ PHASE 6: COGNITIVE BLACK BOX — LINEAGE REPLAY ═══"
-Write-Physics "Every cognitive transition is IMMUTABLY HASH-CHAINED."
+Write-Narrative "═══ PHASE 6: AUDIT TRAIL — LINEAGE REPLAY ═══"
+Write-Physics "Every transition is IMMUTABLY HASH-CHAINED."
 Write-Physics "This is the flight recorder of a reasoning engine."
 
 $lineage = Invoke-MCP -Method "tools/call" -ToolName "lineage.replay" -Arguments @{} -Id 12
@@ -238,14 +238,14 @@ Read-Host "`nPress Enter for final invariant verification"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ PHASE 7: FINAL SEAL — INVARIANT VERIFICATION ═══"
-Write-Physics "Verifying substrate vital signs..."
+Write-Physics "Verifying system vital signs..."
 
 $finalGov = Invoke-MCP -Method "tools/call" -ToolName "governance.status" -Arguments @{} -Id 13
 $finalContent = ($finalGov.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 
 Write-Host ""
 Write-Host "  ╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "  ║                    SUBSTRATE VITAL SIGNS                       ║" -ForegroundColor Green
+Write-Host "  ║                     SYSTEM VITAL SIGNS                         ║" -ForegroundColor Green
 Write-Host "  ╠════════════════════════════════════════════════════════════════╣" -ForegroundColor Green
 Write-Host "  ║  Drift OK:      $($finalContent.drift_ok.ToString().PadRight(43))║" -ForegroundColor Green
 Write-Host "  ║  Energy Drift:  $($finalContent.energy_drift.ToString().PadRight(43))║" -ForegroundColor Green
@@ -264,15 +264,15 @@ Write-Host @"
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                         EXPERIMENT COMPLETE                                  ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  SCG behaved like PHYSICS, not STORAGE.                                      ║
+║  Iter behaved like PHYSICS, not STORAGE.                                     ║
 ║                                                                              ║
 ║  • Beliefs have MASS (energy)                                                ║
 ║  • Edges are CONDUCTIVE PATHWAYS, not foreign keys                           ║
 ║  • Propagation follows DYNAMICAL EQUATIONS, not business logic               ║
-║  • The lineage hash is the COGNITIVE BLACK BOX                               ║
+║  • The lineage hash is the audit trail                                       ║
 ║  • Governance enforces THERMODYNAMIC CONSTRAINTS                             ║
 ║                                                                              ║
-║  This is a deterministic cognitive physics engine governing AI reasoning.    ║
+║  This is deterministic governed execution for AI tooling.                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan

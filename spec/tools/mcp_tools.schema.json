@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://scg.nodetic.ai/mcp/v0.3/tools/mcp_tools.schema.json",
+  "$id": "https://iter.nodetic.ai/mcp/v0.3/tools/mcp_tools.schema.json",
   "title": "MCP Tools",
   "description": "Schema definitions for all MCP tool requests and responses",
   "definitions": {
