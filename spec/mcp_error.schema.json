@@ -18,20 +18,20 @@
   },
   "definitions": {
     "error_codes": {
-      "description": "Error code taxonomy",
+      "description": "Error codes",
       "type": "object",
       "properties": {
         "1000": {
           "const": "esv_validation_failed",
-          "description": "ESV/energy conservation check failed"
+          "description": "Request rejected by policy"
         },
         "2000": {
           "const": "drift_exceeded",
-          "description": "Thermodynamic drift exceeded threshold"
+          "description": "Request rejected by policy"
         },
         "3000": {
           "const": "lineage_corruption",
-          "description": "Lineage hash chain integrity violation"
+          "description": "Audit integrity violation"
         },
         "4000": {
           "const": "bad_request",
@@ -43,7 +43,7 @@
         },
         "5000": {
           "const": "substrate_error",
-          "description": "Internal substrate error"
+          "description": "Internal error"
         }
       }
     }
