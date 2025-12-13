@@ -16,12 +16,12 @@ fn main() {
 }
 
 fn run_stdio_server() {
-    let mut runtime = SubstrateRuntime::with_defaults().expect("Failed to initialize substrate runtime");
+    let mut runtime = SubstrateRuntime::with_defaults().expect("Failed to initialize execution runtime");
     let stdin = std::io::stdin();
     let mut reader = BufReader::new(stdin.lock());
     let mut stdout = std::io::stdout();
 
-    eprintln!("SCG MCP server running in STDIO mode");
+    eprintln!("Iter server running in STDIO mode");
 
     loop {
         let mut line = String::new();

@@ -25,7 +25,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     "prompts": {}
                 },
                 "serverInfo": {
-                    "name": "scg_mcp_server",
+                    "name": "iter-server",
                     "version": "0.3.0"
                 }
             });
@@ -53,7 +53,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                 "tools": [
                     {
                         "name": "node.create",
-                        "description": "Create SCG node with belief and energy values",
+                        "description": "Create node with belief and energy values",
                         "version": "0.3.0",
                         "sideEffects": ["state_mutation", "energy_allocation", "lineage_append"],
                         "dependencies": [],
@@ -180,7 +180,7 @@ pub fn handle_rpc(runtime: &mut SubstrateRuntime, req: RpcRequest) -> RpcRespons
                     },
                     {
                         "name": "governance.status",
-                        "description": "Query SCG governance health status including checksum validity, drift, and ESV status",
+                        "description": "Query governance health status including checksum validity, drift, and ESV status",
                         "version": "0.3.0",
                         "sideEffects": [],
                         "dependencies": [],

@@ -1,10 +1,9 @@
-// SCG Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
+// Governance: Deterministic | ESV-Compliant | Drift ≤1e-10
 // Lineage: MCP_BOUNDARY_V2.0
-// Generated under SCG_Governance_v1.0
 
 //! Sanitizer Module - MCP Boundary Protection
 //!
-//! Ensures no SCG substrate internals leak through the MCP boundary.
+//! Ensures no internal engine internals leak through the MCP boundary.
 //!
 //! Many items are public API for test code and external crates.
 

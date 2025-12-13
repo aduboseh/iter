@@ -2,10 +2,15 @@
 name = "scg_mcp_server"
 version = "0.3.0"
 edition = "2021"
-description = "MCP gateway for SCG Substrate - secure boundary between AI assistants and cognitive substrate"
+description = "MCP gateway for Iter - secure boundary for governed execution"
 
 [[bin]]
 name = "scg_mcp_server"
+path = "src/main.rs"
+
+# User-facing binary alias (same implementation)
+[[bin]]
+name = "iter-server"
 path = "src/main.rs"
 
 [lib]

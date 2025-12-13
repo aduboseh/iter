@@ -1,4 +1,4 @@
-# SCG MCP Attack Surface
+# Iter Attack Surface
 
 > Complete enumeration of blocked patterns and bypass prevention
 
@@ -270,3 +270,4 @@ When a new attack vector is discovered:
 
 - [SECURITY.md](./SECURITY.md) - Security architecture
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System design
+

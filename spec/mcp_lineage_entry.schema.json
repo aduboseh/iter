@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://scg.nodetic.ai/mcp/v0.3/mcp_lineage_entry.schema.json",
+  "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_lineage_entry.schema.json",
   "title": "McpLineageEntry",
   "description": "Sanitized lineage entry for MCP responses. Exposes only checksum, not full hash chain or internal state.",
   "type": "object",
