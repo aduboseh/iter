@@ -8,7 +8,7 @@
 
 Iter Server provides an MCP (JSON-RPC 2.0) interface that exposes a small set of tools for governed execution and audit.
 
-This document describes **what** the interface provides. Internal mechanisms and enforcement details are intentionally not described here.
+This document describes **what** the interface provides. Implementation mechanisms and enforcement details are intentionally not described here.
 
 ---
 

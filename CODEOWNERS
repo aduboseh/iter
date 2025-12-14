@@ -1,74 +1,68 @@
-# SCG MCP Server CODEOWNERS
-# Defines code ownership and review requirements for the SCG MCP boundary layer.
+# Iter Server CODEOWNERS
+# Defines code ownership and review requirements for this repository.
 # See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # =============================================================================
-# SUBSTRATE BRIDGE (Founder Approval Required)
-# This is the ONLY import point for the SCG substrate.
-# Any changes require explicit founder review.
+# ENGINE BRIDGE (Owner Approval Required)
+# High-sensitivity boundary files.
 # =============================================================================
 
-/src/scg_core.rs                         @Armonti
+/src/scg_core.rs                         @aduboseh
 
 # =============================================================================
-# GOVERNANCE MODULE (Founder Approval Required)
-# Governance validation and health endpoints.
+# GOVERNANCE (Owner Approval Required)
 # =============================================================================
 
-/src/governance.rs                       @Armonti
-/governance/**                           @Armonti
-/lineage/**                              @Armonti
+/src/governance.rs                       @aduboseh
+/governance/**                           @aduboseh
+/lineage/**                              @aduboseh
 
 # =============================================================================
-# FAULT TOLERANCE (Founder + MCP Team)
-# Quarantine, rollback, and governor correction.
+# FAULT TOLERANCE
 # =============================================================================
 
-/src/fault/**                            @Armonti @mcp-engineering
+/src/fault/**                            @aduboseh
 
 # =============================================================================
-# LINEAGE TRACKING (Founder + MCP Team)
-# Replay, snapshots, and sharding.
+# LINEAGE TRACKING
 # =============================================================================
 
-/src/lineage/**                          @Armonti @mcp-engineering
+/src/lineage/**                          @aduboseh
 
 # =============================================================================
-# MCP HANDLER AND TYPES (MCP Engineering Team)
-# RPC handlers, type definitions, main entry point.
+# MCP HANDLER AND TYPES
 # =============================================================================
 
-/src/mcp_handler.rs                      @mcp-engineering
-/src/types.rs                            @mcp-engineering
-/src/main.rs                             @mcp-engineering
-/src/lib.rs                              @mcp-engineering
+/src/mcp_handler.rs                      @aduboseh
+/src/types.rs                            @aduboseh
+/src/main.rs                             @aduboseh
+/src/lib.rs                              @aduboseh
 
 # =============================================================================
-# TELEMETRY (MCP Engineering Team)
-# Observability, metrics, logging.
+# TELEMETRY
 # =============================================================================
 
-/src/telemetry/**                        @mcp-engineering
+/src/telemetry/**                        @aduboseh
 
 # =============================================================================
 # INFRASTRUCTURE AND DEPLOYMENT
 # =============================================================================
 
-/deploy/**                               @mcp-engineering @devops
-/.github/**                              @Armonti @mcp-engineering
+/deploy/**                               @aduboseh
+/.github/**                              @aduboseh
 
 # =============================================================================
 # GOVERNANCE AND CONFIGURATION FILES
 # =============================================================================
 
-.mcp-context                             @Armonti
-/Cargo.toml                              @Armonti @mcp-engineering
+.mcp-context                             @aduboseh
+/Cargo.toml                              @aduboseh
 
 # =============================================================================
 # DOCUMENTATION AND SCRIPTS
 # =============================================================================
 
-/docs/**                                 @mcp-engineering
-/scripts/**                              @mcp-engineering
-/audits/**                               @Armonti
+/docs/**                                 @aduboseh
+/scripts/**                              @aduboseh
+/audits/**                               @aduboseh
 
