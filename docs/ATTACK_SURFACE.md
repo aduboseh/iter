@@ -20,11 +20,11 @@ Typical outputs include:
 
 The server is designed to **not** expose information that could be used to reconstruct internal execution mechanisms or internal state, including (non-exhaustive):
 
-- internal topology/structure
-- raw policy inputs or internal scoring vectors
-- internal energy/distribution details
+- non-public topology/structure
+- raw policy inputs or non-public scoring vectors
+- non-public energy/distribution details
 - debug traces or implementation details
-- full audit-chain internals
+- full audit-chain details
 
 ---
 

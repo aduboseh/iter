@@ -22,4 +22,4 @@ cargo test --lib
 
 Notes:
 - This repository includes additional security and boundary tests.
-- Details of internal test strategies are intentionally not documented publicly.
+- Details of non-public test strategies are intentionally not documented publicly.
