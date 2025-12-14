@@ -1,4 +1,6 @@
-# Release Notes: v0.3.0-phase4
+# Release Notes: v0.3.0-phase4 (INTERNAL)
+
+**INTERNAL — NOT FOR PUBLIC DISTRIBUTION**
 
 **Release Date:** December 2024  
 **Tag:** `v0.3.0-phase4`
