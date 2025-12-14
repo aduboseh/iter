@@ -4,7 +4,7 @@ Thank you for your interest in contributing to Iter!
 
 ## Public Surface Guidelines
 
-**Public surfaces must not reference SCG.** All user-facing content—including README, documentation, demos, examples, marketplace listings, CLI help text, and Rustdoc comments on public APIs—should use "Iter" branding and approved terminology only. Internal crate names, workflow identifiers, and test baselines may retain their existing naming conventions.
+Public surfaces must not reference internal substrate or governance names. All user-facing content—including README, documentation, demos, examples, marketplace listings, CLI help text, and Rustdoc comments on public APIs—should use "Iter" branding and approved terminology only. Internal crate names, workflow identifiers, and test baselines may retain their existing naming conventions.
 
 ## Getting Started
 

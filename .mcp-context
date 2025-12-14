@@ -1,6 +1,6 @@
 # MCP Context Marker
 # This file identifies this directory as an Iter Server repository.
-# Warp and other tools should activate Iter-specific rules when present.
+# Tools should activate Iter-specific rules when present.
 
 type: iter-server
 governance_version: 1.0

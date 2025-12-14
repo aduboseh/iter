@@ -1,5 +1,8 @@
-## Report
+# Public Cleanup Report v6 (INTERNAL)
 
+**INTERNAL — NOT FOR PUBLIC DISTRIBUTION**
+
+## Report
 - iter-internal created (private): yes
 - extraction method: git filter-repo on fresh clone
 

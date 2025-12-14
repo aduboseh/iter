@@ -68,7 +68,7 @@ cargo run --release --example mcp_client
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | cargo run --release --bin iter-server
 ```
 
-### Claude Desktop Integration
+### Desktop Client Integration
 
 ```json
 {
