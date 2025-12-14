@@ -6,16 +6,10 @@ description = "Governed Model Context Protocol server with deterministic executi
 authors = ["Only SG Solutions"]
 
 [features]
-default = ["full_substrate"]
-full_substrate = [
-    "dep:scg-sim",
-    "dep:scg-energy",
-    "dep:scg-governance",
-    "dep:scg-ethics",
-    "dep:scg-trace",
-    "dep:scg-consensus",
-    "dep:scg-elasticity",
-]
+default = ["public_stub"]
+# full_substrate: Requires proprietary workspace. Build via private CI or local dev
+# with SCG crates available. Not buildable from public repo alone.
+full_substrate = []
 public_stub = []
 
 [[bin]]
@@ -50,14 +44,10 @@ chrono = { version = "0.4", features = ["serde"] }
 # Tracing
 tracing = "0.1"
 
-# Substrate crates (optional, activated with full_substrate feature)
-scg-sim = { path = "../SCG/crates/scg-sim", optional = true }
-scg-energy = { path = "../SCG/crates/scg-energy", optional = true }
-scg-governance = { path = "../SCG/crates/scg-governance", optional = true }
-scg-ethics = { path = "../SCG/crates/scg-ethics", optional = true }
-scg-trace = { path = "../SCG/crates/scg-trace", optional = true }
-scg-consensus = { path = "../SCG/crates/scg-consensus", optional = true }
-scg-elasticity = { path = "../SCG/crates/scg-elasticity", optional = true }
+# NOTE: Substrate crates (scg-*) are NOT listed here.
+# The public repo builds with public_stub only.
+# Full substrate builds require the private workspace with SCG crates
+# available at ../SCG. See iter-internal docs for workspace setup.
 
 [dev-dependencies]
 unicode-normalization = "0.1"
