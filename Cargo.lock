@@ -368,6 +368,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "iter_mcp_server"
+version = "0.3.0"
+dependencies = [
+ "approx",
+ "chrono",
+ "hex",
+ "parking_lot",
+ "proptest",
+ "scg-consensus",
+ "scg-elasticity",
+ "scg-energy",
+ "scg-ethics",
+ "scg-governance",
+ "scg-sim",
+ "scg-trace",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -874,31 +899,6 @@ dependencies = [
  "sha2",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "scg_mcp_server"
-version = "0.3.0"
-dependencies = [
- "approx",
- "chrono",
- "hex",
- "parking_lot",
- "proptest",
- "scg-consensus",
- "scg-elasticity",
- "scg-energy",
- "scg-ethics",
- "scg-governance",
- "scg-sim",
- "scg-trace",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "tracing",
- "unicode-normalization",
 ]
 
 [[package]]

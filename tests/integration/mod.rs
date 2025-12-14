@@ -1,4 +1,4 @@
-// SCG MCP Integration Test Suite
+// Iter MCP Integration Test Suite
 // Module declarations for integration tests
 
 pub mod common;

@@ -30,23 +30,44 @@
 #![warn(missing_docs)]
 
 // ============================================================================
-// Core Modules
+// Core Modules (always available)
 // ============================================================================
 
 pub mod caller_context;
+
+// ============================================================================
+// Full Substrate Modules (require proprietary substrate)
+// ============================================================================
+
+#[cfg(feature = "full_substrate")]
 pub mod governance;
-pub mod mcp_handler;
+#[cfg(feature = "full_substrate")]
 pub mod metrics;
+#[cfg(feature = "full_substrate")]
+pub mod mcp_handler;
+#[cfg(feature = "full_substrate")]
 pub mod services;
+#[cfg(feature = "full_substrate")]
 pub mod substrate_runtime;
+#[cfg(feature = "full_substrate")]
 pub mod traits;
+#[cfg(feature = "full_substrate")]
 pub mod types;
+#[cfg(feature = "full_substrate")]
 pub mod validation;
 
 // ============================================================================
-// MCP Type Re-exports (Sanitized for external use)
+// Public Stub Module (demonstration mode)
 // ============================================================================
 
+#[cfg(feature = "public_stub")]
+pub mod substrate;
+
+// ============================================================================
+// MCP Type Re-exports (Sanitized for external use - full substrate only)
+// ============================================================================
+
+#[cfg(feature = "full_substrate")]
 pub use types::{
     McpNodeState, McpEdgeState, McpGovernorStatus, McpLineageEntry,
     McpError, RpcRequest, RpcResponse, RpcError,
@@ -56,13 +77,22 @@ pub use types::{
 };
 
 // ============================================================================
-// Boundary Traits (Public API for substrate interaction)
+// Boundary Traits (Public API for substrate interaction - full substrate only)
 // ============================================================================
 
+#[cfg(feature = "full_substrate")]
 pub use traits::{SubstrateNodeView, SubstrateEdgeView, SubstrateGovernorView};
 
 // ============================================================================
-// Substrate Runtime (Public facade only)
+// Substrate Runtime (Public facade only - full substrate mode)
 // ============================================================================
 
+#[cfg(feature = "full_substrate")]
 pub use substrate_runtime::{SubstrateRuntime, SubstrateRuntimeConfig, SharedSubstrateRuntime};
+
+// ============================================================================
+// Stub Runtime (Public stub mode)
+// ============================================================================
+
+#[cfg(feature = "public_stub")]
+pub use substrate::stub::StubRuntime;

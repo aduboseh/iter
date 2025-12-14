@@ -12,7 +12,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   # Suppress trace output during tests
-  SCG_DETERMINISM: "1"
+  ITER_DETERMINISM: "1"
 
 jobs:
   integration-tests:

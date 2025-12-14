@@ -1,20 +1,29 @@
 [package]
-name = "scg_mcp_server"
+name = "iter_mcp_server"
 version = "0.3.0"
 edition = "2021"
-description = "MCP gateway for Iter - secure boundary for governed execution"
+description = "Governed Model Context Protocol server with deterministic execution"
+authors = ["Only SG Solutions"]
 
-[[bin]]
-name = "scg_mcp_server"
-path = "src/main.rs"
+[features]
+default = ["full_substrate"]
+full_substrate = [
+    "dep:scg-sim",
+    "dep:scg-energy",
+    "dep:scg-governance",
+    "dep:scg-ethics",
+    "dep:scg-trace",
+    "dep:scg-consensus",
+    "dep:scg-elasticity",
+]
+public_stub = []
 
-# User-facing binary alias (same implementation)
 [[bin]]
 name = "iter-server"
 path = "src/main.rs"
 
 [lib]
-name = "scg_mcp_server"
+name = "iter_mcp_server"
 path = "src/lib.rs"
 
 [dependencies]
@@ -38,36 +47,19 @@ parking_lot = "0.12"
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 
-# Tracing (matches SCG monorepo)
+# Tracing
 tracing = "0.1"
 
-# ============================================================================
-# SCG Substrate Crates (Real Implementation)
-# ============================================================================
-
-# Core simulation - IntegratedSimulation, CognitiveGraph, NodeState, Edge
-scg-sim = { path = "../SCG/crates/scg-sim" }
-
-# Energy management - EnergyLedger, EnergyModel, conservation tracking
-scg-energy = { path = "../SCG/crates/scg-energy" }
-
-# Governance - GovernanceValidator, drift validation, ESV params
-scg-governance = { path = "../SCG/crates/scg-governance" }
-
-# Ethics module - harm evaluation and policy checks
-scg-ethics = { path = "../SCG/crates/scg-ethics" }
-
-# Causal trace - CausalTrace, hash-chained event logging
-scg-trace = { path = "../SCG/crates/scg-trace" }
-
-# Consensus - ConsensusEngine (used by IntegratedSimulation)
-scg-consensus = { path = "../SCG/crates/scg-consensus" }
-
-# Elastic Governor - adaptive stability control
-scg-elasticity = { path = "../SCG/crates/scg-elasticity" }
+# Substrate crates (optional, activated with full_substrate feature)
+scg-sim = { path = "../SCG/crates/scg-sim", optional = true }
+scg-energy = { path = "../SCG/crates/scg-energy", optional = true }
+scg-governance = { path = "../SCG/crates/scg-governance", optional = true }
+scg-ethics = { path = "../SCG/crates/scg-ethics", optional = true }
+scg-trace = { path = "../SCG/crates/scg-trace", optional = true }
+scg-consensus = { path = "../SCG/crates/scg-consensus", optional = true }
+scg-elasticity = { path = "../SCG/crates/scg-elasticity", optional = true }
 
 [dev-dependencies]
-# Integration test dependencies
 unicode-normalization = "0.1"
 approx = "0.5"
 proptest = "1.4"

@@ -1,4 +1,4 @@
-# SCG Governance Manifest (Public)
+# Iter Governance Manifest (Public)
 
 This repository implements a governed execution model backed by an
 integrity-locked internal governance manifest.

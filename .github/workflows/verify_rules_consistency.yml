@@ -18,7 +18,7 @@ jobs:
 
       - name: Verify public governance stub exists
         run: |
-          if [ ! -f governance/SCG_Governance.md ]; then
+          if [ ! -f governance/GOVERNANCE.md ]; then
             echo "::error::Public governance stub missing"
             exit 1
           fi
