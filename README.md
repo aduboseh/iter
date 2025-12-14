@@ -14,7 +14,7 @@ It is designed for:
 - deterministic replay
 - decision audit
 - governed execution
-- zero leakage of internal engine internals through responses
+- zero leakage of non-public engine details through responses
 
 Iter is NOT:
 - a general-purpose agent runtime

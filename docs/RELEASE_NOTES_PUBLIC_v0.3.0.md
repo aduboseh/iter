@@ -7,7 +7,7 @@ This release focuses on external stability of the Iter MCP boundary: a clarified
 - API contract stabilized for external integrators (stable tool names, consistent error codes, stable response shapes)
 - Backward compatibility maintained with v0.2.0 (no migration required)
 - Machine-readable schemas available for MCP request/response types
-- Boundary validation and observability are present (high level; internal mechanics intentionally not documented publicly)
+- Boundary validation and observability are present (high level; implementation details intentionally not documented publicly)
 - Documentation and examples updated for integrator onboarding
 
 ## Kernel Compatibility

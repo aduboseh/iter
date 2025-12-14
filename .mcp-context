@@ -1,40 +1,5 @@
 # MCP Context Marker
 # This file identifies this directory as an Iter Server repository.
-# Tools should activate Iter-specific rules when present.
 
 type: iter-server
-governance_version: 1.0
-governance_checksum: 9D7623E581D982D8F9BC816738EF0880E9631E6FD5789C36AF80698DF2BAA527
-
-# Relationship to execution engine
-engine_binding: sealed
 protocol: Model-Context-Protocol
-
-# Active rule categories
-rules:
-  - global_invariants: [G1, G2, G3]
-  - task_structure: [T1, T2]
-  - code_behavior: [C1, C2, C3]
-  - environment: [E1, E2, E3]
-  - ethics_governance: [X1, X2, X3]
-  - meta_stability: [M1, M2]
-
-# Determinism constraints
-determinism:
-  epsilon: 1e-10
-  replay_required: true
-  lineage_tracking: true
-
-# MCP-specific constraints
-mcp_constraints:
-  # MCP server cannot violate engine invariants
-  engine_invariants_binding: strict
-  # MCP cannot leak entropy into the engine
-  entropy_containment: enabled
-  # All MCP operations must be traceable
-  operation_tracing: required
-
-# ESV (Ethical State Vector) requirements
-esv:
-  enabled: true
-  compliance_frameworks: [HIPAA, SOC2, NIST]

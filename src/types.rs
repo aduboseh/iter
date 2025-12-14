@@ -50,7 +50,7 @@ pub enum McpError {
     EdgeNotFound { id: u64 },
     /// ESV validation failed (code 1000, "esv_validation_failed")
     EsvValidationFailed { reason: String },
-    /// Thermodynamic drift exceeded (code 2000, "drift_exceeded")
+    /// Drift exceeded (code 2000, "drift_exceeded")
     DriftExceeded { drift: f64, threshold: f64 },
     /// Lineage integrity violation (code 3000, "lineage_corruption")
     LineageCorruption { details: String },

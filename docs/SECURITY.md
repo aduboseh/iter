@@ -16,13 +16,13 @@ Assume an adversary who can:
 
 ## Assets protected
 
-The server is designed to protect internal execution details and other sensitive data, including (non-exhaustive):
+The server is designed to protect non-public execution details and other sensitive data, including (non-exhaustive):
 
-- internal topology/structure
-- internal policy inputs and scoring signals
-- internal energy/distribution details
+- non-public topology/structure
+- non-public policy inputs and scoring signals
+- non-public energy/distribution details
 - debug traces and implementation details
-- internal audit-chain details
+- non-public audit-chain details
 
 ---
 
