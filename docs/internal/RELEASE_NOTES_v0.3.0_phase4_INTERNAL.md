@@ -115,6 +115,4 @@ cargo clippy --all-targets -- -D warnings
 cargo run --example mcp_client
 ```
 
-## Contributors
 
-- AI-assisted development with Claude

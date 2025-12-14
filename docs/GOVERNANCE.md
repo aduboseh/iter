@@ -30,7 +30,7 @@ Automated checks verify that:
 - boundary tests continue to pass
 - governance artifacts remain in an expected state
 
-Exact checksum values and internal verification details are intentionally not documented publicly.
+Exact checksum values and non-public verification details are intentionally not documented publicly.
 
 ---
 

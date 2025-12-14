@@ -1,4 +1,4 @@
-# SCG MCP Integration Test Suite CI
+# MCP Integration Test Suite CI
 # Validates MCP boundary sanitization on every PR
 
 name: MCP Integration Tests
@@ -11,7 +11,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Suppress SCG trace output during tests
+  # Suppress trace output during tests
   SCG_DETERMINISM: "1"
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout SCG repo for scg-connectome dependency
+      - name: Checkout substrate dependency repo
         uses: actions/checkout@v4
         with:
           repository: aduboseh/SCG
