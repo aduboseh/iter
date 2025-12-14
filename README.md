@@ -76,6 +76,10 @@ Every outbound response passes through a deterministic sanitizer backed by forbi
 
 Details: `docs/GOVERNANCE.md`
 
+## Kernel Compatibility
+
+Validated against [drift-kernel v1.0.0](https://github.com/aduboseh/drift-kernel/releases/tag/drift-kernel-v1.0.0).
+
 ## Testing
 
 ```bash
