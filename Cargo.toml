@@ -54,7 +54,7 @@ scg-energy = { path = "../SCG/crates/scg-energy" }
 # Governance - GovernanceValidator, drift validation, ESV params
 scg-governance = { path = "../SCG/crates/scg-governance" }
 
-# Ethics kernel - EthicsKernel, harm evaluation, moral capacity
+# Ethics module - harm evaluation and policy checks
 scg-ethics = { path = "../SCG/crates/scg-ethics" }
 
 # Causal trace - CausalTrace, hash-chained event logging
