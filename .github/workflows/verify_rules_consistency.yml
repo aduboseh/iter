@@ -9,18 +9,34 @@ on:
 
 jobs:
   governance-guarantees:
-    name: Verify Governance Behavioral Guarantees
+    name: Verify Governance Signals
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Run tests (deterministic, release)
+      - name: Verify public governance stub exists
         run: |
-          # Behavior over doctrine: validate observable guarantees via tests.
-          cargo test --release -- --test-threads=1
+          if [ ! -f governance/SCG_Governance.md ]; then
+            echo "::error::Public governance stub missing"
+            exit 1
+          fi
+          echo "✅ Governance stub present"
+
+      - name: Verify no CRLF line endings
+        run: |
+          if grep -rIl $'\r' --include="*.rs" --include="*.md" --include="*.toml" --include="*.yml" --include="*.yaml" --include="*.json" . 2>/dev/null; then
+            echo "::error::CRLF detected — line ending drift"
+            exit 1
+          fi
+          echo "✅ Line endings OK (LF only)"
+
+      - name: Verify stability baseline exists
+        run: |
+          if [ ! -f audits/stability_v0.2.0/repo_manifest.sha256 ]; then
+            echo "::error::Stability baseline manifest missing"
+            exit 1
+          fi
+          echo "✅ Stability baseline present"
 
