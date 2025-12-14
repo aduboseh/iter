@@ -1,294 +1,152 @@
 //! Determinism Demo
 //!
-//! Demonstrates tool calls and repeatable outcomes via the Iter Server MCP surface.
+//! Demonstrates that the Iter server produces identical outputs for identical inputs.
+//! This example treats the server as a black box, communicating only via MCP protocol.
 //!
-//! Run with:
+//! # Usage
+//!
 //! ```bash
-//! cargo run --release --example determinism_demo
+//! cargo build --release --bin iter-server
+//! cargo run --example determinism_demo
 //! ```
+//!
+//! # What this demonstrates
+//!
+//! - Same inputs → same outputs (deterministic execution)
+//! - Observable determinism from the client perspective
+//! - No knowledge of server internals required
 
-use scg_mcp_server::mcp_handler::handle_rpc;
-use scg_mcp_server::substrate_runtime::{SubstrateRuntime, SubstrateRuntimeConfig};
-use scg_mcp_server::types::RpcRequest;
-use serde_json::json;
+use serde_json::{json, Value};
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Command, Stdio};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║             ITER DETERMINISM DEMONSTRATION v0.3.0                ║");
-    println!("║     Deterministic decision paths & audit — not a CRUD API        ║");
+    println!("║             ITER DETERMINISM DEMONSTRATION                       ║");
+    println!("║     Same inputs → Same outputs (client perspective)              ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
-    // Initialize runtime with default config
-    let config = SubstrateRuntimeConfig::default();
-    let mut runtime = SubstrateRuntime::new(config).expect("Failed to create runtime");
+    // Run the demo twice and compare outputs
+    println!("Running identical operations twice to verify determinism...\n");
 
-    // ========================================================================
-// PHASE 1: Runtime Initialization
-    // ========================================================================
+    let run1 = run_demo_sequence();
+    let run2 = run_demo_sequence();
+
     println!("┌─────────────────────────────────────────────────────────────────┐");
-println!("│ PHASE 1: Runtime Initialization                                │");
+    println!("│ DETERMINISM VERIFICATION                                       │");
     println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Initializing iter-server runtime...\n");
 
-    let init_req = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "initialize".to_string(),
-        params: json!({}),
-        id: Some(json!(1)),
-    };
-    let _init_resp = handle_rpc(&mut runtime, init_req);
-println!("  ✓ Runtime initialized\n");
-
-    // ========================================================================
-// PHASE 2: Instantiate Nodes
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-println!("│ PHASE 2: Instantiate Nodes                                     │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Creating two nodes...\n");
-
-    // Create Node A: High mass (high energy = stable beliefs)
-    let create_a = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "node.create",
-            "arguments": { "belief": 0.7, "energy": 100.0 }
-        }),
-        id: Some(json!(2)),
-    };
-    let resp_a = handle_rpc(&mut runtime, create_a);
-    let node_a = extract_content(&resp_a);
-    println!("  Node A:");
-    println!("  ├── Belief: 0.7");
-    println!("  └── Energy: 100.0");
-    println!("      Response: {}\n", node_a);
-
-    // Create Node B: Lower mass (lower energy = more malleable)
-    let create_b = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "node.create",
-            "arguments": { "belief": 0.3, "energy": 50.0 }
-        }),
-        id: Some(json!(3)),
-    };
-    let resp_b = handle_rpc(&mut runtime, create_b);
-    let node_b = extract_content(&resp_b);
-    println!("  Node B:");
-    println!("  ├── Belief: 0.3");
-    println!("  └── Energy: 50.0");
-    println!("      Response: {}\n", node_b);
-
-    // ========================================================================
-    // PHASE 3: Bind Conductive Pathway
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 3: Bind Conductive Pathway                               │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Binding an edge from Node A → Node B...\n");
-
-    let bind = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "edge.bind",
-            "arguments": { "src": "0", "dst": "1", "weight": 0.7 }
-        }),
-        id: Some(json!(4)),
-    };
-    let resp_bind = handle_rpc(&mut runtime, bind);
-    let edge = extract_content(&resp_bind);
-    println!("  Edge:");
-    println!("  └── Weight: 0.7");
-    println!("      Response: {}\n", edge);
-
-    // ========================================================================
-    // PHASE 4: The Impossible Perturbation — Energy Cost Demo
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 4: Node Mutation                                         │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Mutating Node A belief by +0.1\n");
-
-    // Query before mutation
-    let query_before = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "node.query",
-            "arguments": { "node_id": "0" }
-        }),
-        id: Some(json!(5)),
-    };
-    let resp_before = handle_rpc(&mut runtime, query_before);
-    let before = extract_content(&resp_before);
-    println!("  BEFORE mutation: {}", before);
-
-    // Mutate
-    let mutate = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "node.mutate",
-            "arguments": { "node_id": "0", "delta": 0.1 }
-        }),
-        id: Some(json!(6)),
-    };
-    let resp_mutate = handle_rpc(&mut runtime, mutate);
-    let after = extract_content(&resp_mutate);
-    println!("  AFTER mutation:  {}\n", after);
-
-    println!("  Result captured from tool response.\n");
-
-    // ========================================================================
-    // PHASE 5: Temporal Dynamics — Propagation
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 5: Temporal Dynamics — Propagation                       │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-    println!("  Running a step...\n");
-
-    // Query Node B before propagation
-    let query_b_before = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "node.query",
-            "arguments": { "node_id": "1" }
-        }),
-        id: Some(json!(7)),
-    };
-    let resp_b_before = handle_rpc(&mut runtime, query_b_before);
-    let b_before = extract_content(&resp_b_before);
-    println!("  Node B BEFORE propagation: {}", b_before);
-
-    // Run propagation step
-    let propagate = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "edge.propagate",
-            "arguments": { "edge_id": "0" }
-        }),
-        id: Some(json!(8)),
-    };
-    let _prop_resp = handle_rpc(&mut runtime, propagate);
-    println!("  → Propagation tick executed");
-
-    // Query Node B after propagation
-    let query_b_after = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "node.query",
-            "arguments": { "node_id": "1" }
-        }),
-        id: Some(json!(9)),
-    };
-    let resp_b_after = handle_rpc(&mut runtime, query_b_after);
-    let b_after = extract_content(&resp_b_after);
-    println!("  Node B AFTER propagation:  {}\n", b_after);
-
-    println!("  Result captured from tool response.\n");
-
-    // ========================================================================
-    // PHASE 6: Governance Status
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 6: Governance Status                                     │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-println!("  Querying governance health...\n");
-
-    let gov = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "governance.status",
-            "arguments": {}
-        }),
-        id: Some(json!(10)),
-    };
-    let gov_resp = handle_rpc(&mut runtime, gov);
-    let gov_status = extract_content(&gov_resp);
-    println!("  Governance Status: {}\n", gov_status);
-
-    println!("  Status captured from tool response.\n");
-
-    // ========================================================================
-// PHASE 7: Audit Trail — Lineage Replay
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 7: Audit Summary                                         │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-println!("  Replaying lineage...\n");
-
-    let lineage = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "lineage.replay",
-            "arguments": {}
-        }),
-        id: Some(json!(11)),
-    };
-    let lineage_resp = handle_rpc(&mut runtime, lineage);
-    let lineage_data = extract_content(&lineage_resp);
-    println!("  Lineage: {}\n", lineage_data);
-
-    println!("  Audit summary captured from tool response.\n");
-
-    // ========================================================================
-    // PHASE 8: ESV Audit — Ethical State Vector
-    // ========================================================================
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│ PHASE 8: ESV Audit — Ethical State Vector Validation           │");
-    println!("└─────────────────────────────────────────────────────────────────┘");
-println!("  Auditing Node A's compliance...\n");
-
-    let esv = RpcRequest {
-        jsonrpc: "2.0".to_string(),
-        method: "tools/call".to_string(),
-        params: json!({
-            "name": "esv.audit",
-            "arguments": { "node_id": "0" }
-        }),
-        id: Some(json!(12)),
-    };
-    let esv_resp = handle_rpc(&mut runtime, esv);
-    let esv_status = extract_content(&esv_resp);
-    println!("  ESV Status: {}\n", esv_status);
-
-    println!("  Status captured from tool response.\n");
-
-    // ========================================================================
-    // SUMMARY
-    // ========================================================================
-    println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║                         SUMMARY                                  ║");
-    println!("╚══════════════════════════════════════════════════════════════════╝");
-    println!("");
-    println!("  Summary:");
-    println!("  - tool calls executed: initialize, create/query/mutate, bind/step, status, audit");
-    println!("  - outputs captured from MCP responses");
-    println!("\n═══════════════════════════════════════════════════════════════════");
+    if run1 == run2 {
+        println!("  ✓ Both runs produced IDENTICAL outputs");
+        println!("  ✓ Determinism verified from client perspective\n");
+    } else {
+        println!("  ✗ Outputs differ — determinism NOT verified\n");
+        println!("  Run 1: {:?}", run1);
+        println!("  Run 2: {:?}", run2);
+    }
 }
 
-/// Extract content text from MCP tool response.
-fn extract_content(resp: &scg_mcp_server::types::RpcResponse) -> String {
-    resp.result
-        .as_ref()
+/// Run a sequence of MCP operations and return key outputs for comparison.
+fn run_demo_sequence() -> Vec<String> {
+    let mut outputs = Vec::new();
+
+    // Spawn iter-server
+    let mut server = Command::new("cargo")
+        .args(["run", "--release", "--bin", "iter-server"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("Failed to spawn iter-server. Did you run `cargo build --release`?");
+
+    let mut stdin = server.stdin.take().expect("Failed to open stdin");
+    let stdout = server.stdout.take().expect("Failed to open stdout");
+    let mut reader = BufReader::new(stdout);
+
+    // Helper to send request and read response
+    let mut rpc_id = 1;
+    let mut send_rpc = |method: &str, params: Value| -> Value {
+        let req = json!({
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": rpc_id
+        });
+        rpc_id += 1;
+
+        writeln!(stdin, "{}", req).expect("Failed to write to server");
+        stdin.flush().expect("Failed to flush stdin");
+
+        let mut line = String::new();
+        reader.read_line(&mut line).expect("Failed to read response");
+        serde_json::from_str(&line).unwrap_or(json!({"error": "parse failed"}))
+    };
+
+    // Initialize
+    let _ = send_rpc("initialize", json!({}));
+
+    // Create two nodes with fixed parameters
+    let node_a = send_rpc("tools/call", json!({
+        "name": "node.create",
+        "arguments": { "belief": 0.7, "energy": 100.0 }
+    }));
+    outputs.push(extract_text(&node_a));
+
+    let node_b = send_rpc("tools/call", json!({
+        "name": "node.create",
+        "arguments": { "belief": 0.3, "energy": 50.0 }
+    }));
+    outputs.push(extract_text(&node_b));
+
+    // Bind edge
+    let edge = send_rpc("tools/call", json!({
+        "name": "edge.bind",
+        "arguments": { "src": "0", "dst": "1", "weight": 0.7 }
+    }));
+    outputs.push(extract_text(&edge));
+
+    // Query node
+    let query = send_rpc("tools/call", json!({
+        "name": "node.query",
+        "arguments": { "node_id": "0" }
+    }));
+    outputs.push(extract_text(&query));
+
+    // Propagate
+    let _ = send_rpc("tools/call", json!({
+        "name": "edge.propagate",
+        "arguments": { "edge_id": "0" }
+    }));
+
+    // Query after propagation
+    let query_after = send_rpc("tools/call", json!({
+        "name": "node.query",
+        "arguments": { "node_id": "1" }
+    }));
+    outputs.push(extract_text(&query_after));
+
+    // Governor status
+    let gov = send_rpc("tools/call", json!({
+        "name": "governor.status",
+        "arguments": {}
+    }));
+    outputs.push(extract_text(&gov));
+
+    // Close server
+    drop(stdin);
+    let _ = server.wait();
+
+    outputs
+}
+
+/// Extract text content from MCP response.
+fn extract_text(resp: &Value) -> String {
+    resp.get("result")
         .and_then(|r| r.get("content"))
         .and_then(|c| c.as_array())
         .and_then(|arr| arr.first())
         .and_then(|item| item.get("text"))
         .and_then(|t| t.as_str())
-        .unwrap_or_else(|| {
-            resp.error
-                .as_ref()
-                .map(|e| e.message.as_str())
-                .unwrap_or("(no content)")
-        })
+        .unwrap_or("(no content)")
         .to_string()
 }
