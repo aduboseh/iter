@@ -1,5 +1,9 @@
-# Iter Demo
+# Iter MCP Tool Demo
 # Demonstrates repeatable tool behavior via MCP
+#
+# NOTE:
+# This demo illustrates observable behavior of the Iter MCP tool surface.
+# It does not describe internal execution logic, governance rules, or validation criteria.
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -64,7 +68,7 @@ function Invoke-MCPDirect {
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                      ITER DETERMINISM LIVE EXPERIMENT                        ║
+║                         ITER MCP TOOL DEMO                                   ║
 ║                              v0.3.0 Release                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -72,10 +76,10 @@ Write-Host @"
 
 Write-Host "This demo exercises the iter-server tool surface." -ForegroundColor Yellow
 Write-Host ""
-Read-Host "Press Enter to begin the experiment"
+Read-Host "Press Enter to begin"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 1: Initialize Runtime
+# PHASE 1: Initialize Session
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ STEP 1: INITIALIZE ═══"
@@ -86,10 +90,10 @@ Write-Result "Protocol: $($init.result.protocolVersion)"
 Write-Result "Server: $($init.result.serverInfo.name) v$($init.result.serverInfo.version)"
 Write-Status "Initialized"
 
-Read-Host "`nPress Enter to instantiate nodes"
+Read-Host "`nPress Enter to create nodes"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 2: Instantiate Nodes
+# PHASE 2: Create Nodes
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ STEP 2: CREATE NODES ═══"
@@ -106,7 +110,7 @@ Write-Result "  Compliance: $($content0.esv_valid)"
 
 Read-Host "`nPress Enter to create a second node"
 
-# Create Node 1 (lighter mass)
+# Create Node 1
 Write-Info "Creating Node 1..."
 
 $node1 = Invoke-MCP -Method "tools/call" -ToolName "node.create" -Arguments @{belief=0.2; energy=30.0} -Id 2
@@ -117,10 +121,10 @@ Write-Result "  ID: $($content1.id)"
 Write-Result "  Belief: $($content1.belief)"
 Write-Result "  Energy: $($content1.energy)"
 
-Read-Host "`nPress Enter to bind conductive pathway"
+Read-Host "`nPress Enter to bind edge"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 3: Bind Conductive Pathway
+# PHASE 3: Bind Edge
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ STEP 3: BIND EDGE ═══"
@@ -133,10 +137,10 @@ Write-Result "Edge bound:"
 Write-Result "  Source: Node $($edgeContent.src) → Target: Node $($edgeContent.dst)"
 Write-Result "  Weight: $($edgeContent.weight)"
 
-Read-Host "`nPress Enter to attempt THE IMPOSSIBLE PERTURBATION"
+Read-Host "`nPress Enter to submit mutation request"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 4: THE IMPOSSIBLE PERTURBATION (Killer Moment)
+# PHASE 4: Mutation Request
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ STEP 4: MUTATE NODE ═══"
@@ -149,10 +153,10 @@ Write-Host "  ╚═════════════════════
 Write-Host ""
 Write-Info "Submitting mutation request..."
 
-# This should fail validation (belief out of delta range for available energy)
-$badMutate = Invoke-MCP -Method "tools/call" -ToolName "node.mutate" -Arguments @{node_id="0"; delta=0.49} -Id 4
+# Submit mutation request and observe result
+$mutateResp = Invoke-MCP -Method "tools/call" -ToolName "node.mutate" -Arguments @{node_id="0"; delta=0.49} -Id 4
 
-$mutateContent = ($badMutate.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
+$mutateContent = ($mutateResp.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Result "Mutation processed:"
 Write-Result "  New Belief: $($mutateContent.belief)"
 Write-Result "  Energy: $($mutateContent.energy)"
@@ -161,10 +165,10 @@ $gov1 = Invoke-MCP -Method "tools/call" -ToolName "governance.status" -Arguments
 $govContent1 = ($gov1.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
 Write-Status "Governance status captured"
 
-Read-Host "`nPress Enter to advance time (propagation)"
+Read-Host "`nPress Enter to run propagation steps"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 5: TEMPORAL DYNAMICS — Propagation
+# PHASE 5: Run Propagation Steps
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ STEP 5: RUN STEPS ═══"
@@ -174,7 +178,7 @@ Write-Host "`n  --- TICK 1 ---" -ForegroundColor White
 $prop1 = Invoke-MCP -Method "tools/call" -ToolName "edge.propagate" -Arguments @{edge_id="0"} -Id 6
 Write-Result ($prop1.result.content | Where-Object { $_.type -eq "text" }).text
 
-# Query both nodes to see belief shift
+# Query both nodes after propagation
 $q0 = Invoke-MCP -Method "tools/call" -ToolName "node.query" -Arguments @{node_id="0"} -Id 7
 $q1 = Invoke-MCP -Method "tools/call" -ToolName "node.query" -Arguments @{node_id="1"} -Id 8
 $qc0 = ($q0.result.content | Where-Object { $_.type -eq "text" }).text | ConvertFrom-Json
@@ -198,7 +202,7 @@ Write-Status "Step complete"
 Read-Host "`nPress Enter to examine the audit trail"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PHASE 6: AUDIT TRAIL — Lineage Replay
+# PHASE 6: Lineage Audit
 # ═══════════════════════════════════════════════════════════════════════════════
 
 Write-Narrative "═══ STEP 6: AUDIT SUMMARY ═══"
@@ -242,9 +246,9 @@ Write-Status "Completed"
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                         EXPERIMENT COMPLETE                                  ║
+║                            DEMO COMPLETE                                     ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  Experiment complete.                                                       ║
+║  Demo complete.                                                              ║
 ║                                                                              ║
 ║  This script demonstrates repeatable tool behavior and audit/status surfaces ║
 ║  via MCP.                                                                    ║
