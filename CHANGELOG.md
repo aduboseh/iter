@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2024-12-15
+
+### Changed
+- Post-A1 credibility lock; no functional delta
+- Added `BUYER_README.md` for corporate evaluation
+- Added 12-month surface freeze statement
+- Archived credibility artifacts in `governance/credibility_log.md`
+
 ## [1.0.0] - 2024-12-15
 
 ### Added
@@ -119,7 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic MCP protocol types
 - Stub substrate interface
 
-[Unreleased]: https://github.com/aduboseh/iter/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/aduboseh/iter/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/aduboseh/iter/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/aduboseh/iter/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/aduboseh/iter/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aduboseh/iter/compare/v0.1.0...v0.2.0
