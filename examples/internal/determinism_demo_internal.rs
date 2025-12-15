@@ -11,9 +11,9 @@
 //! cargo run --release --example determinism_demo
 //! ```
 
-use scg_mcp_server::mcp_handler::handle_rpc;
-use scg_mcp_server::substrate_runtime::{SubstrateRuntime, SubstrateRuntimeConfig};
-use scg_mcp_server::types::RpcRequest;
+use iter_mcp_server::mcp_handler::handle_rpc;
+use iter_mcp_server::substrate_runtime::{SubstrateRuntime, SubstrateRuntimeConfig};
+use iter_mcp_server::types::RpcRequest;
 use serde_json::json;
 
 fn main() {

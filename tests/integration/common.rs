@@ -1,10 +1,10 @@
-// SCG MCP Integration Test Suite - Common Utilities
+// Iter MCP Integration Test Suite - Common Utilities
 // Validates MCP boundary sanitization under real request/response flows
 
-use scg_mcp_server::mcp_handler::handle_rpc;
-use scg_mcp_server::services::sanitizer::{normalize_for_matching, FORBIDDEN_PATTERNS};
-use scg_mcp_server::types::{RpcRequest, RpcResponse};
-use scg_mcp_server::SubstrateRuntime;
+use iter_mcp_server::mcp_handler::handle_rpc;
+use iter_mcp_server::services::sanitizer::{normalize_for_matching, FORBIDDEN_PATTERNS};
+use iter_mcp_server::types::{RpcRequest, RpcResponse};
+use iter_mcp_server::SubstrateRuntime;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 

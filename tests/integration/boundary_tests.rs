@@ -1,4 +1,4 @@
-// SCG MCP Integration Test Suite - Boundary Tests
+// Iter MCP Integration Test Suite - Boundary Tests
 // Core sanitization validation for all MCP endpoints
 
 use super::common::*;

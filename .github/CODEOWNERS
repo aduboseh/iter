@@ -1,8 +1,8 @@
-# SCG MCP Server CODEOWNERS
+# Iter MCP Server CODEOWNERS
 # Defines approval requirements for sensitive files and directories.
 #
 # MCP Hardening v2.0 — Sealed 2025-12-03
-# Authority: SCG Governor / Founder
+# Authority: Only SG Solutions / Founder
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PROTECTED: Forbidden Pattern Registry

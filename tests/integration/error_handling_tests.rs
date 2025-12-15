@@ -1,4 +1,4 @@
-// SCG MCP Integration Test Suite - Error Handling Tests
+// Iter MCP Integration Test Suite - Error Handling Tests
 // Validates error response sanitization
 
 use super::common::*;
