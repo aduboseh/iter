@@ -1,0 +1,172 @@
+# Release Gate - All checks must pass before release
+#
+# This workflow runs on release branches and tags to enforce release discipline.
+# No release can ship without passing all gates.
+
+name: Release Gate
+
+on:
+  push:
+    branches:
+      - 'release/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - 'release/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Gate 1: Governance invariants
+  governance:
+    name: Governance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-governance-${{ hashFiles('Cargo.lock') }}
+      
+      - name: Run governance tests
+        run: cargo test --features public_stub --test governance_invariants
+
+  # Gate 2: SDK CI (both Rust and TypeScript)
+  sdk-rust:
+    name: Rust SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/rust
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build and test
+        run: |
+          cargo check
+          cargo test
+
+  sdk-typescript:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/typescript
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install and test
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+  # Gate 3: Version consistency
+  version-check:
+    name: Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check version consistency
+        run: |
+          # Extract versions
+          CRATE_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          RUST_SDK_VERSION=$(grep '^version' sdks/rust/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          TS_SDK_VERSION=$(node -p "require('./sdks/typescript/package.json').version")
+          
+          echo "Crate version: $CRATE_VERSION"
+          echo "Rust SDK version: $RUST_SDK_VERSION"
+          echo "TypeScript SDK version: $TS_SDK_VERSION"
+          
+          # For release tags, verify tag matches crate version
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+            TAG_VERSION="${TAG_VERSION%-rc.*}"  # Strip RC suffix
+            if [[ "$CRATE_VERSION" != "$TAG_VERSION" ]]; then
+              echo "ERROR: Tag version ($TAG_VERSION) does not match Cargo.toml ($CRATE_VERSION)"
+              exit 1
+            fi
+          fi
+
+  # Gate 4: Changelog exists
+  changelog-check:
+    name: Changelog Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify changelog
+        run: |
+          if [[ ! -f CHANGELOG.md ]]; then
+            echo "ERROR: CHANGELOG.md not found"
+            exit 1
+          fi
+          
+          # For release tags, verify version entry exists
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+            TAG_VERSION="${TAG_VERSION%-rc.*}"  # Strip RC suffix
+            if ! grep -q "## \[$TAG_VERSION\]" CHANGELOG.md; then
+              echo "ERROR: No changelog entry for version $TAG_VERSION"
+              exit 1
+            fi
+          fi
+
+  # Gate 5: No substrate leaks in public artifacts
+  boundary-check:
+    name: Boundary Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for substrate leaks
+        run: |
+          # Ensure SDKs don't reference substrate
+          if grep -r "scg\|SCG\|substrate" sdks/rust/src/ 2>/dev/null | grep -v "// "; then
+            echo "ERROR: SDK references substrate internals"
+            exit 1
+          fi
+          
+          if grep -r "scg\|SCG\|substrate" sdks/typescript/src/ 2>/dev/null | grep -v "// "; then
+            echo "ERROR: SDK references substrate internals"
+            exit 1
+          fi
+          
+          echo "Boundary check passed"
+
+  # Final gate: All checks must pass
+  release-gate:
+    name: Release Gate
+    needs: [governance, sdk-rust, sdk-typescript, version-check, changelog-check, boundary-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All gates passed
+        run: |
+          echo "✅ All release gates passed"
+          echo ""
+          echo "Release checklist:"
+          echo "  ✓ Governance tests"
+          echo "  ✓ Rust SDK"
+          echo "  ✓ TypeScript SDK"
+          echo "  ✓ Version consistency"
+          echo "  ✓ Changelog entry"
+          echo "  ✓ Boundary integrity"
