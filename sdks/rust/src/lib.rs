@@ -119,7 +119,9 @@ impl std::fmt::Display for SdkError {
                 write!(f, "Version mismatch: client={}, server={}", client, server)
             }
             SdkError::ConnectionFailed(msg) => write!(f, "Connection failed: {}", msg),
-            SdkError::RequestFailed(err) => write!(f, "Request failed: {} ({})", err.message, err.code),
+            SdkError::RequestFailed(err) => {
+                write!(f, "Request failed: {} ({})", err.message, err.code)
+            }
             SdkError::Io(err) => write!(f, "IO error: {}", err),
             SdkError::Json(err) => write!(f, "JSON error: {}", err),
         }
@@ -164,12 +166,14 @@ impl IterClient {
             .stderr(Stdio::null())
             .spawn()?;
 
-        let stdin = process.stdin.take().ok_or_else(|| {
-            SdkError::ConnectionFailed("Failed to open stdin".to_string())
-        })?;
-        let stdout = process.stdout.take().ok_or_else(|| {
-            SdkError::ConnectionFailed("Failed to open stdout".to_string())
-        })?;
+        let stdin = process
+            .stdin
+            .take()
+            .ok_or_else(|| SdkError::ConnectionFailed("Failed to open stdin".to_string()))?;
+        let stdout = process
+            .stdout
+            .take()
+            .ok_or_else(|| SdkError::ConnectionFailed("Failed to open stdout".to_string()))?;
 
         Ok(Self {
             process,
@@ -189,7 +193,7 @@ impl IterClient {
     /// Send a raw JSON-RPC request
     pub fn send(&mut self, method: &str, params: Option<serde_json::Value>) -> Result<RpcResponse> {
         self.request_id += 1;
-        
+
         let request = RpcRequest {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
@@ -205,7 +209,7 @@ impl IterClient {
         self.stdout.read_line(&mut response_line)?;
 
         let response: RpcResponse = serde_json::from_str(&response_line)?;
-        
+
         if let Some(err) = response.error {
             return Err(SdkError::RequestFailed(err));
         }
@@ -222,7 +226,7 @@ impl IterClient {
                 message: "No result".to_string(),
             })
         })?;
-        
+
         let tools: ToolListResponse = serde_json::from_value(result)?;
         Ok(tools.tools)
     }
@@ -233,32 +237,41 @@ impl IterClient {
             "belief": belief,
             "energy": energy
         });
-        
-        let response = self.send("tools/call", Some(serde_json::json!({
-            "name": "node.create",
-            "arguments": params
-        })))?;
-        
+
+        let response = self.send(
+            "tools/call",
+            Some(serde_json::json!({
+                "name": "node.create",
+                "arguments": params
+            })),
+        )?;
+
         parse_tool_result(response)
     }
 
     /// Query a node
     pub fn node_query(&mut self, node_id: u64) -> Result<NodeState> {
-        let response = self.send("tools/call", Some(serde_json::json!({
-            "name": "node.query",
-            "arguments": { "node_id": node_id }
-        })))?;
-        
+        let response = self.send(
+            "tools/call",
+            Some(serde_json::json!({
+                "name": "node.query",
+                "arguments": { "node_id": node_id }
+            })),
+        )?;
+
         parse_tool_result(response)
     }
 
     /// Get governor status
     pub fn governor_status(&mut self) -> Result<GovernorStatus> {
-        let response = self.send("tools/call", Some(serde_json::json!({
-            "name": "governor.status",
-            "arguments": {}
-        })))?;
-        
+        let response = self.send(
+            "tools/call",
+            Some(serde_json::json!({
+                "name": "governor.status",
+                "arguments": {}
+            })),
+        )?;
+
         parse_tool_result(response)
     }
 }
@@ -316,9 +329,10 @@ fn parse_tool_result<T: serde::de::DeserializeOwned>(response: RpcResponse) -> R
             message: "No result".to_string(),
         })
     })?;
-    
+
     // MCP tool responses have content array
-    let content = result.get("content")
+    let content = result
+        .get("content")
         .and_then(|c| c.as_array())
         .and_then(|arr| arr.first())
         .and_then(|item| item.get("text"))
@@ -329,7 +343,7 @@ fn parse_tool_result<T: serde::de::DeserializeOwned>(response: RpcResponse) -> R
                 message: "Invalid tool response format".to_string(),
             })
         })?;
-    
+
     let parsed: T = serde_json::from_str(content)?;
     Ok(parsed)
 }
@@ -343,22 +357,24 @@ pub fn is_version_compatible(server_version: &str) -> bool {
     // Parse versions
     let parse = |v: &str| -> Option<(u32, u32, u32)> {
         let parts: Vec<&str> = v.split('.').collect();
-        if parts.len() != 3 { return None; }
+        if parts.len() != 3 {
+            return None;
+        }
         Some((
             parts[0].parse().ok()?,
             parts[1].parse().ok()?,
             parts[2].parse().ok()?,
         ))
     };
-    
+
     let server = match parse(server_version) {
         Some(v) => v,
         None => return false,
     };
-    
+
     let min = parse(MIN_SERVER_VERSION).unwrap();
     let max = parse(MAX_SERVER_VERSION).unwrap();
-    
+
     // Check major.minor.patch bounds
     server >= min && server <= max
 }
