@@ -1,6 +1,6 @@
 [package]
 name = "iter_mcp_server"
-version = "0.3.0"
+version = "1.0.0"
 edition = "2021"
 description = "Governed Model Context Protocol server with deterministic execution"
 authors = ["Only SG Solutions"]
