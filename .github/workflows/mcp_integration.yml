@@ -144,15 +144,15 @@ jobs:
       - name: Verify stability baseline exists
         run: |
           echo "🔒 Verifying stability baseline integrity..."
-          if [ ! -f audits/stability_v0.2.0/repo_manifest.sha256 ]; then
+          if [ ! -f audits/stability_v1.0.0/repo_manifest.sha256 ]; then
             echo "::error::Stability baseline manifest missing"
             exit 1
           fi
-          if [ ! -f audits/stability_v0.2.0/timestamp.txt ]; then
+          if [ ! -f audits/stability_v1.0.0/timestamp.txt ]; then
             echo "::error::Stability baseline timestamp missing"
             exit 1
           fi
-          echo "✅ Stability baseline v0.2.0 verified"
+          echo "✅ Stability baseline v1.0.0 verified"
 
   governance-invariants:
     runs-on: ubuntu-latest

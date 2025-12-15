@@ -4,6 +4,9 @@ version = "1.0.0"
 edition = "2021"
 description = "Governed Model Context Protocol server with deterministic execution"
 authors = ["Only SG Solutions"]
+license = "MIT"
+repository = "https://github.com/aduboseh/iter"
+readme = "README.md"
 
 [features]
 default = ["public_stub"]

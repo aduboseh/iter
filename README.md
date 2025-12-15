@@ -53,20 +53,22 @@ The MCP surface is intentionally small. All tools are deterministic, side-effect
 ## Quick Start
 
 ```bash
-# Clone and build
+# Clone and build (public_stub mode - no proprietary dependencies)
 git clone https://github.com/aduboseh/iter.git
 cd iter
 cargo build --release
 
-# Run the determinism demo (recommended first experience)
-cargo run --release --example determinism_demo
+# Run governance tests
+cargo test --test governance_invariants
 
-# Or run the reference client
-cargo run --release --example mcp_client
+# Build the server binary
+cargo build --release --bin iter-server
 
-# Run the server (STDIO transport)
+# Query tools list (STDIO transport)
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | cargo run --release --bin iter-server
 ```
+
+> **Note:** Examples (`determinism_demo`, `mcp_client`) compile but require `full_substrate` for meaningful execution. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md) for build mode details.
 
 ### Desktop Client Integration
 
@@ -103,11 +105,15 @@ Validated against [drift-kernel v1.0.0](https://github.com/aduboseh/drift-kernel
 ## Testing
 
 ```bash
-cargo test                        # All tests
-cargo test --test mcp_integration # Integration suite
+# Governance invariant tests (public_stub mode)
+cargo test --test governance_invariants
+
+# SDK tests (isolated, no substrate deps)
+cd sdks/rust && cargo test
+cd sdks/typescript && npm test
 ```
 
-Details: `docs/TESTING.md`
+> **Note:** Integration tests (`mcp_integration`) require `full_substrate` mode. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md).
 
 ## Marketplace identity
 
