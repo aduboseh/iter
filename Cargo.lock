@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "iter_mcp_server"
-version = "0.3.0"
+version = "1.0.0"
 dependencies = [
  "approx",
  "chrono",
