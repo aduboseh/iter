@@ -10,6 +10,8 @@
 
 Iter Server is a hardened **Model Context Protocol (MCP)** gateway (JSON-RPC 2.0) that exposes a small, governed tool surface while enforcing a strict response sanitization boundary.
 
+> **Surface Freeze:** Protocol and SDK surface are stable for 12 months (through December 2025) barring security issues. See [RELEASE.md](RELEASE.md) for compatibility policy.
+
 It is designed for:
 - deterministic replay
 - decision audit
