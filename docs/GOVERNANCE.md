@@ -1,41 +1,43 @@
 # Iter Governance
 
-> Visitor-facing change control and integrity posture for the Iter Server boundary.
+Governance for the Iter public protocol surface.
 
----
+## Governance Tests
 
-## What governance guarantees (high level)
+71 invariant tests enforce:
 
-- public-facing surfaces are reviewed and controlled
-- security-critical paths require explicit owner approval
-- automated checks run on every change to enforce baseline integrity
+- **Schema stability**: Protocol type shapes cannot change without version bump
+- **Error taxonomy**: Error codes are exhaustive and stable
+- **Versioning**: Protocol version rules are enforced
+- **Telemetry**: Audit event structure and redaction guarantees
+- **Release discipline**: Version consistency, changelog, boundary integrity
 
----
+Run locally:
+```bash
+cargo test --test governance_invariants
+```
 
-## Change control
+## Change Control
 
-This repository uses:
+- Branch protection on `main`
+- Required status checks (CI must pass)
+- CODEOWNERS review for security-critical paths
+- Signed commits and tags
 
-- branch protection on `main`
-- required status checks
-- CODEOWNERS-required review for security-critical paths
+## Release Policy
 
----
+See [RELEASE.md](../RELEASE.md) for:
+- Release channels (stable, rc)
+- Support window (N, N-1 for 6 months)
+- EOL policy
+- Hotfix procedures
 
-## Integrity checks
+## Certification Scope
 
-Automated checks verify that:
+See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md) for what public CI certifies vs. private CI.
 
-- protected artifacts remain consistent and unmodified
-- boundary tests continue to pass
-- governance artifacts remain in an expected state
+## Contact
 
-Exact checksum values and non-public verification details are intentionally not documented publicly.
-
----
-
-## Reporting
-
-- governance: governance@onlysgsolutions.com
-- security: security@onlysgsolutions.com
+- Governance: governance@onlysgsolutions.com
+- Security: security@onlysgsolutions.com
 

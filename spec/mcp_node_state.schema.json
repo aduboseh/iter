@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iter.nodetic.ai/mcp/v0.3/mcp_node_state.schema.json",
+  "$id": "https://github.com/aduboseh/iter/blob/v1.0.0/spec/mcp_node_state.schema.json",
   "title": "McpNodeState",
   "description": "Node state for MCP responses.",
   "type": "object",

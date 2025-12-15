@@ -1,0 +1,101 @@
+# SDK Publish Check - Dry-run validation for SDK packaging
+#
+# Validates that SDKs can be published without actually releasing.
+# This proves packaging is viable and catches metadata issues early.
+
+name: SDK Publish Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sdks/**'
+      - 'Cargo.toml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sdks/**'
+  workflow_dispatch:
+
+jobs:
+  rust-sdk-publish-check:
+    name: Rust SDK Publish Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/rust
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Verify Cargo.toml metadata
+        run: |
+          echo "Checking Cargo.toml metadata..."
+          
+          # Required fields for crates.io
+          grep -q '^name = ' Cargo.toml || { echo "Missing: name"; exit 1; }
+          grep -q '^version = ' Cargo.toml || { echo "Missing: version"; exit 1; }
+          grep -q '^license = ' Cargo.toml || { echo "Missing: license"; exit 1; }
+          grep -q '^description = ' Cargo.toml || { echo "Missing: description"; exit 1; }
+          
+          echo "✅ Cargo.toml metadata complete"
+      
+      - name: Dry-run publish
+        run: |
+          echo "Running cargo publish --dry-run..."
+          cargo publish --dry-run --allow-dirty
+          echo "✅ Rust SDK publish dry-run succeeded"
+
+  typescript-sdk-publish-check:
+    name: TypeScript SDK Publish Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/typescript
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Verify package.json metadata
+        run: |
+          echo "Checking package.json metadata..."
+          
+          # Required fields for npm
+          node -e "const p = require('./package.json'); if (!p.name) process.exit(1);" || { echo "Missing: name"; exit 1; }
+          node -e "const p = require('./package.json'); if (!p.version) process.exit(1);" || { echo "Missing: version"; exit 1; }
+          node -e "const p = require('./package.json'); if (!p.license) process.exit(1);" || { echo "Missing: license"; exit 1; }
+          node -e "const p = require('./package.json'); if (!p.description) process.exit(1);" || { echo "Missing: description"; exit 1; }
+          
+          echo "✅ package.json metadata complete"
+      
+      - name: Dry-run pack
+        run: |
+          echo "Running npm pack --dry-run..."
+          npm pack --dry-run
+          echo "✅ TypeScript SDK pack dry-run succeeded"
+
+  publish-check-gate:
+    name: Publish Check Gate
+    needs: [rust-sdk-publish-check, typescript-sdk-publish-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All publish checks passed
+        run: |
+          echo "✅ All SDK publish checks passed"
+          echo ""
+          echo "SDKs are ready for publication when desired:"
+          echo "  - iter-sdk (Rust): cargo publish"
+          echo "  - @iter/sdk (TypeScript): npm publish"

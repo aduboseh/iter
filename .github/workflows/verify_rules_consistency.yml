@@ -34,9 +34,9 @@ jobs:
 
       - name: Verify stability baseline exists
         run: |
-          if [ ! -f audits/stability_v0.2.0/repo_manifest.sha256 ]; then
+          if [ ! -f audits/stability_v1.0.0/repo_manifest.sha256 ]; then
             echo "::error::Stability baseline manifest missing"
             exit 1
           fi
-          echo "✅ Stability baseline present"
+          echo "✅ Stability baseline v1.0.0 present"
 
