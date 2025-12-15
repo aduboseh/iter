@@ -9,6 +9,10 @@ Public API and operational documentation only.
 - [Testing Strategy](TESTING.md) - Test methodology and validation
 - [Governance](GOVERNANCE.md) - Change control and integrity
 
+## Build Modes
+
+Public CI validates protocol contracts via stub runtime; substrate execution is private.
+
 ## Internal Documentation
 
 Architecture, design rationale, and implementation details are maintained privately.
