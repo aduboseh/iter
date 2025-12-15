@@ -1,0 +1,20 @@
+[package]
+name = "iter-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Thin client SDK for the Iter MCP protocol"
+license = "MIT"
+repository = "https://github.com/aduboseh/iter"
+readme = "README.md"
+keywords = ["mcp", "iter", "sdk", "client"]
+categories = ["api-bindings", "network-programming"]
+
+# IMPORTANT: This SDK must NOT depend on the substrate (SCG) or iter internals.
+# It compiles against public_stub only.
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+# No dev dependencies on iter itself - SDK tests are isolated
