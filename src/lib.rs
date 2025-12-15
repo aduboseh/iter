@@ -75,6 +75,15 @@ pub use types::{
 };
 
 // ============================================================================
+// Protocol Version (always available)
+// ============================================================================
+
+pub use types::{
+    PROTOCOL_VERSION, PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH,
+    MIN_SUPPORTED_MAJOR, ProtocolVersion, CompatibilityStatus, Deprecation,
+};
+
+// ============================================================================
 // Boundary Traits (Public API for substrate interaction - full substrate only)
 // ============================================================================
 
