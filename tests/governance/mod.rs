@@ -7,6 +7,7 @@
 //!
 //! - `schema_stability`: Protocol type shape invariants
 //! - `error_taxonomy`: Error code completeness and stability
+//! - `versioning`: Protocol version and compatibility rules
 //!
 //! # Governance Contract
 //!
@@ -15,3 +16,4 @@
 
 pub mod schema_stability;
 pub mod error_taxonomy;
+pub mod versioning;
