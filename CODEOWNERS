@@ -3,66 +3,57 @@
 # See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # =============================================================================
-# ENGINE BRIDGE (Owner Approval Required)
-# High-sensitivity boundary files.
+# CORE SOURCE (Owner Approval Required)
 # =============================================================================
 
-/src/scg_core.rs                         @aduboseh
-
-# =============================================================================
-# GOVERNANCE (Owner Approval Required)
-# =============================================================================
-
-/src/governance.rs                       @aduboseh
-/governance/**                           @aduboseh
-/lineage/**                              @aduboseh
-
-# =============================================================================
-# FAULT TOLERANCE
-# =============================================================================
-
-/src/fault/**                            @aduboseh
-
-# =============================================================================
-# LINEAGE TRACKING
-# =============================================================================
-
-/src/lineage/**                          @aduboseh
-
-# =============================================================================
-# MCP HANDLER AND TYPES
-# =============================================================================
-
-/src/mcp_handler.rs                      @aduboseh
-/src/types.rs                            @aduboseh
-/src/main.rs                             @aduboseh
 /src/lib.rs                              @aduboseh
+/src/main.rs                             @aduboseh
+/src/mcp_handler.rs                      @aduboseh
+/src/governance.rs                       @aduboseh
+/src/substrate_runtime.rs                @aduboseh
+/src/validation.rs                       @aduboseh
+/src/types/**                            @aduboseh
+/src/substrate/**                        @aduboseh
+/src/services/**                         @aduboseh
 
 # =============================================================================
-# TELEMETRY
+# GOVERNANCE & TESTS
 # =============================================================================
 
-/src/telemetry/**                        @aduboseh
+/governance/**                           @aduboseh
+/tests/**                                @aduboseh
 
 # =============================================================================
-# INFRASTRUCTURE AND DEPLOYMENT
+# PROTOCOL SPECIFICATIONS
 # =============================================================================
 
-/deploy/**                               @aduboseh
+/spec/**                                 @aduboseh
+
+# =============================================================================
+# SDKs
+# =============================================================================
+
+/sdks/**                                 @aduboseh
+
+# =============================================================================
+# INFRASTRUCTURE AND CI
+# =============================================================================
+
 /.github/**                              @aduboseh
 
 # =============================================================================
-# GOVERNANCE AND CONFIGURATION FILES
+# RELEASE & AUDIT ARTIFACTS
 # =============================================================================
 
-.mcp-context                             @aduboseh
 /Cargo.toml                              @aduboseh
+/RELEASE.md                              @aduboseh
+/CHANGELOG.md                            @aduboseh
+/ARCHITECTURE_BOUNDARY.md                @aduboseh
+/audits/**                               @aduboseh
 
 # =============================================================================
-# DOCUMENTATION AND SCRIPTS
+# DOCUMENTATION
 # =============================================================================
 
 /docs/**                                 @aduboseh
-/scripts/**                              @aduboseh
-/audits/**                               @aduboseh
 
