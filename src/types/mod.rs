@@ -7,6 +7,7 @@
 //! - `protocol`: JSON-RPC 2.0 wire types (always available)
 //! - `mcp`: Sanitized MCP response types (always available)
 //! - `version`: Protocol versioning and compatibility (always available)
+//! - `audit`: Telemetry and audit event types (always available)
 //! - `substrate`: Substrate adapters (full_substrate only)
 //!
 //! # Security
@@ -15,6 +16,7 @@
 //! Internal fields (topology, raw ESV, energy matrices) are never exposed.
 
 // Always-available modules
+pub mod audit;
 pub mod mcp;
 pub mod protocol;
 pub mod version;
@@ -40,4 +42,10 @@ pub use mcp::{
 pub use version::{
     PROTOCOL_VERSION, PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH,
     MIN_SUPPORTED_MAJOR, ProtocolVersion, CompatibilityStatus, Deprecation,
+};
+
+// Re-export audit types
+pub use audit::{
+    TraceContext, AuditPhase, AuditOutcome, AuditEvent,
+    AUDIT_ALLOWLIST, AUDIT_DENYLIST, is_field_allowed, is_field_denied,
 };

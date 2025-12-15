@@ -84,6 +84,15 @@ pub use types::{
 };
 
 // ============================================================================
+// Audit & Telemetry (always available)
+// ============================================================================
+
+pub use types::{
+    TraceContext, AuditPhase, AuditOutcome, AuditEvent,
+    AUDIT_ALLOWLIST, AUDIT_DENYLIST, is_field_allowed, is_field_denied,
+};
+
+// ============================================================================
 // Boundary Traits (Public API for substrate interaction - full substrate only)
 // ============================================================================
 
