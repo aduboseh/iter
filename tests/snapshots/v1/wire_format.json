@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "description": "Golden wire format snapshots for protocol v1.0.0",
+  "generated": "2025-12-15",
+  "snapshots": {
+    "rpc_request_minimal": {
+      "jsonrpc": "2.0",
+      "method": "tools/list"
+    },
+    "rpc_request_with_params": {
+      "jsonrpc": "2.0",
+      "method": "node.create",
+      "params": {
+        "belief": 0.5,
+        "energy": 1.0
+      },
+      "id": 1
+    },
+    "rpc_response_success": {
+      "jsonrpc": "2.0",
+      "result": {
+        "id": 1,
+        "belief": 0.5,
+        "energy": 1.0,
+        "esv_valid": true,
+        "stability": 0.9
+      },
+      "id": 1
+    },
+    "rpc_response_error": {
+      "jsonrpc": "2.0",
+      "error": {
+        "code": 4004,
+        "message": "Node not found: N42"
+      },
+      "id": 2
+    },
+    "mcp_node_state": {
+      "id": 1,
+      "belief": 0.5,
+      "energy": 1.0,
+      "esv_valid": true,
+      "stability": 0.9
+    },
+    "mcp_edge_state": {
+      "id": 1,
+      "src": 2,
+      "dst": 3,
+      "weight": 0.7
+    },
+    "mcp_governor_status": {
+      "drift_ok": true,
+      "energy_drift": 0.0,
+      "coherence": 1.0,
+      "node_count": 5,
+      "edge_count": 4,
+      "healthy": true
+    },
+    "mcp_lineage_entry": {
+      "sequence": 1,
+      "operation": "tick",
+      "checksum": "abc123def456",
+      "tick": 100
+    },
+    "tool_info": {
+      "name": "node.create",
+      "description": "Create a node with initial values",
+      "version": "1.0.0",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "belief": { "type": "number" },
+          "energy": { "type": "number" }
+        },
+        "required": ["belief", "energy"]
+      }
+    },
+    "protocol_version": {
+      "version": "1.0.0",
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  }
+}
