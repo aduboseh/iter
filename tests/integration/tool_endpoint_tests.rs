@@ -1,4 +1,4 @@
-// SCG MCP Integration Test Suite - Tool Endpoint Tests
+// Iter MCP Integration Test Suite - Tool Endpoint Tests
 // Functional and sanitization tests for MCP tools
 
 use super::common::*;
