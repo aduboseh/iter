@@ -34,6 +34,7 @@
 // ============================================================================
 
 pub mod caller_context;
+pub mod types;
 
 // ============================================================================
 // Full Substrate Modules (require proprietary substrate)
@@ -52,8 +53,6 @@ pub mod substrate_runtime;
 #[cfg(feature = "full_substrate")]
 pub mod traits;
 #[cfg(feature = "full_substrate")]
-pub mod types;
-#[cfg(feature = "full_substrate")]
 pub mod validation;
 
 // ============================================================================
@@ -64,10 +63,9 @@ pub mod validation;
 pub mod substrate;
 
 // ============================================================================
-// MCP Type Re-exports (Sanitized for external use - full substrate only)
+// MCP Type Re-exports (always available - no substrate dependencies)
 // ============================================================================
 
-#[cfg(feature = "full_substrate")]
 pub use types::{
     McpNodeState, McpEdgeState, McpGovernorStatus, McpLineageEntry,
     McpError, RpcRequest, RpcResponse, RpcError,
