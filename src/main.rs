@@ -18,6 +18,17 @@ use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 
 fn main() {
+    // Local identity closure: print the actual executable path and CWD at runtime.
+    // (Shows up in Warp's MCP logs as stderr.)
+    match std::env::current_exe() {
+        Ok(p) => eprintln!("ITER LOCAL PROOF — PATH = {}", p.display()),
+        Err(e) => eprintln!("ITER LOCAL PROOF — PATH = <error: {}>", e),
+    }
+    match std::env::current_dir() {
+        Ok(p) => eprintln!("ITER CWD = {}", p.display()),
+        Err(e) => eprintln!("ITER CWD = <error: {}>", e),
+    }
+
     print_mode_banner();
     run_stdio_server();
 }
@@ -98,13 +109,15 @@ fn run_stdio_server() {
 #[cfg(feature = "public_stub")]
 fn run_stdio_server() {
     use crate::substrate::stub::StubRuntime;
+    use std::io::BufWriter;
 
     let mut runtime = StubRuntime::new();
     let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
     let mut reader = BufReader::new(stdin.lock());
-    let mut stdout = std::io::stdout();
+    let mut writer = BufWriter::new(stdout.lock());
 
-    eprintln!("Iter server running in STDIO mode (stub)");
+    eprintln!("Iter server running in STDIO mode (stub) — BUILD 2024-12-16-v6-haltra");
 
     loop {
         let mut line = String::new();
@@ -121,31 +134,40 @@ fn run_stdio_server() {
                     Ok(req) => {
                         let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
                         let id = req.get("id").cloned();
+                        
+                        // Notifications (no id) get no response per JSON-RPC 2.0 spec
+                        if id.is_none() || id.as_ref().map(|v| v.is_null()).unwrap_or(false) {
+                            // Still call handler for side effects, but don't respond
+                            let _ = handle_stub_request(&mut runtime, method, &req);
+                            continue;
+                        }
+                        
+                        // Build response as owned bytes - no shared Value, no reuse
                         let resp = handle_stub_request(&mut runtime, method, &req);
-                        let response = json!({
+                        let response_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": id,
                             "result": resp
-                        });
-                        if let Ok(json) = serde_json::to_string(&response) {
-                            writeln!(stdout, "{}", json).expect("stdout write failed");
-                            stdout.flush().expect("stdout flush failed");
-                        }
+                        })).unwrap_or_default();
+                        
+                        // Single atomic write + newline + flush (Haltra pattern)
+                        let _ = writer.write_all(&response_bytes);
+                        let _ = writer.write_all(b"\n");
+                        let _ = writer.flush();
                     }
                     Err(e) => {
                         eprintln!("Failed to parse JSON-RPC request: {}", e);
-                        let error_resp = json!({
+                        let error_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
-                            "id": null,
+                            "id": serde_json::Value::Null,
                             "error": {
                                 "code": -32700,
                                 "message": "Parse error"
                             }
-                        });
-                        if let Ok(json) = serde_json::to_string(&error_resp) {
-                            writeln!(stdout, "{}", json).expect("stdout write failed");
-                            stdout.flush().expect("stdout flush failed");
-                        }
+                        })).unwrap_or_default();
+                        let _ = writer.write_all(&error_bytes);
+                        let _ = writer.write_all(b"\n");
+                        let _ = writer.flush();
                     }
                 }
             }
@@ -164,27 +186,121 @@ fn handle_stub_request(
     req: &serde_json::Value,
 ) -> serde_json::Value {
     match method {
-        "initialize" => json!({
-            "protocolVersion": "2024-11-05",
-            "serverInfo": {
-                "name": "iter-server",
-                "version": "0.3.0"
-            },
-            "capabilities": {
-                "tools": {}
-            }
+        "initialize" => {
+            // Warp currently advertises protocolVersion "2025-03-26".
+            // Echo the client's requested protocol version for maximum compatibility.
+            let client_protocol = req
+                .get("params")
+                .and_then(|p| p.get("protocolVersion"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("2024-11-05");
+
+            json!({
+                "protocolVersion": client_protocol,
+                "serverInfo": {
+                    "name": "iter-server",
+                    "version": "0.3.0"
+                },
+                "capabilities": {
+                    "tools": {},
+                    "resources": {},
+                    "prompts": {}
+                }
+            })
+        }
+        "resources/list" => json!({
+            "resources": []
         }),
-        "tools/list" => json!({
+        "prompts/list" => json!({
+            "prompts": []
+        }),
+        "notifications/initialized" => json!({}),
+        "tools/list" | "tools.list" => json!({
             "tools": [
-                {"name": "node.create", "description": "Create a node"},
-                {"name": "node.query", "description": "Query a node"},
-                {"name": "node.mutate", "description": "Mutate node belief"},
-                {"name": "edge.bind", "description": "Bind an edge"},
-                {"name": "edge.propagate", "description": "Run propagation step"},
-                {"name": "governor.status", "description": "Query governor status"},
-                {"name": "governance.status", "description": "Query governance health"},
-                {"name": "esv.audit", "description": "Audit node ESV"},
-                {"name": "lineage.replay", "description": "Replay lineage"}
+                {
+                    "name": "node.create",
+                    "description": "Create a node",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "belief": { "type": "number", "description": "Initial belief value" },
+                            "energy": { "type": "number", "description": "Initial energy value" }
+                        },
+                        "required": ["belief", "energy"]
+                    }
+                },
+                {
+                    "name": "node.query",
+                    "description": "Query a node",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                        },
+                        "required": ["node_id"]
+                    }
+                },
+                {
+                    "name": "node.mutate",
+                    "description": "Mutate node belief",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" },
+                            "delta": { "type": "number", "description": "Belief delta" }
+                        },
+                        "required": ["node_id", "delta"]
+                    }
+                },
+                {
+                    "name": "edge.bind",
+                    "description": "Bind an edge",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "src": { "type": "string", "description": "Source node ID (numeric string)" },
+                            "dst": { "type": "string", "description": "Destination node ID (numeric string)" },
+                            "weight": { "type": "number", "description": "Edge weight" }
+                        },
+                        "required": ["src", "dst", "weight"]
+                    }
+                },
+                {
+                    "name": "edge.propagate",
+                    "description": "Run propagation step",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "edge_id": { "type": "string", "description": "Edge ID (accepted for compatibility, not used)" }
+                        }
+                    }
+                },
+                {
+                    "name": "governor.status",
+                    "description": "Query governor status",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governance.status",
+                    "description": "Query governance health",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "esv.audit",
+                    "description": "Audit node ESV",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                        },
+                        "required": ["node_id"]
+                    }
+                },
+                {
+                    "name": "lineage.replay",
+                    "description": "Replay lineage",
+                    "inputSchema": { "type": "object", "properties": {} }
+                }
             ]
         }),
         "tools/call" => {
