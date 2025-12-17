@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+# PROVENANCE-SWEEP-01 guard
+# Blocks agent attribution / ambiguity in commit messages.
+# Override only when explicitly intended:
+#   ITER_ALLOW_ATTRIBUTION=1 git commit ...
+
+if [ "${ITER_ALLOW_ATTRIBUTION:-}" = "1" ]; then
+  exit 0
+fi
+
+msg_file="$1"
+
+# Case-insensitive checks; keep patterns aligned with PROVENANCE-SWEEP-01.
+if grep -Eiq 'co-authored-by:|warp|agent@|ai@|assistant' "$msg_file"; then
+  echo "Blocked: commit message contains disallowed provenance/agent attribution text." >&2
+  echo "Remove it, or set ITER_ALLOW_ATTRIBUTION=1 to override intentionally." >&2
+  exit 1
+fi
+
+exit 0
