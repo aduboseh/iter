@@ -19,7 +19,7 @@ use std::io::{BufRead, BufReader, Write};
 
 fn main() {
     // Local identity closure: print the actual executable path and CWD at runtime.
-    // (Shows up in Warp's MCP logs as stderr.)
+    // (Shows up in some MCP client logs as stderr.)
     match std::env::current_exe() {
         Ok(p) => eprintln!("ITER LOCAL PROOF — PATH = {}", p.display()),
         Err(e) => eprintln!("ITER LOCAL PROOF — PATH = <error: {}>", e),
@@ -187,7 +187,7 @@ fn handle_stub_request(
 ) -> serde_json::Value {
     match method {
         "initialize" => {
-            // Warp currently advertises protocolVersion "2025-03-26".
+            // Some clients currently advertise protocolVersion "2025-03-26".
             // Echo the client's requested protocol version for maximum compatibility.
             let client_protocol = req
                 .get("params")

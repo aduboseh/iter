@@ -1,11 +1,11 @@
 # MCP Relay Script
-# Warp spawns this, which relays stdio to an already-running iter-server via named pipe
-# 
-# Usage:
-# 1. In a separate terminal: .\target\release\iter-server.exe
-# 2. Configure Warp to use this script as the MCP command
+# MCP relay helper: relays stdio to an already-running iter-server via named pipe
 #
-# This bypasses Warp's flaky Windows stdio process management.
+# Usage:
+# 1. Start iter-server in a separate terminal
+# 2. Configure your MCP client to use this script as the MCP command
+#
+# This bypasses flaky Windows stdio process management in some clients.
 
 $pipeName = "iter-mcp-pipe"
 $pipe = $null

@@ -5,11 +5,11 @@
 //! # Architecture
 //!
 //! ```text
-//! AI Assistant -> MCP Protocol -> server -> sealed engine
-//!                          |
-//!                    Response Sanitizer
-//!                          |
-//!                    Safe JSON Output
+//! Client -> MCP Protocol -> server -> sealed engine
+//!                     |
+//!               Response Sanitizer
+//!                     |
+//!               Safe JSON Output
 //! ```
 //!
 //! # Security
