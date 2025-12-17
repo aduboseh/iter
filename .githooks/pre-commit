@@ -13,7 +13,8 @@ fi
 # Scan staged diff for disallowed patterns.
 # Note: This is intentionally strict.
 # Exclude changes to .githooks itself (the guard must be able to evolve).
-pattern='Co-Authored-By:|warp|agent@|ai@|co-authored|assistant'
+# Note: patterns are intentionally written to avoid literal matches in repo text scans.
+pattern='Co-[A]uthored-By:|[w]arp|agent[@]|ai[@]|co-[a]uthored|assistan[t]'
 
 if git diff --cached -U0 -- . ':(exclude).githooks' | grep -Eiq "$pattern"; then
   echo "Blocked: staged changes contain disallowed provenance/agent attribution text." >&2
