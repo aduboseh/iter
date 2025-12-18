@@ -14,6 +14,10 @@ Public surfaces must not reference internal substrate or governance names. All u
 4. Run the test suite: `cargo test`
 5. Submit a pull request
 
+## Authorship Policy
+
+All contributions must be attributed solely to human maintainers. Tooling may assist execution, but authorship is retained by the contributor submitting the pull request. Do not include `Co-Authored-By` trailers or any AI/agent attribution in commit messages.
+
 ## Code Style
 
 - Follow existing patterns in the codebase

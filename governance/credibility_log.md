@@ -57,6 +57,8 @@ ITER-A1 addressed all gaps identified in the pre-freeze assessment:
 
 Protocol and SDK surface stable for 12 months (through December 2025) barring security issues.
 
+**Note**: v1.0.1 re-tagged at HEAD to correct pre-merge sequencing; no functional delta.
+
 ---
 
 ## Audit Trail

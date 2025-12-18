@@ -37,6 +37,38 @@ pub struct StubEdge {
     pub weight: f64,
 }
 
+/// Derived state for reference propagation artifact.
+/// 
+/// This is a deterministic summary of substrate state computed during propagation.
+/// It demonstrates conservation and replay integrity without exposing kernel logic.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DerivedState {
+    /// Total number of nodes
+    pub node_count: usize,
+    /// Total number of edges
+    pub edge_count: usize,
+    /// Sum of all node energy values
+    pub total_energy: f64,
+    /// Arithmetic mean of all node belief values
+    pub mean_belief: f64,
+}
+
+/// Reference propagation artifact returned by edge.propagate in stub mode.
+/// 
+/// This artifact enables deterministic replay verification without exposing
+/// any proprietary kernel logic or weighted dynamics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PropagationArtifact {
+    /// Stable decision identifier (derived from lineage sequence)
+    pub decision_id: String,
+    /// Deterministic derived state summary
+    pub derived_state: DerivedState,
+    /// SHA-256 checksum of serialized derived_state
+    pub propagation_checksum: String,
+    /// Mode label - always "reference-stub" for this artifact
+    pub mode: String,
+}
+
 /// Stub runtime for public demonstration
 pub struct StubRuntime {
     nodes: HashMap<u64, StubNode>,
@@ -44,11 +76,14 @@ pub struct StubRuntime {
     lineage: Vec<LineageEntry>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineageEntry {
     pub sequence: u64,
     pub operation: String,
     pub checksum: String,
+    /// Optional propagation artifact attached for edge.propagate operations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub propagation_artifact: Option<PropagationArtifact>,
 }
 
 impl Default for StubRuntime {
@@ -119,10 +154,79 @@ impl StubRuntime {
         Some(edge)
     }
 
-    /// Run a propagation step (stub: no-op with deterministic response)
-    pub fn propagate(&mut self) -> String {
-        self.record_lineage("edge.propagate", "step");
-        "Propagation step executed (stub mode)".to_string()
+    /// Run a propagation step (stub: deterministic reference artifact)
+    /// 
+    /// Returns a PropagationArtifact containing:
+    /// - Deterministic derived state (node_count, edge_count, total_energy, mean_belief)
+    /// - SHA-256 checksum for replay verification
+    /// - Mode label "reference-stub"
+    pub fn propagate(&mut self) -> PropagationArtifact {
+        let derived_state = self.compute_derived_state();
+        let propagation_checksum = Self::compute_checksum(&derived_state);
+        let sequence = self.lineage.len() as u64;
+        let decision_id = format!("prop-{}", sequence);
+        
+        let artifact = PropagationArtifact {
+            decision_id: decision_id.clone(),
+            derived_state,
+            propagation_checksum,
+            mode: "reference-stub".to_string(),
+        };
+        
+        // Record lineage with attached artifact
+        self.record_lineage_with_artifact("edge.propagate", "step", Some(artifact.clone()));
+        
+        artifact
+    }
+    
+    /// Compute deterministic derived state from current substrate.
+    /// 
+    /// Rules (per RPSU-01):
+    /// - node_count = total nodes
+    /// - edge_count = total edges
+    /// - total_energy = sum of node.energy
+    /// - mean_belief = arithmetic mean of node.belief
+    /// - Fixed ordering, no randomness, no weights
+    fn compute_derived_state(&self) -> DerivedState {
+        let node_count = self.nodes.len();
+        let edge_count = self.edges.len();
+        
+        // Sum energy and belief from nodes in deterministic order (sorted by ID)
+        let mut node_ids: Vec<u64> = self.nodes.keys().copied().collect();
+        node_ids.sort();
+        
+        let (total_energy, total_belief) = node_ids.iter().fold((0.0, 0.0), |(e, b), id| {
+            let node = &self.nodes[id];
+            (e + node.energy, b + node.belief)
+        });
+        
+        let mean_belief = if node_count > 0 {
+            total_belief / node_count as f64
+        } else {
+            0.0
+        };
+        
+        DerivedState {
+            node_count,
+            edge_count,
+            total_energy,
+            mean_belief,
+        }
+    }
+    
+    /// Compute deterministic SHA-256 checksum of derived state.
+    /// 
+    /// Rules (per RPSU-01):
+    /// - Stable field order (guaranteed by struct definition)
+    /// - Stable numeric formatting (serde_json default)
+    /// - No timestamps
+    /// - No environment dependencies
+    fn compute_checksum(derived_state: &DerivedState) -> String {
+        let bytes = serde_json::to_vec(derived_state)
+            .expect("DerivedState serialization is infallible");
+        let mut hasher = Sha256::new();
+        hasher.update(&bytes);
+        format!("{:x}", hasher.finalize())
     }
 
     /// Get governor status (stub: always healthy)
@@ -147,19 +251,106 @@ impl StubRuntime {
     }
 
     /// Get lineage entries
-    pub fn lineage_replay(&self) -> &[LineageEntry] {
+    pub fn lineage_entries(&self) -> &[LineageEntry] {
         &self.lineage
+    }
+    
+    /// Replay lineage with verification.
+    /// 
+    /// For edge.propagate entries with attached artifacts:
+    /// - Recomputes derived_state from current substrate state
+    /// - Recomputes checksum
+    /// - Returns match/blocked status
+    /// 
+    /// Per RPSU-01: Silent divergence is forbidden.
+    pub fn lineage_replay(&self) -> Vec<ReplayResult> {
+        self.lineage.iter().map(|entry| {
+            if entry.operation == "edge.propagate" {
+                if let Some(ref artifact) = entry.propagation_artifact {
+                    // Recompute and verify
+                    let current_derived = self.compute_derived_state();
+                    let current_checksum = Self::compute_checksum(&current_derived);
+                    
+                    if current_checksum == artifact.propagation_checksum {
+                        ReplayResult {
+                            decision_id: artifact.decision_id.clone(),
+                            replay_status: ReplayStatus::Match,
+                            propagation_checksum: Some(current_checksum),
+                            reason: None,
+                        }
+                    } else {
+                        ReplayResult {
+                            decision_id: artifact.decision_id.clone(),
+                            replay_status: ReplayStatus::Blocked,
+                            propagation_checksum: Some(current_checksum),
+                            reason: Some("derived_state_mismatch".to_string()),
+                        }
+                    }
+                } else {
+                    // Legacy entry without artifact - treat as match for backwards compat
+                    ReplayResult {
+                        decision_id: format!("legacy-{}", entry.sequence),
+                        replay_status: ReplayStatus::Match,
+                        propagation_checksum: None,
+                        reason: None,
+                    }
+                }
+            } else {
+                // Non-propagate entries always match
+                ReplayResult {
+                    decision_id: format!("op-{}", entry.sequence),
+                    replay_status: ReplayStatus::Match,
+                    propagation_checksum: None,
+                    reason: None,
+                }
+            }
+        }).collect()
     }
 
     fn record_lineage(&mut self, operation: &str, data: &str) {
+        self.record_lineage_with_artifact(operation, data, None);
+    }
+    
+    fn record_lineage_with_artifact(
+        &mut self,
+        operation: &str,
+        data: &str,
+        propagation_artifact: Option<PropagationArtifact>,
+    ) {
         let sequence = self.lineage.len() as u64;
         let checksum = compute_stable_hash(&format!("{}:{}:{}", sequence, operation, data));
         self.lineage.push(LineageEntry {
             sequence,
             operation: operation.to_string(),
             checksum,
+            propagation_artifact,
         });
     }
+}
+
+/// Result of replaying a single lineage entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplayResult {
+    /// Decision identifier from the original artifact
+    pub decision_id: String,
+    /// Replay verification status
+    pub replay_status: ReplayStatus,
+    /// Recomputed checksum (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub propagation_checksum: Option<String>,
+    /// Reason for blocked status (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// Status of replay verification.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReplayStatus {
+    /// Checksum matches - state unchanged since recording
+    Match,
+    /// Checksum mismatch - structural mutation detected
+    Blocked,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -225,5 +416,207 @@ mod tests {
         assert!(obj.contains_key("drift_ok"));
         assert!(obj.contains_key("healthy"));
         assert!(!obj.contains_key("_mode")); // No mode field
+    }
+
+    // ========================================================================
+    // RPSU-01 Tests: Reference Propagation Artifact
+    // ========================================================================
+
+    #[test]
+    fn propagation_artifact_has_reference_stub_mode() {
+        let mut rt = StubRuntime::new();
+        rt.create_node(0.5, 100.0);
+        rt.create_node(0.3, 50.0);
+        
+        let artifact = rt.propagate();
+        
+        // Per RPSU-01: Output must be labeled "reference-stub"
+        assert_eq!(artifact.mode, "reference-stub");
+    }
+
+    #[test]
+    fn propagation_artifact_contains_derived_state() {
+        let mut rt = StubRuntime::new();
+        rt.create_node(0.6, 100.0);
+        rt.create_node(0.4, 50.0);
+        rt.bind_edge(rt.nodes.keys().min().copied().unwrap(), 
+                     rt.nodes.keys().max().copied().unwrap(), 0.5);
+        
+        let artifact = rt.propagate();
+        
+        // Verify derived state values
+        assert_eq!(artifact.derived_state.node_count, 2);
+        assert_eq!(artifact.derived_state.edge_count, 1);
+        assert!((artifact.derived_state.total_energy - 150.0).abs() < 1e-10);
+        assert!((artifact.derived_state.mean_belief - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn propagation_checksum_is_deterministic() {
+        // Per RPSU-01: Checksums must be identical across multiple runs
+        
+        // Run 1
+        let mut rt1 = StubRuntime::new();
+        let n1_id = rt1.create_node(0.7, 100.0).id;
+        let n2_id = rt1.create_node(0.3, 50.0).id;
+        rt1.bind_edge(n1_id, n2_id, 0.8);
+        let artifact1 = rt1.propagate();
+        
+        // Run 2 - fresh runtime, same operations
+        let mut rt2 = StubRuntime::new();
+        let n3_id = rt2.create_node(0.7, 100.0).id;
+        let n4_id = rt2.create_node(0.3, 50.0).id;
+        rt2.bind_edge(n3_id, n4_id, 0.8);
+        let artifact2 = rt2.propagate();
+        
+        // Derived states must match
+        assert_eq!(artifact1.derived_state, artifact2.derived_state);
+        
+        // Checksums must be identical
+        assert_eq!(artifact1.propagation_checksum, artifact2.propagation_checksum);
+    }
+
+    #[test]
+    fn replay_succeeds_without_state_change() {
+        // Per RPSU-01: Replay must succeed when state unchanged
+        let mut rt = StubRuntime::new();
+        rt.create_node(0.5, 100.0);
+        rt.create_node(0.5, 100.0);
+        rt.propagate();
+        
+        // Replay immediately after - no state change
+        let results = rt.lineage_replay();
+        
+        // Find the propagation entry
+        let prop_result = results.iter()
+            .find(|r| r.decision_id.starts_with("prop-"))
+            .expect("Should have propagation replay result");
+        
+        assert_eq!(prop_result.replay_status, ReplayStatus::Match);
+        assert!(prop_result.reason.is_none());
+    }
+
+    #[test]
+    fn replay_blocks_on_structural_mutation() {
+        // Per RPSU-01: Replay must block on structural mutation
+        let mut rt = StubRuntime::new();
+        let _n1 = rt.create_node(0.5, 100.0);
+        let _n2 = rt.create_node(0.5, 100.0);
+        rt.propagate();
+        
+        // Mutate structure - add a new node
+        rt.create_node(0.8, 200.0);
+        
+        // Replay after structural change
+        let results = rt.lineage_replay();
+        
+        // Find the propagation entry
+        let prop_result = results.iter()
+            .find(|r| r.decision_id.starts_with("prop-"))
+            .expect("Should have propagation replay result");
+        
+        assert_eq!(prop_result.replay_status, ReplayStatus::Blocked);
+        assert_eq!(prop_result.reason.as_deref(), Some("derived_state_mismatch"));
+    }
+
+    #[test]
+    fn replay_blocks_on_belief_mutation() {
+        // Per RPSU-01: Replay must block on any state mutation
+        let mut rt = StubRuntime::new();
+        let n1 = rt.create_node(0.5, 100.0);
+        rt.propagate();
+        
+        // Mutate belief
+        rt.mutate_node(n1.id, 0.1);
+        
+        // Replay after belief change
+        let results = rt.lineage_replay();
+        
+        let prop_result = results.iter()
+            .find(|r| r.decision_id.starts_with("prop-"))
+            .expect("Should have propagation replay result");
+        
+        assert_eq!(prop_result.replay_status, ReplayStatus::Blocked);
+    }
+
+    #[test]
+    fn lineage_entry_contains_artifact() {
+        // Per RPSU-01: Lineage must attach derived_state, checksum, mode
+        let mut rt = StubRuntime::new();
+        rt.create_node(0.5, 100.0);
+        rt.propagate();
+        
+        let entries = rt.lineage_entries();
+        let prop_entry = entries.iter()
+            .find(|e| e.operation == "edge.propagate")
+            .expect("Should have propagate entry");
+        
+        let artifact = prop_entry.propagation_artifact.as_ref()
+            .expect("Propagate entry must have artifact");
+        
+        assert_eq!(artifact.mode, "reference-stub");
+        assert!(!artifact.propagation_checksum.is_empty());
+        assert_eq!(artifact.derived_state.node_count, 1);
+    }
+
+    #[test]
+    fn propagation_artifact_json_schema() {
+        // Verify JSON output matches RPSU-01 specification
+        let mut rt = StubRuntime::new();
+        rt.create_node(0.6, 1.0);
+        rt.create_node(0.5, 1.0);
+        rt.bind_edge(rt.nodes.keys().min().copied().unwrap(),
+                     rt.nodes.keys().max().copied().unwrap(), 0.5);
+        
+        let artifact = rt.propagate();
+        let json = serde_json::to_value(&artifact).unwrap();
+        let obj = json.as_object().unwrap();
+        
+        // Required fields per RPSU-01
+        assert!(obj.contains_key("decision_id"));
+        assert!(obj.contains_key("derived_state"));
+        assert!(obj.contains_key("propagation_checksum"));
+        assert!(obj.contains_key("mode"));
+        
+        // Derived state fields
+        let ds = obj.get("derived_state").unwrap().as_object().unwrap();
+        assert!(ds.contains_key("node_count"));
+        assert!(ds.contains_key("edge_count"));
+        assert!(ds.contains_key("total_energy"));
+        assert!(ds.contains_key("mean_belief"));
+        
+        // Verify values match spec example
+        assert_eq!(ds.get("node_count").unwrap(), 2);
+        assert_eq!(ds.get("edge_count").unwrap(), 1);
+        assert_eq!(ds.get("total_energy").unwrap(), 2.0);
+        assert_eq!(ds.get("mean_belief").unwrap(), 0.55);
+    }
+
+    #[test]
+    fn empty_substrate_propagation() {
+        // Edge case: propagation on empty substrate
+        let mut rt = StubRuntime::new();
+        let artifact = rt.propagate();
+        
+        assert_eq!(artifact.derived_state.node_count, 0);
+        assert_eq!(artifact.derived_state.edge_count, 0);
+        assert_eq!(artifact.derived_state.total_energy, 0.0);
+        assert_eq!(artifact.derived_state.mean_belief, 0.0);
+        assert_eq!(artifact.mode, "reference-stub");
+    }
+
+    #[test]
+    fn multiple_propagations_have_unique_decision_ids() {
+        let mut rt = StubRuntime::new();
+        rt.create_node(0.5, 100.0);
+        
+        let a1 = rt.propagate();
+        let a2 = rt.propagate();
+        let a3 = rt.propagate();
+        
+        // Decision IDs must be unique
+        assert_ne!(a1.decision_id, a2.decision_id);
+        assert_ne!(a2.decision_id, a3.decision_id);
+        assert_ne!(a1.decision_id, a3.decision_id);
     }
 }
