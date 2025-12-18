@@ -1,0 +1,26 @@
+name: public-boundary-guard
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+jobs:
+  examples_boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure no internal examples directory exists
+        run: |
+          if [ -d "examples/internal" ]; then
+            echo "examples/internal must not exist in the public repo"
+            exit 1
+          fi
+      - name: Block internal imports in public examples
+        run: |
+          # Public examples must be black-box clients. No internal crate/module wiring.
+          if grep -R -nE "iter_mcp_server|crate::internal::|internal::" examples; then
+            echo "Found internal import patterns under examples/"
+            exit 1
+          fi
