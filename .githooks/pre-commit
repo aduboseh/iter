@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+# PROVENANCE-SWEEP-01 guard
+# Blocks staged introduction of attribution/agent terms into the repository.
+# Override only when explicitly intended:
+#   ITER_ALLOW_ATTRIBUTION=1 git commit ...
+
+if [ "${ITER_ALLOW_ATTRIBUTION:-}" = "1" ]; then
+  exit 0
+fi
+
+# Scan staged diff for disallowed patterns.
+# Note: This is intentionally strict.
+# Exclude changes to .githooks itself (the guard must be able to evolve).
+# Note: patterns are intentionally written to avoid literal matches in repo text scans.
+pattern='Co-[A]uthored-By:|[w]arp|agent[@]|ai[@]|co-[a]uthored|assistan[t]'
+
+if git diff --cached -U0 -- . ':(exclude).githooks' | grep -Eiq "$pattern"; then
+  echo "Blocked: staged changes contain disallowed provenance/agent attribution text." >&2
+  echo "Remove it, or set ITER_ALLOW_ATTRIBUTION=1 to override intentionally." >&2
+  exit 1
+fi
+
+exit 0

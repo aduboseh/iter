@@ -3,10 +3,15 @@
 //! A true MCP client that communicates with the Iter server via STDIO transport.
 //! Demonstrates all available tools without any knowledge of server internals.
 //!
+//! NOTE: This client demonstrates Iter's public MCP surface only.
+//! It does not reflect or expose Iter’s internal architecture or execution model.
+//!
 //! # Usage
 //!
+//! Assumes `iter-server` is installed and available on `PATH`.
+//! (When working from source, you can build `iter-server` and put `target/release` on `PATH`.)
+//!
 //! ```bash
-//! cargo build --release --bin iter-server
 //! cargo run --example mcp_client
 //! ```
 //!
@@ -14,7 +19,7 @@
 //!
 //! - `node.create` - Create node with belief and energy
 //! - `node.query` - Query node state by ID
-//! - `node.mutate` - Mutate node belief (debug operation)
+//! - `node.mutate` - Mutate node belief (governed operation; availability may be restricted by policy)
 //! - `edge.bind` - Bind edge between nodes
 //! - `edge.propagate` - Run simulation step
 //! - `governor.status` - Query governor status
@@ -68,34 +73,60 @@ fn main() {
     println!("--- Node Operations ---");
 
     // Create first node
-    let create_resp = client.tool_call("node.create", json!({
-        "belief": 0.7,
-        "energy": 100.0
-    }));
-    println!("node.create (belief=0.7, energy=100): {}", extract_text(&create_resp));
+    let create_resp = client.tool_call(
+        "node.create",
+        json!({
+            "belief": 0.7,
+            "energy": 100.0
+        }),
+    );
+    println!(
+        "node.create (belief=0.7, energy=100): {}",
+        extract_text(&create_resp)
+    );
     let node1_id = extract_id(&create_resp).unwrap_or(0);
     println!("  -> Created node ID: {}", node1_id);
 
     // Create second node
-    let create_resp2 = client.tool_call("node.create", json!({
-        "belief": 0.3,
-        "energy": 50.0
-    }));
+    let create_resp2 = client.tool_call(
+        "node.create",
+        json!({
+            "belief": 0.3,
+            "energy": 50.0
+        }),
+    );
     let node2_id = extract_id(&create_resp2).unwrap_or(1);
-    println!("node.create (belief=0.3, energy=50): created node {}", node2_id);
+    println!(
+        "node.create (belief=0.3, energy=50): created node {}",
+        node2_id
+    );
 
     // Query node
-    let query_resp = client.tool_call("node.query", json!({
-        "node_id": node1_id.to_string()
-    }));
-    println!("node.query (node {}): {}", node1_id, extract_text(&query_resp));
+    let query_resp = client.tool_call(
+        "node.query",
+        json!({
+            "node_id": node1_id.to_string()
+        }),
+    );
+    println!(
+        "node.query (node {}): {}",
+        node1_id,
+        extract_text(&query_resp)
+    );
 
-    // Mutate node (DEBUG operation)
-    let mutate_resp = client.tool_call("node.mutate", json!({
-        "node_id": node1_id.to_string(),
-        "delta": 0.1
-    }));
-    println!("node.mutate (node {}, delta=+0.1): {}", node1_id, extract_text(&mutate_resp));
+    // Mutate node (governed operation; availability subject to policy)
+    let mutate_resp = client.tool_call(
+        "node.mutate",
+        json!({
+            "node_id": node1_id.to_string(),
+            "delta": 0.1
+        }),
+    );
+    println!(
+        "node.mutate (node {}, delta=+0.1): {}",
+        node1_id,
+        extract_text(&mutate_resp)
+    );
     println!();
 
     // ========================================================================
@@ -104,24 +135,42 @@ fn main() {
     println!("--- Edge Operations ---");
 
     // Bind edge
-    let bind_resp = client.tool_call("edge.bind", json!({
-        "src": node1_id.to_string(),
-        "dst": node2_id.to_string(),
-        "weight": 0.5
-    }));
-    println!("edge.bind ({}→{}, weight=0.5): {}", node1_id, node2_id, extract_text(&bind_resp));
+    let bind_resp = client.tool_call(
+        "edge.bind",
+        json!({
+            "src": node1_id.to_string(),
+            "dst": node2_id.to_string(),
+            "weight": 0.5
+        }),
+    );
+    println!(
+        "edge.bind ({}→{}, weight=0.5): {}",
+        node1_id,
+        node2_id,
+        extract_text(&bind_resp)
+    );
 
     // Propagate (run simulation step)
-    let prop_resp = client.tool_call("edge.propagate", json!({
-        "edge_id": "0"
-    }));
+    let prop_resp = client.tool_call(
+        "edge.propagate",
+        json!({
+            "edge_id": "0"
+        }),
+    );
     println!("edge.propagate (step): {}", extract_text(&prop_resp));
 
     // Query node after propagation
-    let query_resp2 = client.tool_call("node.query", json!({
-        "node_id": node2_id.to_string()
-    }));
-    println!("node.query (node {} after propagation): {}", node2_id, extract_text(&query_resp2));
+    let query_resp2 = client.tool_call(
+        "node.query",
+        json!({
+            "node_id": node2_id.to_string()
+        }),
+    );
+    println!(
+        "node.query (node {} after propagation): {}",
+        node2_id,
+        extract_text(&query_resp2)
+    );
     println!();
 
     // ========================================================================
@@ -138,9 +187,12 @@ fn main() {
     println!("governance.status: {}", extract_text(&governance_resp));
 
     // ESV audit
-    let esv_resp = client.tool_call("esv.audit", json!({
-        "node_id": node1_id.to_string()
-    }));
+    let esv_resp = client.tool_call(
+        "esv.audit",
+        json!({
+            "node_id": node1_id.to_string()
+        }),
+    );
     println!("esv.audit (node {}): {}", node1_id, extract_text(&esv_resp));
     println!();
 
@@ -160,13 +212,19 @@ fn main() {
     println!("--- Error Handling Demo ---");
 
     // Query non-existent node
-    let bad_query_resp = client.tool_call("node.query", json!({
-        "node_id": "999999"
-    }));
+    let bad_query_resp = client.tool_call(
+        "node.query",
+        json!({
+            "node_id": "999999"
+        }),
+    );
     println!("node.query (non-existent node 999999):");
     if let Some(err) = bad_query_resp.get("error") {
         println!("  Error code: {}", err.get("code").unwrap_or(&json!(-1)));
-        println!("  Error message: {}", err.get("message").unwrap_or(&json!("unknown")));
+        println!(
+            "  Error message: {}",
+            err.get("message").unwrap_or(&json!("unknown"))
+        );
     } else {
         println!("  {}", extract_text(&bad_query_resp));
     }
@@ -176,7 +234,10 @@ fn main() {
     println!("tools/call (invalid.tool):");
     if let Some(err) = bad_tool_resp.get("error") {
         println!("  Error code: {}", err.get("code").unwrap_or(&json!(-1)));
-        println!("  Error message: {}", err.get("message").unwrap_or(&json!("unknown")));
+        println!(
+            "  Error message: {}",
+            err.get("message").unwrap_or(&json!("unknown"))
+        );
     }
     println!();
 
@@ -196,13 +257,17 @@ struct McpClient {
 impl McpClient {
     /// Spawn iter-server and return a client handle.
     fn spawn() -> Self {
-        let mut server = Command::new("cargo")
-            .args(["run", "--release", "--bin", "iter-server"])
+        // Prefer spawning the `iter-server` binary rather than coupling to a dev workflow.
+        // Override with `ITER_SERVER_BIN` when `iter-server` is not on PATH.
+        let server_bin =
+            std::env::var_os("ITER_SERVER_BIN").unwrap_or_else(|| "iter-server".into());
+
+        let mut server = Command::new(server_bin)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .expect("Failed to spawn iter-server. Did you run `cargo build --release`?");
+            .expect("Failed to spawn iter-server. Ensure `iter-server` is available on PATH (or set ITER_SERVER_BIN).");
 
         let stdin = server.stdin.take().expect("Failed to open stdin");
         let stdout = server.stdout.take().expect("Failed to open stdout");
@@ -230,16 +295,22 @@ impl McpClient {
         self.stdin.flush().expect("Failed to flush stdin");
 
         let mut line = String::new();
-        self.reader.read_line(&mut line).expect("Failed to read response");
-        serde_json::from_str(&line).unwrap_or(json!({"error": {"code": -1, "message": "parse failed"}}))
+        self.reader
+            .read_line(&mut line)
+            .expect("Failed to read response");
+        serde_json::from_str(&line)
+            .unwrap_or(json!({"error": {"code": -1, "message": "parse failed"}}))
     }
 
     /// Convenience method for tools/call.
     fn tool_call(&mut self, tool_name: &str, arguments: Value) -> Value {
-        self.call("tools/call", json!({
-            "name": tool_name,
-            "arguments": arguments
-        }))
+        self.call(
+            "tools/call",
+            json!({
+                "name": tool_name,
+                "arguments": arguments
+            }),
+        )
     }
 
     /// Close the server process.
