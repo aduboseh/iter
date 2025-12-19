@@ -15,7 +15,7 @@
 //! Failures in this module block merge. These are not unit tests—they are
 //! invariant checks that enforce the public API contract.
 
-pub mod schema_stability;
 pub mod error_taxonomy;
-pub mod versioning;
 pub mod release_discipline;
+pub mod schema_stability;
+pub mod versioning;

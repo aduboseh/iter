@@ -9,12 +9,12 @@
 //! - Wire format matches golden snapshots
 //! - Breaking changes require major version bump
 
-use iter_mcp_server::{
-    PROTOCOL_VERSION, PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH,
-    MIN_SUPPORTED_MAJOR, ProtocolVersion, CompatibilityStatus,
-};
-use iter_mcp_server::types::protocol::*;
 use iter_mcp_server::types::mcp::*;
+use iter_mcp_server::types::protocol::*;
+use iter_mcp_server::{
+    CompatibilityStatus, ProtocolVersion, MIN_SUPPORTED_MAJOR, PROTOCOL_MAJOR, PROTOCOL_MINOR,
+    PROTOCOL_PATCH, PROTOCOL_VERSION,
+};
 use serde_json::{json, Value};
 use std::fs;
 
@@ -25,8 +25,9 @@ use std::fs;
 #[test]
 fn protocol_version_is_valid_semver() {
     // Version string must be parseable
-    let v = ProtocolVersion::parse(PROTOCOL_VERSION).expect("PROTOCOL_VERSION must be valid semver");
-    
+    let v =
+        ProtocolVersion::parse(PROTOCOL_VERSION).expect("PROTOCOL_VERSION must be valid semver");
+
     // Components must match constants
     assert_eq!(v.major, PROTOCOL_MAJOR);
     assert_eq!(v.minor, PROTOCOL_MINOR);
@@ -36,16 +37,22 @@ fn protocol_version_is_valid_semver() {
 #[test]
 fn protocol_version_constants_are_consistent() {
     let expected = format!("{}.{}.{}", PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH);
-    assert_eq!(PROTOCOL_VERSION, expected, "PROTOCOL_VERSION must match component constants");
+    assert_eq!(
+        PROTOCOL_VERSION, expected,
+        "PROTOCOL_VERSION must match component constants"
+    );
 }
 
 #[test]
 fn min_supported_version_is_valid() {
     // MIN_SUPPORTED_MAJOR must be <= current major
-    assert!(MIN_SUPPORTED_MAJOR <= PROTOCOL_MAJOR, 
+    assert!(
+        MIN_SUPPORTED_MAJOR <= PROTOCOL_MAJOR,
         "MIN_SUPPORTED_MAJOR ({}) cannot exceed PROTOCOL_MAJOR ({})",
-        MIN_SUPPORTED_MAJOR, PROTOCOL_MAJOR);
-    
+        MIN_SUPPORTED_MAJOR,
+        PROTOCOL_MAJOR
+    );
+
     // MIN_SUPPORTED_MAJOR must be at least 1
     assert!(MIN_SUPPORTED_MAJOR >= 1, "MIN_SUPPORTED_MAJOR must be >= 1");
 }
@@ -59,7 +66,10 @@ fn current_version_is_compatible() {
     let current = ProtocolVersion::current();
     assert!(current.is_compatible());
     assert!(current.is_current());
-    assert_eq!(current.check_compatibility(), CompatibilityStatus::Compatible);
+    assert_eq!(
+        current.check_compatibility(),
+        CompatibilityStatus::Compatible
+    );
 }
 
 #[test]
@@ -89,7 +99,10 @@ fn same_major_higher_minor_is_forward_compatible() {
         patch: 0,
     };
     assert!(newer.is_compatible());
-    assert_eq!(newer.check_compatibility(), CompatibilityStatus::ForwardCompatible);
+    assert_eq!(
+        newer.check_compatibility(),
+        CompatibilityStatus::ForwardCompatible
+    );
 }
 
 #[test]
@@ -101,7 +114,10 @@ fn higher_major_is_incompatible() {
         patch: 0,
     };
     assert!(!future.is_compatible());
-    assert!(matches!(future.check_compatibility(), CompatibilityStatus::Incompatible { .. }));
+    assert!(matches!(
+        future.check_compatibility(),
+        CompatibilityStatus::Incompatible { .. }
+    ));
 }
 
 #[test]
@@ -114,7 +130,10 @@ fn below_min_supported_is_incompatible() {
             patch: 0,
         };
         assert!(!ancient.is_compatible());
-        assert!(matches!(ancient.check_compatibility(), CompatibilityStatus::Incompatible { .. }));
+        assert!(matches!(
+            ancient.check_compatibility(),
+            CompatibilityStatus::Incompatible { .. }
+        ));
     }
 }
 
@@ -132,19 +151,21 @@ fn load_golden_snapshots() -> Value {
 fn golden_snapshot_version_matches_current() {
     let snapshots = load_golden_snapshots();
     let snapshot_version = snapshots["version"].as_str().unwrap();
-    
+
     // Snapshot version must match current protocol version
-    assert_eq!(snapshot_version, PROTOCOL_VERSION,
+    assert_eq!(
+        snapshot_version, PROTOCOL_VERSION,
         "Golden snapshot version ({}) must match PROTOCOL_VERSION ({}). \
          Update snapshots when bumping protocol version.",
-        snapshot_version, PROTOCOL_VERSION);
+        snapshot_version, PROTOCOL_VERSION
+    );
 }
 
 #[test]
 fn rpc_request_matches_golden_snapshot() {
     let snapshots = load_golden_snapshots();
     let golden = &snapshots["snapshots"]["rpc_request_with_params"];
-    
+
     // Create same request programmatically
     let request = RpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -152,9 +173,9 @@ fn rpc_request_matches_golden_snapshot() {
         params: json!({"belief": 0.5, "energy": 1.0}),
         id: Some(json!(1)),
     };
-    
+
     let serialized = serde_json::to_value(&request).unwrap();
-    
+
     // Compare field by field (allows for ordering differences)
     assert_eq!(serialized["jsonrpc"], golden["jsonrpc"]);
     assert_eq!(serialized["method"], golden["method"]);
@@ -165,17 +186,20 @@ fn rpc_request_matches_golden_snapshot() {
 fn rpc_response_matches_golden_snapshot() {
     let snapshots = load_golden_snapshots();
     let golden = &snapshots["snapshots"]["rpc_response_success"];
-    
-    let response = RpcResponse::success(json!(1), json!({
-        "id": 1,
-        "belief": 0.5,
-        "energy": 1.0,
-        "esv_valid": true,
-        "stability": 0.9
-    }));
-    
+
+    let response = RpcResponse::success(
+        json!(1),
+        json!({
+            "id": 1,
+            "belief": 0.5,
+            "energy": 1.0,
+            "esv_valid": true,
+            "stability": 0.9
+        }),
+    );
+
     let serialized = serde_json::to_value(&response).unwrap();
-    
+
     assert_eq!(serialized["jsonrpc"], golden["jsonrpc"]);
     assert_eq!(serialized["id"], golden["id"]);
     assert!(serialized.get("result").is_some());
@@ -185,7 +209,7 @@ fn rpc_response_matches_golden_snapshot() {
 fn mcp_node_state_matches_golden_snapshot() {
     let snapshots = load_golden_snapshots();
     let golden = &snapshots["snapshots"]["mcp_node_state"];
-    
+
     let node = McpNodeState {
         id: 1,
         belief: 0.5,
@@ -193,9 +217,9 @@ fn mcp_node_state_matches_golden_snapshot() {
         esv_valid: true,
         stability: 0.9,
     };
-    
+
     let serialized = serde_json::to_value(&node).unwrap();
-    
+
     // All fields must match golden
     assert_eq!(serialized["id"], golden["id"]);
     assert_eq!(serialized["belief"], golden["belief"]);
@@ -208,10 +232,10 @@ fn mcp_node_state_matches_golden_snapshot() {
 fn protocol_version_matches_golden_snapshot() {
     let snapshots = load_golden_snapshots();
     let golden = &snapshots["snapshots"]["protocol_version"];
-    
+
     let version = ProtocolVersion::current();
     let serialized = serde_json::to_value(&version).unwrap();
-    
+
     assert_eq!(serialized["version"], golden["version"]);
     assert_eq!(serialized["major"], golden["major"]);
     assert_eq!(serialized["minor"], golden["minor"]);
@@ -229,7 +253,11 @@ fn major_version_is_documented() {
     if PROTOCOL_MAJOR > 1 {
         // Check for migration guide (placeholder - would check file exists)
         // For now, just document the requirement
-        assert!(true, "Major version {} requires migration documentation", PROTOCOL_MAJOR);
+        assert!(
+            true,
+            "Major version {} requires migration documentation",
+            PROTOCOL_MAJOR
+        );
     }
 }
 
@@ -239,7 +267,7 @@ fn version_serialization_is_stable() {
     let json1 = serde_json::to_string(&v1).unwrap();
     let v2: ProtocolVersion = serde_json::from_str(&json1).unwrap();
     let json2 = serde_json::to_string(&v2).unwrap();
-    
+
     // Roundtrip must be stable
     assert_eq!(json1, json2, "Version serialization must be deterministic");
 }

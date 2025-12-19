@@ -48,11 +48,9 @@ pub mod substrate;
 // ============================================================================
 
 pub use types::{
-    McpNodeState, McpEdgeState, McpGovernorStatus, McpLineageEntry,
-    McpError, RpcRequest, RpcResponse, RpcError,
-    CreateNodeParams, MutateNodeParams, QueryNodeParams,
-    BindEdgeParams, PropagateEdgeParams, ExportLineageParams,
-    ToolInfo, ToolList,
+    BindEdgeParams, CreateNodeParams, ExportLineageParams, McpEdgeState, McpError,
+    McpGovernorStatus, McpLineageEntry, McpNodeState, MutateNodeParams, PropagateEdgeParams,
+    QueryNodeParams, RpcError, RpcRequest, RpcResponse, ToolInfo, ToolList,
 };
 
 // ============================================================================
@@ -60,8 +58,8 @@ pub use types::{
 // ============================================================================
 
 pub use types::{
-    PROTOCOL_VERSION, PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH,
-    MIN_SUPPORTED_MAJOR, ProtocolVersion, CompatibilityStatus, Deprecation,
+    CompatibilityStatus, Deprecation, ProtocolVersion, MIN_SUPPORTED_MAJOR, PROTOCOL_MAJOR,
+    PROTOCOL_MINOR, PROTOCOL_PATCH, PROTOCOL_VERSION,
 };
 
 // ============================================================================

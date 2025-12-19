@@ -159,6 +159,30 @@ jobs:
           
           echo "Boundary check passed"
 
+  # Gate 6: SBOM Generation
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-sbom
+        run: cargo install cargo-sbom
+      
+      - name: Generate SBOM
+        run: cargo sbom > iter-sbom.json
+      
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.ref_name }}
+          path: iter-sbom.json
+          retention-days: 90
+
   # Final gate: All checks must pass
   release-gate:
     name: Release Gate
@@ -176,3 +200,4 @@ jobs:
           echo "  ✓ Version consistency"
           echo "  ✓ Changelog entry"
           echo "  ✓ Boundary integrity"
+          echo "  ✓ SBOM generated (for tags)"
