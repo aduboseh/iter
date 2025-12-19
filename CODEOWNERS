@@ -8,13 +8,8 @@
 
 /src/lib.rs                              @aduboseh
 /src/main.rs                             @aduboseh
-/src/mcp_handler.rs                      @aduboseh
-/src/governance.rs                       @aduboseh
-/src/substrate_runtime.rs                @aduboseh
-/src/validation.rs                       @aduboseh
 /src/types/**                            @aduboseh
 /src/substrate/**                        @aduboseh
-/src/services/**                         @aduboseh
 
 # =============================================================================
 # GOVERNANCE & TESTS
