@@ -251,6 +251,7 @@ impl StubRuntime {
     }
 
     /// Get lineage entries
+    #[allow(dead_code)]
     pub fn lineage_entries(&self) -> &[LineageEntry] {
         &self.lineage
     }

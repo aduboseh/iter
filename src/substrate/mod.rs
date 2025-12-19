@@ -5,6 +5,3 @@
 
 #[cfg(feature = "public_stub")]
 pub mod stub;
-
-#[cfg(feature = "public_stub")]
-pub use stub::*;
