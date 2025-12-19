@@ -1,9 +1,10 @@
-Architecture Boundary
+# Architecture Boundary
 
 This document defines what the public Iter repository certifies versus what is validated in private infrastructure.
 
-Certification Scopes
-Public CI Certifies (this repository)
+## Certification Scopes
+
+### Public CI Certifies (this repository)
 Domain	What's Tested	Guarantee
 Protocol	Wire format, JSON-RPC 2.0 compliance, MCP tool interface	Stable 1.0.0 contract
 Type Shapes	Schema stability for all public types	Breaking changes require major version bump
@@ -19,7 +20,7 @@ Test count: 71 governance invariants plus SDK unit tests
 
 Audience: Protocol consumers, SDK users, auditors, integrators
 
-Private CI Certifies (licensed deployments)
+### Private CI Certifies (licensed deployments)
 Domain	What's Tested	Guarantee
 Execution	Node, edge, and governor behavior	Correct substrate semantics
 Integration	End-to-end MCP request flows	Real operations work
@@ -32,29 +33,31 @@ Test count: Additional integration and property-based tests
 
 Audience: Licensed customers, deployment engineers, security auditors
 
-Why This Separation Exists
+## Why This Separation Exists
 
-IP Protection
+**IP Protection**
 Execution semantics are proprietary, protocol surface is open
 
-Independent Auditability
+**Independent Auditability**
 Public contract can be verified without access to internals
 
-Clean Dependency Graph
+**Clean Dependency Graph**
 SDKs never depend on substrate, substrate implements the protocol
 
-Appropriate Trust Boundaries
+**Appropriate Trust Boundaries**
 Different guarantees for different audiences
 
-What Each Audience Should Trust
+## What Each Audience Should Trust
 If you are	Trust this	Validated by
 Building a client	Protocol types, SDK behavior	Public CI
 Integrating telemetry	Audit event schema, redaction rules	Public CI
 Auditing the contract	Type shapes, versioning rules, error taxonomy	Public CI
 Deploying Iter	Execution correctness, performance	Private CI
 Evaluating security	Boundary integrity (public) plus threat model (private)	Both
-How to Verify
-Public guarantees (anyone can run)
+
+## How to Verify
+
+### Public guarantees (anyone can run)
 # Clone the public repo
 git clone https://github.com/aduboseh/iter.git
 cd iter
@@ -67,8 +70,9 @@ cd sdks/rust && cargo test
 
 # Build and test TypeScript SDK
 cd sdks/typescript && npm ci && npm test
+```
 
-Private guarantees (licensed access required)
+### Private guarantees (licensed access required)
 
 Contact the Iter team under licensed access for:
 
@@ -78,7 +82,7 @@ Deployment-specific test results
 
 Security audit reports
 
-Summary
+## Summary
 
 Iter v1.0.0 certifies the public protocol, SDK surface, telemetry contract, and release guarantees.
 

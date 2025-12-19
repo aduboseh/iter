@@ -117,6 +117,10 @@ cd sdks/typescript && npm test
 
 > **Note:** Integration tests (`mcp_integration`) require `full_substrate` mode. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md).
 
+## License
+
+Iter is licensed under Apache-2.0. Proprietary substrate components are not included in this repository.
+
 ## Marketplace identity
 
 Name: **Iter**
