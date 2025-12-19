@@ -1,16 +1,3 @@
-#[cfg(feature = "full_substrate")]
-mod governance;
-#[cfg(feature = "full_substrate")]
-mod mcp_handler;
-#[cfg(feature = "full_substrate")]
-mod services;
-#[cfg(feature = "full_substrate")]
-mod substrate_runtime;
-#[cfg(feature = "full_substrate")]
-mod types;
-#[cfg(feature = "full_substrate")]
-mod validation;
-
 #[cfg(feature = "public_stub")]
 mod substrate;
 
@@ -34,79 +21,14 @@ fn main() {
 }
 
 fn print_mode_banner() {
-    #[cfg(feature = "public_stub")]
-    {
-        eprintln!("┌────────────────────────────────────────────────────────────┐");
-        eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
-        eprintln!("│ Proprietary substrate DISABLED                             │");
-        eprintln!("│ Responses are deterministic placeholders                   │");
-        eprintln!("└────────────────────────────────────────────────────────────┘");
-        eprintln!();
-    }
-
-    #[cfg(all(feature = "full_substrate", not(feature = "public_stub")))]
-    {
-        eprintln!("Iter server running (full substrate mode)");
-    }
+    eprintln!("┌────────────────────────────────────────────────────────────┐");
+    eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
+    eprintln!("│ Proprietary substrate DISABLED                             │");
+    eprintln!("│ Responses are deterministic placeholders                   │");
+    eprintln!("└────────────────────────────────────────────────────────────┘");
+    eprintln!();
 }
 
-#[cfg(feature = "full_substrate")]
-fn run_stdio_server() {
-    use crate::mcp_handler::handle_rpc;
-    use crate::substrate_runtime::SubstrateRuntime;
-    use crate::types::RpcRequest;
-
-    let mut runtime = SubstrateRuntime::with_defaults().expect("Failed to initialize execution runtime");
-    let stdin = std::io::stdin();
-    let mut reader = BufReader::new(stdin.lock());
-    let mut stdout = std::io::stdout();
-
-    eprintln!("Iter server running in STDIO mode");
-
-    loop {
-        let mut line = String::new();
-        match reader.read_line(&mut line) {
-            Ok(0) => break, // EOF
-            Ok(_) => {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
-
-                match serde_json::from_str::<RpcRequest>(line) {
-                    Ok(req) => {
-                        let resp = handle_rpc(&mut runtime, req);
-                        if let Ok(json) = serde_json::to_string(&resp) {
-                            writeln!(stdout, "{}", json).expect("stdout write failed");
-                            stdout.flush().expect("stdout flush failed");
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to parse JSON-RPC request: {}", e);
-                        let error_resp = json!({
-                            "jsonrpc": "2.0",
-                            "id": null,
-                            "error": {
-                                "code": -32700,
-                                "message": "Parse error"
-                            }
-                        });
-                        if let Ok(json) = serde_json::to_string(&error_resp) {
-                            writeln!(stdout, "{}", json).expect("stdout write failed");
-                            stdout.flush().expect("stdout flush failed");
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error reading from stdin: {}", e);
-                break;
-            }
-        }
-    }
-}
-
-#[cfg(feature = "public_stub")]
 fn run_stdio_server() {
     use crate::substrate::stub::StubRuntime;
     use std::io::BufWriter;
