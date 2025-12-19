@@ -39,7 +39,10 @@ fn run_stdio_server() {
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = BufWriter::new(stdout.lock());
 
-    eprintln!("Iter server running in STDIO mode (stub) — BUILD 2024-12-16-v6-haltra");
+    eprintln!(
+        "Iter server running in STDIO mode (stub) — v{}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     loop {
         let mut line = String::new();
@@ -56,22 +59,23 @@ fn run_stdio_server() {
                     Ok(req) => {
                         let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
                         let id = req.get("id").cloned();
-                        
+
                         // Notifications (no id) get no response per JSON-RPC 2.0 spec
                         if id.is_none() || id.as_ref().map(|v| v.is_null()).unwrap_or(false) {
                             // Still call handler for side effects, but don't respond
                             let _ = handle_stub_request(&mut runtime, method, &req);
                             continue;
                         }
-                        
+
                         // Build response as owned bytes - no shared Value, no reuse
                         let resp = handle_stub_request(&mut runtime, method, &req);
                         let response_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": id,
                             "result": resp
-                        })).unwrap_or_default();
-                        
+                        }))
+                        .unwrap_or_default();
+
                         // Single atomic write + newline + flush (Haltra pattern)
                         let _ = writer.write_all(&response_bytes);
                         let _ = writer.write_all(b"\n");
@@ -86,7 +90,8 @@ fn run_stdio_server() {
                                 "code": -32700,
                                 "message": "Parse error"
                             }
-                        })).unwrap_or_default();
+                        }))
+                        .unwrap_or_default();
                         let _ = writer.write_all(&error_bytes);
                         let _ = writer.write_all(b"\n");
                         let _ = writer.flush();
@@ -121,7 +126,7 @@ fn handle_stub_request(
                 "protocolVersion": client_protocol,
                 "serverInfo": {
                     "name": "iter-server",
-                    "version": "0.3.0"
+                    "version": env!("CARGO_PKG_VERSION")
                 },
                 "capabilities": {
                     "tools": {},
@@ -233,7 +238,7 @@ fn handle_stub_request(
             let args = params.get("arguments").unwrap_or(&empty_args);
             handle_stub_tool(runtime, tool_name, args)
         }
-        _ => json!({"error": "Unknown method"})
+        _ => json!({"error": "Unknown method"}),
     }
 }
 
@@ -254,8 +259,10 @@ fn handle_stub_tool(
             let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
             let id: u64 = id_str.parse().unwrap_or(0);
             match runtime.query_node(id) {
-                Some(node) => json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]}),
-                None => json!({"error": {"code": 4004, "message": "Node not found"}})
+                Some(node) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
+                }
+                None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
         "node.mutate" => {
@@ -263,17 +270,29 @@ fn handle_stub_tool(
             let id: u64 = id_str.parse().unwrap_or(0);
             let delta = args.get("delta").and_then(|d| d.as_f64()).unwrap_or(0.0);
             match runtime.mutate_node(id, delta) {
-                Some(node) => json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]}),
-                None => json!({"error": {"code": 4004, "message": "Node not found"}})
+                Some(node) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
+                }
+                None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
         "edge.bind" => {
-            let src: u64 = args.get("src").and_then(|s| s.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0);
-            let dst: u64 = args.get("dst").and_then(|d| d.as_str()).and_then(|d| d.parse().ok()).unwrap_or(0);
+            let src: u64 = args
+                .get("src")
+                .and_then(|s| s.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let dst: u64 = args
+                .get("dst")
+                .and_then(|d| d.as_str())
+                .and_then(|d| d.parse().ok())
+                .unwrap_or(0);
             let weight = args.get("weight").and_then(|w| w.as_f64()).unwrap_or(0.5);
             match runtime.bind_edge(src, dst, weight) {
-                Some(edge) => json!({"content": [{"type": "text", "text": serde_json::to_string(&edge).unwrap()}]}),
-                None => json!({"error": {"code": 4004, "message": "Node not found"}})
+                Some(edge) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&edge).unwrap()}]})
+                }
+                None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
         "edge.propagate" => {
@@ -288,14 +307,16 @@ fn handle_stub_tool(
             let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
             let id: u64 = id_str.parse().unwrap_or(0);
             match runtime.esv_audit(id) {
-                Some(audit) => json!({"content": [{"type": "text", "text": serde_json::to_string(&audit).unwrap()}]}),
-                None => json!({"error": {"code": 4004, "message": "Node not found"}})
+                Some(audit) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&audit).unwrap()}]})
+                }
+                None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
         "lineage.replay" => {
             let lineage = runtime.lineage_replay();
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
-        _ => json!({"error": {"code": 3000, "message": "Unknown tool"}})
+        _ => json!({"error": {"code": 3000, "message": "Unknown tool"}}),
     }
 }

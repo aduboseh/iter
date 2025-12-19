@@ -78,7 +78,9 @@ fn run_demo_sequence() -> Vec<String> {
         stdin.flush().expect("Failed to flush stdin");
 
         let mut line = String::new();
-        reader.read_line(&mut line).expect("Failed to read response");
+        reader
+            .read_line(&mut line)
+            .expect("Failed to read response");
         serde_json::from_str(&line).unwrap_or(json!({"error": "parse failed"}))
     };
 
@@ -86,50 +88,71 @@ fn run_demo_sequence() -> Vec<String> {
     let _ = send_rpc("initialize", json!({}));
 
     // Create two nodes with fixed parameters
-    let node_a = send_rpc("tools/call", json!({
-        "name": "node.create",
-        "arguments": { "belief": 0.7, "energy": 100.0 }
-    }));
+    let node_a = send_rpc(
+        "tools/call",
+        json!({
+            "name": "node.create",
+            "arguments": { "belief": 0.7, "energy": 100.0 }
+        }),
+    );
     outputs.push(extract_text(&node_a));
 
-    let node_b = send_rpc("tools/call", json!({
-        "name": "node.create",
-        "arguments": { "belief": 0.3, "energy": 50.0 }
-    }));
+    let node_b = send_rpc(
+        "tools/call",
+        json!({
+            "name": "node.create",
+            "arguments": { "belief": 0.3, "energy": 50.0 }
+        }),
+    );
     outputs.push(extract_text(&node_b));
 
     // Bind edge
-    let edge = send_rpc("tools/call", json!({
-        "name": "edge.bind",
-        "arguments": { "src": "0", "dst": "1", "weight": 0.7 }
-    }));
+    let edge = send_rpc(
+        "tools/call",
+        json!({
+            "name": "edge.bind",
+            "arguments": { "src": "0", "dst": "1", "weight": 0.7 }
+        }),
+    );
     outputs.push(extract_text(&edge));
 
     // Query node
-    let query = send_rpc("tools/call", json!({
-        "name": "node.query",
-        "arguments": { "node_id": "0" }
-    }));
+    let query = send_rpc(
+        "tools/call",
+        json!({
+            "name": "node.query",
+            "arguments": { "node_id": "0" }
+        }),
+    );
     outputs.push(extract_text(&query));
 
     // Propagate
-    let _ = send_rpc("tools/call", json!({
-        "name": "edge.propagate",
-        "arguments": { "edge_id": "0" }
-    }));
+    let _ = send_rpc(
+        "tools/call",
+        json!({
+            "name": "edge.propagate",
+            "arguments": { "edge_id": "0" }
+        }),
+    );
 
     // Query after propagation
-    let query_after = send_rpc("tools/call", json!({
-        "name": "node.query",
-        "arguments": { "node_id": "1" }
-    }));
+    let query_after = send_rpc(
+        "tools/call",
+        json!({
+            "name": "node.query",
+            "arguments": { "node_id": "1" }
+        }),
+    );
     outputs.push(extract_text(&query_after));
 
     // Governor status
-    let gov = send_rpc("tools/call", json!({
-        "name": "governor.status",
-        "arguments": {}
-    }));
+    let gov = send_rpc(
+        "tools/call",
+        json!({
+            "name": "governor.status",
+            "arguments": {}
+        }),
+    );
     outputs.push(extract_text(&gov));
 
     // Close server

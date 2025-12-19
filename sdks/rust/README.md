@@ -79,4 +79,6 @@ client.with_trace(trace);
 
 ## License
 
-MIT
+Apache-2.0
+
+SDKs are Apache-2.0 licensed; proprietary substrate components are not included.

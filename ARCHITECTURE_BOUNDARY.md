@@ -16,6 +16,8 @@ Release Discipline	Version consistency, changelog, boundary integrity	Unsafe cha
 
 Build mode: public_stub (default)
 
+The public stub is a deterministic reference implementation for protocol behavior, not a production or performance runtime.
+
 Test count: 71 governance invariants plus SDK unit tests
 
 Audience: Protocol consumers, SDK users, auditors, integrators

@@ -19,19 +19,15 @@ pub mod version;
 
 // Re-export protocol types
 pub use protocol::{
-    RpcRequest, RpcResponse, RpcError,
-    ToolInfo, ToolList,
-    CreateNodeParams, MutateNodeParams, QueryNodeParams,
-    BindEdgeParams, PropagateEdgeParams, ExportLineageParams,
+    BindEdgeParams, CreateNodeParams, ExportLineageParams, MutateNodeParams, PropagateEdgeParams,
+    QueryNodeParams, RpcError, RpcRequest, RpcResponse, ToolInfo, ToolList,
 };
 
 // Re-export MCP types
-pub use mcp::{
-    McpError, McpNodeState, McpEdgeState, McpGovernorStatus, McpLineageEntry,
-};
+pub use mcp::{McpEdgeState, McpError, McpGovernorStatus, McpLineageEntry, McpNodeState};
 
 // Re-export version types
 pub use version::{
-    PROTOCOL_VERSION, PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH,
-    MIN_SUPPORTED_MAJOR, ProtocolVersion, CompatibilityStatus, Deprecation,
+    CompatibilityStatus, Deprecation, ProtocolVersion, MIN_SUPPORTED_MAJOR, PROTOCOL_MAJOR,
+    PROTOCOL_MINOR, PROTOCOL_PATCH, PROTOCOL_VERSION,
 };

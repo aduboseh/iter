@@ -67,11 +67,11 @@ impl ProtocolVersion {
         if parts.len() != 3 {
             return None;
         }
-        
+
         let major = parts[0].parse().ok()?;
         let minor = parts[1].parse().ok()?;
         let patch = parts[2].parse().ok()?;
-        
+
         Some(Self {
             version: version.to_string(),
             major,
@@ -88,9 +88,7 @@ impl ProtocolVersion {
 
     /// Check if this version is exactly the current version
     pub fn is_current(&self) -> bool {
-        self.major == PROTOCOL_MAJOR 
-            && self.minor == PROTOCOL_MINOR 
-            && self.patch == PROTOCOL_PATCH
+        self.major == PROTOCOL_MAJOR && self.minor == PROTOCOL_MINOR && self.patch == PROTOCOL_PATCH
     }
 }
 

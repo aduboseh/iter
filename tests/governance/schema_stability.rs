@@ -10,8 +10,8 @@
 //! - Field removals/renames require major version bump
 //! - These tests compile in public_stub mode (no substrate deps)
 
-use iter_mcp_server::types::protocol::*;
 use iter_mcp_server::types::mcp::*;
+use iter_mcp_server::types::protocol::*;
 use serde_json::json;
 
 // ============================================================================
@@ -25,7 +25,7 @@ fn rpc_request_has_required_fields() {
         "jsonrpc": "2.0",
         "method": "test"
     });
-    
+
     let req: RpcRequest = serde_json::from_value(minimal).expect("minimal request should parse");
     assert_eq!(req.jsonrpc, "2.0");
     assert_eq!(req.method, "test");
@@ -41,7 +41,7 @@ fn rpc_request_accepts_optional_fields() {
         "params": {"belief": 0.5, "energy": 1.0},
         "id": 42
     });
-    
+
     let req: RpcRequest = serde_json::from_value(full).expect("full request should parse");
     assert_eq!(req.method, "node.create");
     assert!(!req.params.is_null());
@@ -53,7 +53,7 @@ fn rpc_request_rejects_missing_required() {
     // Missing jsonrpc
     let bad1 = json!({"method": "test"});
     assert!(serde_json::from_value::<RpcRequest>(bad1).is_err());
-    
+
     // Missing method
     let bad2 = json!({"jsonrpc": "2.0"});
     assert!(serde_json::from_value::<RpcRequest>(bad2).is_err());
@@ -66,14 +66,14 @@ fn rpc_request_rejects_missing_required() {
 #[test]
 fn rpc_response_success_shape() {
     let resp = RpcResponse::success(json!(1), json!({"result": "ok"}));
-    
+
     let serialized = serde_json::to_value(&resp).expect("should serialize");
-    
+
     // Required fields
     assert_eq!(serialized["jsonrpc"], "2.0");
     assert_eq!(serialized["id"], 1);
     assert!(serialized.get("result").is_some());
-    
+
     // Error must be absent on success
     assert!(serialized.get("error").is_none());
 }
@@ -81,18 +81,18 @@ fn rpc_response_success_shape() {
 #[test]
 fn rpc_response_error_shape() {
     let resp = RpcResponse::error(json!(2), -32600, "Invalid Request");
-    
+
     let serialized = serde_json::to_value(&resp).expect("should serialize");
-    
+
     // Required fields
     assert_eq!(serialized["jsonrpc"], "2.0");
     assert_eq!(serialized["id"], 2);
     assert!(serialized.get("error").is_some());
-    
+
     // Error structure
     assert_eq!(serialized["error"]["code"], -32600);
     assert_eq!(serialized["error"]["message"], "Invalid Request");
-    
+
     // Result must be absent on error
     assert!(serialized.get("result").is_none());
 }
@@ -102,7 +102,7 @@ fn rpc_response_roundtrip() {
     let original = RpcResponse::success(json!("req-123"), json!({"node_id": 1}));
     let json_str = serde_json::to_string(&original).expect("serialize");
     let parsed: RpcResponse = serde_json::from_str(&json_str).expect("deserialize");
-    
+
     assert_eq!(parsed.jsonrpc, "2.0");
     assert_eq!(parsed.id, json!("req-123"));
 }
@@ -120,9 +120,9 @@ fn mcp_node_state_has_all_fields() {
         esv_valid: true,
         stability: 0.9,
     };
-    
+
     let serialized = serde_json::to_value(&node).expect("should serialize");
-    
+
     // All fields must be present
     assert!(serialized.get("id").is_some());
     assert!(serialized.get("belief").is_some());
@@ -139,9 +139,9 @@ fn mcp_edge_state_has_all_fields() {
         dst: 3,
         weight: 0.7,
     };
-    
+
     let serialized = serde_json::to_value(&edge).expect("should serialize");
-    
+
     assert!(serialized.get("id").is_some());
     assert!(serialized.get("src").is_some());
     assert!(serialized.get("dst").is_some());
@@ -158,9 +158,9 @@ fn mcp_governor_status_has_all_fields() {
         edge_count: 4,
         healthy: true,
     };
-    
+
     let serialized = serde_json::to_value(&status).expect("should serialize");
-    
+
     assert!(serialized.get("drift_ok").is_some());
     assert!(serialized.get("energy_drift").is_some());
     assert!(serialized.get("coherence").is_some());
@@ -177,9 +177,9 @@ fn mcp_lineage_entry_has_all_fields() {
         checksum: "abc123".to_string(),
         tick: 100,
     };
-    
+
     let serialized = serde_json::to_value(&entry).expect("should serialize");
-    
+
     assert!(serialized.get("sequence").is_some());
     assert!(serialized.get("operation").is_some());
     assert!(serialized.get("checksum").is_some());

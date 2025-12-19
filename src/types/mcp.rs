@@ -39,7 +39,9 @@ impl fmt::Display for McpError {
         match self {
             McpError::NodeNotFound { id } => write!(f, "Node not found: N{}", id),
             McpError::EdgeNotFound { id } => write!(f, "Edge not found: E{}", id),
-            McpError::EsvValidationFailed { reason } => write!(f, "ESV validation failed: {}", reason),
+            McpError::EsvValidationFailed { reason } => {
+                write!(f, "ESV validation failed: {}", reason)
+            }
             McpError::DriftExceeded { drift, threshold } => {
                 write!(f, "Drift exceeded: {} > {}", drift, threshold)
             }
