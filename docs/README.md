@@ -17,5 +17,6 @@ Public CI validates protocol contracts via stub runtime; substrate execution is 
 
 Architecture, design rationale, and implementation details are maintained privately.
 
-Available to partners, auditors, and acquirers under NDA.  
-Contact: governance@onlysgsolutions.com
+Available to partners, auditors, and acquirers under NDA.
+
+Contact: Armonti Du-Bose-Hill <armontidubosehill@gmail.com>

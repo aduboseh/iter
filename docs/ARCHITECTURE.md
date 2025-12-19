@@ -13,4 +13,4 @@ See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md) for what public vs. 
 
 Execution architecture, substrate internals, and performance characteristics are documented privately. Available to partners, auditors, and acquirers under NDA.
 
-Contact: architecture@onlysgsolutions.com
+Contact: Armonti Du-Bose-Hill <armontidubosehill@gmail.com>
