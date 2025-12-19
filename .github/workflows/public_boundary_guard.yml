@@ -7,20 +7,101 @@ on:
     branches:
       - "**"
 jobs:
-  examples_boundary:
+  ip_boundary_audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # ================================================================
+      # Directory structure guards
+      # ================================================================
       - name: Ensure no internal examples directory exists
         run: |
           if [ -d "examples/internal" ]; then
-            echo "examples/internal must not exist in the public repo"
+            echo "::error::examples/internal must not exist in the public repo"
             exit 1
           fi
+
+      - name: Ensure no internal src directories exist
+        run: |
+          # These directories were moved to iter-internal
+          for dir in "src/services/sanitizer" "tests/integration"; do
+            if [ -d "$dir" ]; then
+              echo "::error::$dir must not exist in the public repo"
+              exit 1
+            fi
+          done
+
+      # ================================================================
+      # File existence guards (moved files must not reappear)
+      # ================================================================
+      - name: Block moved internal files
+        run: |
+          MOVED_FILES=(
+            "src/traits.rs"
+            "src/mcp_handler.rs"
+            "src/substrate_runtime.rs"
+            "src/services/sanitizer/forbidden.rs"
+            "src/services/sanitizer/response.rs"
+            "src/types/audit.rs"
+            "src/types/substrate.rs"
+            "tests/governance/telemetry.rs"
+            "tests/integration/boundary_tests.rs"
+            "tests/integration/common.rs"
+            "tests/integration/error_handling_tests.rs"
+            "tests/integration/tool_endpoint_tests.rs"
+            "tests/mcp_integration.rs"
+          )
+          for file in "${MOVED_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "::error::$file must not exist in the public repo (moved to iter-internal)"
+              exit 1
+            fi
+          done
+
+      # ================================================================
+      # Content pattern guards (IP leak detection)
+      # ================================================================
+      - name: Block substrate crate imports
+        run: |
+          # scg-* crates are proprietary and must not appear in public code
+          if grep -r -n --include="*.rs" "scg_" src tests; then
+            echo "::error::Found scg_ crate imports in public source"
+            exit 1
+          fi
+
+      - name: Block substrate_runtime references
+        run: |
+          # substrate_runtime module was moved to iter-internal
+          if grep -r -n --include="*.rs" "substrate_runtime" src tests; then
+            echo "::error::Found substrate_runtime references in public source"
+            exit 1
+          fi
+
+      - name: Block sanitizer::forbidden references
+        run: |
+          # Internal sanitization logic was moved to iter-internal
+          if grep -r -n --include="*.rs" "sanitizer::forbidden" src tests; then
+            echo "::error::Found sanitizer::forbidden references in public source"
+            exit 1
+          fi
+
       - name: Block internal imports in public examples
         run: |
           # Public examples must be black-box clients. No internal crate/module wiring.
           if grep -R -nE "iter_mcp_server|crate::internal::|internal::" examples; then
-            echo "Found internal import patterns under examples/"
+            echo "::error::Found internal import patterns under examples/"
             exit 1
           fi
+
+      # ================================================================
+      # Build verification
+      # ================================================================
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Verify public_stub compilation
+        run: cargo check --all-targets
+
+      - name: Run governance tests
+        run: cargo test --test governance_invariants

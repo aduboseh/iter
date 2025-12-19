@@ -37,25 +37,6 @@ pub mod caller_context;
 pub mod types;
 
 // ============================================================================
-// Full Substrate Modules (require proprietary substrate)
-// ============================================================================
-
-#[cfg(feature = "full_substrate")]
-pub mod governance;
-#[cfg(feature = "full_substrate")]
-pub mod metrics;
-#[cfg(feature = "full_substrate")]
-pub mod mcp_handler;
-#[cfg(feature = "full_substrate")]
-pub mod services;
-#[cfg(feature = "full_substrate")]
-pub mod substrate_runtime;
-#[cfg(feature = "full_substrate")]
-pub mod traits;
-#[cfg(feature = "full_substrate")]
-pub mod validation;
-
-// ============================================================================
 // Public Stub Module (demonstration mode)
 // ============================================================================
 
@@ -82,29 +63,6 @@ pub use types::{
     PROTOCOL_VERSION, PROTOCOL_MAJOR, PROTOCOL_MINOR, PROTOCOL_PATCH,
     MIN_SUPPORTED_MAJOR, ProtocolVersion, CompatibilityStatus, Deprecation,
 };
-
-// ============================================================================
-// Audit & Telemetry (always available)
-// ============================================================================
-
-pub use types::{
-    TraceContext, AuditPhase, AuditOutcome, AuditEvent,
-    AUDIT_ALLOWLIST, AUDIT_DENYLIST, is_field_allowed, is_field_denied,
-};
-
-// ============================================================================
-// Boundary Traits (Public API for substrate interaction - full substrate only)
-// ============================================================================
-
-#[cfg(feature = "full_substrate")]
-pub use traits::{SubstrateNodeView, SubstrateEdgeView, SubstrateGovernorView};
-
-// ============================================================================
-// Substrate Runtime (Public facade only - full substrate mode)
-// ============================================================================
-
-#[cfg(feature = "full_substrate")]
-pub use substrate_runtime::{SubstrateRuntime, SubstrateRuntimeConfig, SharedSubstrateRuntime};
 
 // ============================================================================
 // Stub Runtime (Public stub mode)

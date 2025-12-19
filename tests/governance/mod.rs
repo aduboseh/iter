@@ -8,7 +8,6 @@
 //! - `schema_stability`: Protocol type shape invariants
 //! - `error_taxonomy`: Error code completeness and stability
 //! - `versioning`: Protocol version and compatibility rules
-//! - `telemetry`: Audit event invariants and redaction guarantees
 //! - `release_discipline`: Release policy and compatibility invariants
 //!
 //! # Governance Contract
@@ -18,6 +17,5 @@
 
 pub mod schema_stability;
 pub mod error_taxonomy;
-pub mod telemetry;
 pub mod versioning;
 pub mod release_discipline;
