@@ -43,6 +43,8 @@ The precise sanitization rules and attack-resistance measures are intentionally 
 
 If you believe you have found a security issue:
 
-- email: security@onlysgsolutions.com
-- do not open a public issue for vulnerabilities
+- Email: armontidubosehill@gmail.com
+- Do not open a public issue for vulnerabilities
+
+Security issues should be reported directly to the maintainer at armontidubosehill@gmail.com. This inbox is actively monitored.
 

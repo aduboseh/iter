@@ -38,6 +38,7 @@ See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md) for what public CI c
 
 ## Contact
 
-- Governance: governance@onlysgsolutions.com
-- Security: security@onlysgsolutions.com
+For governance or security inquiries:
+
+Armonti Du-Bose-Hill <armontidubosehill@gmail.com>
 

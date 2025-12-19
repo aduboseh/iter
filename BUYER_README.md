@@ -96,9 +96,9 @@ cd ../typescript && npm ci && npm test
 
 ## Contact
 
-- Technical: architecture@onlysgsolutions.com
-- Licensing: legal@onlysgsolutions.com
-- Security: security@onlysgsolutions.com
+For technical, licensing, or security inquiries:
+
+Armonti Du-Bose-Hill <armontidubosehill@gmail.com>
 
 ---
 
