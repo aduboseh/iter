@@ -98,7 +98,7 @@ jobs:
       # Build verification
       # ================================================================
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Verify public_stub compilation
         run: cargo check --all-targets
