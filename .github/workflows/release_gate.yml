@@ -80,9 +80,13 @@ jobs:
           npm test
 
   # Gate 3: Version consistency
+  # NOTE: v0.x tags are deprecated historical boundary tags.
+  # They are re-pointed for IP safety and are not versioned releases.
+  # Release Gate enforcement applies only to canonical v1.x releases.
   version-check:
     name: Version Consistency
     runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref_name, 'v0.') }}
     steps:
       - uses: actions/checkout@v4
       
@@ -108,9 +112,11 @@ jobs:
           fi
 
   # Gate 4: Changelog exists
+  # NOTE: v0.x tags are deprecated historical boundary tags (see Gate 3 comment).
   changelog-check:
     name: Changelog Check
     runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref_name, 'v0.') }}
     steps:
       - uses: actions/checkout@v4
       
