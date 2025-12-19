@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2024-12-19
+
+### Fixed
+- Runtime version consistency: use `CARGO_PKG_VERSION` everywhere
+- SDK license alignment: all metadata now Apache-2.0
+- Unused import and dead code warnings
+
+### Added
+- Code quality CI workflow: fmt, clippy, audit enforcement
+- SBOM generation for release tags
+- Architecture boundary clarification for stub implementation
+
 ## [1.0.1] - 2024-12-15
 
 ### Changed
@@ -127,7 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic MCP protocol types
 - Stub substrate interface
 
-[Unreleased]: https://github.com/aduboseh/iter/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/aduboseh/iter/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/aduboseh/iter/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/aduboseh/iter/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/aduboseh/iter/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/aduboseh/iter/compare/v0.2.0...v0.3.0
