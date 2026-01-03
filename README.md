@@ -49,7 +49,6 @@ The MCP surface is intentionally small. All tools are deterministic, side-effect
 | `governor.status` | Query drift/coherence status |
 | `esv.audit` | Audit node ethical state vector |
 | `lineage.replay` | Replay checksum history |
-| `lineage.export` | Export lineage log |
 | `governance.status` | Query governance health status |
 
 ## Quick Start
@@ -117,6 +116,31 @@ cd sdks/typescript && npm test
 
 > **Note:** Integration tests (`mcp_integration`) require `full_substrate` mode. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md).
 
+Deterministic Governance Proof (Executable)
+
+A reproducible proof demonstrating deterministic governance over stochastic proposals using the Iter MCP server.
+
+This proof shows that, for a fixed governance substrate and policy set, governance outcomes are a deterministic function of inputs and constraints, even when upstream proposals vary in magnitude and intent.
+
+- Script: demos/governance_over_stochastic.ps1
+
+- Artifacts:
+
+  - demos/governance_proof.json
+
+  - demos/governance_proof_log.json
+
+- Lineage checksum is computed via SHA-256 and verified identical across executions
+
+- Evaluates five divergent proposals through the same governance path
+
+- Governance verdicts are deterministic across runs
+
+- No model training or learning is performed; governance evaluation only
+
+```powershell
+Run:.\demos\governance_over_stochastic.ps1
+```
 ## License
 
 Iter is licensed under Apache-2.0. Proprietary substrate components are not included in this repository.
@@ -128,5 +152,5 @@ Name: **Iter**
 Subtitle: **Deterministic Decision Paths & Audit for Copilot**
 
 <p align="center">
-  <sub>Only SG Solutions © 2025</sub>
+  <sub>Only SG Solutions © 2026</sub>
 </p>
