@@ -1,0 +1,92 @@
+{
+  "lineage_checksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "protocol_version": "2024-11-05",
+  "lineage_path": "C:\\Users\\adubo\\iter\\demos\\governance_proof.json",
+  "phases": [
+    {
+      "nodes": [
+        {
+          "id": 0,
+          "belief": 0.9,
+          "energy": 100.0,
+          "esv_valid": true
+        },
+        {
+          "id": 0,
+          "belief": 0.2,
+          "energy": 50.0,
+          "esv_valid": true
+        }
+      ],
+      "phase": "context_creation"
+    },
+    {
+      "proposals": [
+        {
+          "verdict": "ALLOWED",
+          "energy_drift": 0.0,
+          "healthy": true,
+          "drift_ok": true,
+          "coherence": 1.0,
+          "delta": 0.05,
+          "proposal": "Conservative"
+        },
+        {
+          "verdict": "ALLOWED",
+          "energy_drift": 0.0,
+          "healthy": true,
+          "drift_ok": true,
+          "coherence": 1.0,
+          "delta": 0.15,
+          "proposal": "Moderate"
+        },
+        {
+          "verdict": "ALLOWED",
+          "energy_drift": 0.0,
+          "healthy": true,
+          "drift_ok": true,
+          "coherence": 1.0,
+          "delta": 0.35,
+          "proposal": "Aggressive"
+        },
+        {
+          "verdict": "ALLOWED",
+          "energy_drift": 0.0,
+          "healthy": true,
+          "drift_ok": true,
+          "coherence": 1.0,
+          "delta": 0.55,
+          "proposal": "Extreme"
+        },
+        {
+          "verdict": "ALLOWED",
+          "energy_drift": 0.0,
+          "healthy": true,
+          "drift_ok": true,
+          "coherence": 1.0,
+          "delta": 0.85,
+          "proposal": "Reckless"
+        }
+      ],
+      "phase": "proposal_evaluation"
+    },
+    {
+      "final_governance": {
+        "drift_ok": true,
+        "energy_drift": 0.0,
+        "coherence": 1.0,
+        "node_count": 0,
+        "edge_count": 0,
+        "healthy": true
+      },
+      "phase": "determinism_verification"
+    },
+    {
+      "entry_count": 0,
+      "phase": "lineage_verification"
+    }
+  ],
+  "server_path": "C:\\Users\\adubo\\iter\\target\\release\\iter-server.exe",
+  "server_version": "0.3.0",
+  "timestamp": "2026-01-02T22:40:26.6969611-05:00"
+}
