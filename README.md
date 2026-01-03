@@ -122,13 +122,10 @@ A reproducible proof demonstrating deterministic governance over stochastic prop
 
 This proof shows that, for a fixed governance substrate and policy set, governance outcomes are a deterministic function of inputs and constraints, even when upstream proposals vary in magnitude and intent.
 
-- Script: demos/governance_over_stochastic.ps1
-
+- Script: [`demos/governance_over_stochastic.ps1`](demos/governance_over_stochastic.ps1)
 - Artifacts:
-
-  - demos/governance_proof.json
-
-  - demos/governance_proof_log.json
+  - [`demos/governance_proof.json`](demos/governance_proof.json)
+  - [`demos/governance_proof_log.json`](demos/governance_proof_log.json)
 
 - Lineage checksum is computed via SHA-256 and verified identical across executions
 
