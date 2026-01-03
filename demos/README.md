@@ -1,37 +1,38 @@
 # Iter Demos
 
-## `governance_over_stochastic.ps1`
+## governance_over_stochastic.ps1
 
-Demonstrates deterministic governance over stochastic model outputs using the Iter MCP server.
+This demo demonstrates deterministic governance over stochastic model outputs using the Iter MCP server.
 
----
-
-## What It Proves
-
-For a fixed governance substrate and policy set, governance outcomes are a deterministic function of inputs and constraints, even when proposals vary in magnitude and intent.
+The purpose of the demo is to show that, for a fixed governance substrate and policy set, governance outcomes are a deterministic function of inputs and constraints, even when upstream proposals vary in magnitude and intent.
 
 Stochasticity in upstream models does not compromise determinism at the governance layer.
 
----
+## What It Proves
+
+For a fixed governance substrate and policy configuration:
+
+- Governance verdicts are deterministic
+- Identical governance inputs produce identical outputs
+- Lineage artifacts can be replayed to reproduce results exactly
+- Determinism is enforced independently of proposal source
 
 ## Proof Structure
 
-1. **Inputs**  
-   Divergent proposals simulating stochastic LLM outputs.
+Inputs  
+Divergent proposals simulating stochastic LLM outputs.
 
-2. **Process**  
-   Deterministic governance evaluation via the Iter MCP interface.
+Process  
+Deterministic governance evaluation via the Iter MCP interface.
 
-3. **Outputs**  
-   Governance verdicts and associated metrics.
+Outputs  
+Governance verdicts and associated evaluation metrics.
 
-4. **Evidence**  
-   Hash-chained lineage artifact with cryptographic checksum.
+Evidence  
+Hash-chained lineage artifact with a cryptographic checksum.
 
-5. **Verification**  
-   Lineage replay produces an identical checksum across executions.
-
----
+Verification  
+Lineage replay produces an identical checksum across executions.
 
 ## How to Run
 
@@ -52,6 +53,7 @@ Identical checksums confirm bit-exact deterministic replay.
 
 Extension to Live LLMs
 The $proposals array simulates stochastic LLM outputs (e.g., temperature > 0).
+
 Live LLM routing (Claude, GPT, or local models) can replace this array without modifying governance logic.
 
-The governance substrate evaluates whatever proposals arrive. Determinism is enforced at the governance layer, not the proposal layer.
+The governance substrate evaluates whatever proposals arrive. Determinism is enforced at the governance layer, not at the proposal layer.
