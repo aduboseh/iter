@@ -92,17 +92,23 @@ impl ProtocolVersion {
     }
 }
 
-/// Compatibility check result
+/// Compatibility check result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompatibilityStatus {
     /// Fully compatible (same major, same or lower minor)
     Compatible,
     /// Forward compatible (same major, higher minor - client is newer)
     ForwardCompatible,
-    /// Deprecated (older major, still supported)
-    Deprecated { supported_until: &'static str },
-    /// Incompatible (outside support window)
-    Incompatible { reason: String },
+    /// Deprecated (older major, still supported).
+    Deprecated {
+        /// Version until which this remains supported
+        supported_until: &'static str,
+    },
+    /// Incompatible (outside support window).
+    Incompatible {
+        /// Human-readable incompatibility reason
+        reason: String,
+    },
 }
 
 impl ProtocolVersion {
@@ -162,9 +168,15 @@ impl Deprecation {
     }
 }
 
-// ============================================================================
-// Tests
-// ============================================================================
+/// Conformance tests for protocol versioning and compatibility.
+///
+/// These tests validate:
+/// - Semantic version parsing and normalization
+/// - Compatibility rules across major/minor boundaries
+/// - Deprecation metadata integrity
+///
+/// The suite is restricted to public, schema-level behavior and avoids any
+/// dependency on internal implementation details.
 
 #[cfg(test)]
 mod tests {

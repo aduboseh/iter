@@ -19,21 +19,29 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static NODE_COUNTER: AtomicU64 = AtomicU64::new(0);
 static EDGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// Stub node state
+/// Stub node state for protocol validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StubNode {
+    /// Stable node identifier
     pub id: u64,
+    /// Belief scalar used for deterministic evaluation
     pub belief: f64,
+    /// Energy value used for bounded state transitions
     pub energy: f64,
+    /// Whether the node satisfies ESV constraints
     pub esv_valid: bool,
 }
 
-/// Stub edge state
+/// Stub edge state for protocol validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StubEdge {
+    /// Stable edge identifier
     pub id: u64,
+    /// Source node identifier
     pub src: u64,
+    /// Destination node identifier
     pub dst: u64,
+    /// Edge weight used during traversal or aggregation
     pub weight: f64,
 }
 
@@ -76,10 +84,14 @@ pub struct StubRuntime {
     lineage: Vec<LineageEntry>,
 }
 
+/// Entry in the immutable lineage log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineageEntry {
+    /// Monotonic sequence number
     pub sequence: u64,
+    /// Operation type identifier
     pub operation: String,
+    /// SHA-256 checksum of this entry
     pub checksum: String,
     /// Optional propagation artifact attached for edge.propagate operations
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,6 +105,7 @@ impl Default for StubRuntime {
 }
 
 impl StubRuntime {
+    /// Creates a new empty stub runtime.
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
@@ -493,20 +506,31 @@ pub enum ReplayStatus {
     Blocked,
 }
 
+/// Governor status metrics for substrate health monitoring.
 #[derive(Debug, Clone, Serialize)]
 pub struct GovernorStatus {
+    /// Whether drift constraints are satisfied
     pub drift_ok: bool,
+    /// Net energy drift measured during evaluation
     pub energy_drift: f64,
+    /// Coherence score of the current substrate state
     pub coherence: f64,
+    /// Total number of nodes in the substrate
     pub node_count: usize,
+    /// Total number of edges in the substrate
     pub edge_count: usize,
+    /// Overall health indicator derived from governance checks
     pub healthy: bool,
 }
 
+/// ESV constraint audit result for a single node.
 #[derive(Debug, Clone, Serialize)]
 pub struct EsvAudit {
+    /// Identifier of the audited node
     pub node_id: u64,
+    /// Whether the node satisfies ESV constraints
     pub valid: bool,
+    /// Human-readable compliance classification
     pub compliance_status: String,
 }
 
@@ -528,15 +552,24 @@ pub enum GovernanceVerdict {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "error_code", content = "reason")]
 pub enum GovernanceError {
-    /// RFC 8785 canonical bytes failed verification
+    /// RFC 8785 canonical bytes failed verification.
     #[serde(rename = "INVALID_CANONICALIZATION")]
-    InvalidCanonicalization { reason: String },
-    /// Receipt integrity check failed
+    InvalidCanonicalization {
+        /// Human-readable error description
+        reason: String,
+    },
+    /// Receipt integrity check failed.
     #[serde(rename = "INVALID_RECEIPT")]
-    InvalidReceipt { reason: String },
-    /// Substrate error during evaluation
+    InvalidReceipt {
+        /// Human-readable error description
+        reason: String,
+    },
+    /// Substrate error during evaluation.
     #[serde(rename = "SUBSTRATE_ERROR")]
-    SubstrateError { reason: String },
+    SubstrateError {
+        /// Human-readable error description
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for GovernanceError {

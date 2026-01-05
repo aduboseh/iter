@@ -11,27 +11,51 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-// ============================================================================
-// MCP Error Types
-// ============================================================================
+/// Governance evaluation errors.
+///
+/// These errors represent canonical failure modes produced during
+/// deterministic governance evaluation.
 
-/// MCP Error codes aligned with JSON-RPC 2.0 and the engine boundary
+/// MCP Error codes aligned with JSON-RPC 2.0 and the engine boundary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum McpError {
-    /// Node not found by ID
-    NodeNotFound { id: u64 },
-    /// Edge not found by ID
-    EdgeNotFound { id: u64 },
-    /// ESV validation failed
-    EsvValidationFailed { reason: String },
-    /// Drift exceeded threshold
-    DriftExceeded { drift: f64, threshold: f64 },
-    /// Lineage integrity violation
-    LineageCorruption { details: String },
-    /// Generic substrate error
-    SubstrateError { message: String },
-    /// Invalid request parameters
-    BadRequest { message: String },
+    /// Node not found by ID.
+    NodeNotFound {
+        /// The missing node identifier
+        id: u64,
+    },
+    /// Edge not found by ID.
+    EdgeNotFound {
+        /// The missing edge identifier
+        id: u64,
+    },
+    /// ESV validation failed.
+    EsvValidationFailed {
+        /// Human-readable failure reason
+        reason: String,
+    },
+    /// Drift exceeded threshold.
+    DriftExceeded {
+        /// Actual drift value
+        drift: f64,
+        /// Maximum allowed drift
+        threshold: f64,
+    },
+    /// Lineage integrity violation.
+    LineageCorruption {
+        /// Corruption details
+        details: String,
+    },
+    /// Generic substrate error.
+    SubstrateError {
+        /// Error message
+        message: String,
+    },
+    /// Invalid request parameters.
+    BadRequest {
+        /// Validation error message
+        message: String,
+    },
 }
 
 impl fmt::Display for McpError {
@@ -87,9 +111,11 @@ impl McpError {
     }
 }
 
-// ============================================================================
-// MCP Response Types (Sanitized for External Exposure)
-// ============================================================================
+/// MCP response types (sanitized for external exposure).
+///
+/// These types define the public, schema-stable response structures returned
+/// by the MCP interface. All fields are explicitly sanitized and exclude any
+/// internal substrate state, identifiers, or execution details.
 
 /// Sanitized node state for MCP responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
