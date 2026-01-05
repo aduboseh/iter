@@ -256,6 +256,142 @@ impl StubRuntime {
         &self.lineage
     }
 
+    /// Evaluate a governance proposal and return authoritative verdict.
+    ///
+    /// This is the PHASE 0+ entry point for Haltra consumption.
+    /// Iter evaluates deterministic admissibility only.
+    ///
+    /// Verdict mapping (canonical, single source of truth):
+    /// - healthy=true AND drift_ok=true AND coherence>=0.7 → ALLOW
+    /// - healthy=false OR drift_ok=false → BLOCK  
+    /// - coherence<0.7 AND healthy=true → REVIEW
+    ///
+    /// JCS Canonicalization (Patch A):
+    /// - If proposal_c14n and proposal_hash are provided, Iter verifies the hash
+    /// - Receipt binds to proposal_hash for deterministic proof chain
+    pub fn evaluate_governance(
+        &mut self,
+        proposal: &GovernanceProposal,
+    ) -> Result<GovernanceEvaluation, GovernanceError> {
+        // Patch A: Verify JCS canonical hash if provided
+        let verified_proposal_hash = self.verify_proposal_hash(proposal)?;
+
+        // Get current governor status for verdict determination
+        let status = self.governor_status();
+
+        // Canonical verdict mapping (GAP 5 resolution)
+        let verdict = if !status.healthy || !status.drift_ok {
+            GovernanceVerdict::Block
+        } else if status.coherence >= 0.7 {
+            GovernanceVerdict::Allow
+        } else {
+            GovernanceVerdict::Review
+        };
+
+        // Build determinism proof
+        let determinism = DeterminismProof {
+            drift_ok: status.drift_ok,
+            energy_drift: status.energy_drift,
+            coherence: status.coherence,
+        };
+
+        // Compute CIH for this evaluation (now includes proposal_hash)
+        let eval_payload = serde_json::json!({
+            "proposal_id": proposal.proposal_id,
+            "proposal_hash": verified_proposal_hash,
+            "state_snapshot_hash": proposal.state_snapshot_hash,
+            "verdict": verdict,
+            "determinism": determinism,
+            "lineage_len": self.lineage.len(),
+        });
+        let cih = compute_stable_hash(&serde_json::to_string(&eval_payload).unwrap_or_default());
+
+        // Compute artifact hash
+        let artifact_hash = compute_stable_hash(&format!(
+            "{}:{}:{:?}",
+            proposal.proposal_id, verified_proposal_hash, verdict
+        ));
+
+        // Record in lineage
+        self.record_lineage(
+            "governance.evaluate",
+            &format!(
+                "proposal:{},hash:{},verdict:{:?}",
+                proposal.proposal_id, verified_proposal_hash, verdict
+            ),
+        );
+
+        // Build receipt with proposal_hash binding (Patch A) + verdict/version (Hardening)
+        let receipt = GovernanceReceipt {
+            cih,
+            artifact_hash,
+            replay_ref: format!("lineage:{}", self.lineage.len() - 1),
+            proposal_hash: verified_proposal_hash,
+            verdict,
+            iter_version: env!("CARGO_PKG_VERSION").to_string(),
+        };
+
+        Ok(GovernanceEvaluation {
+            verdict,
+            determinism,
+            receipt,
+        })
+    }
+
+    /// Verify proposal hash matches canonical bytes (Patch A: JCS verification).
+    ///
+    /// If proposal_c14n and proposal_hash are provided:
+    /// - Decode base64 proposal_c14n
+    /// - Compute SHA-256 of decoded bytes
+    /// - Verify computed hash matches proposal_hash
+    ///
+    /// If not provided, falls back to legacy hash computation.
+    fn verify_proposal_hash(
+        &self,
+        proposal: &GovernanceProposal,
+    ) -> Result<String, GovernanceError> {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+        match (&proposal.proposal_c14n, &proposal.proposal_hash) {
+            (Some(c14n_b64), Some(claimed_hash)) => {
+                // Decode base64 canonical bytes
+                let c14n_bytes = STANDARD.decode(c14n_b64).map_err(|e| {
+                    GovernanceError::InvalidCanonicalization {
+                        reason: format!("base64 decode failed: {}", e),
+                    }
+                })?;
+
+                // Compute SHA-256 of canonical bytes
+                let computed_hash = compute_stable_hash(&String::from_utf8_lossy(&c14n_bytes));
+
+                // Verify hash match
+                if computed_hash != *claimed_hash {
+                    return Err(GovernanceError::InvalidCanonicalization {
+                        reason: format!(
+                            "proposal_hash mismatch: computed={}, claimed={}",
+                            computed_hash, claimed_hash
+                        ),
+                    });
+                }
+
+                Ok(claimed_hash.clone())
+            }
+            (None, Some(hash)) => {
+                // Hash provided without canonical bytes - trust but warn
+                // (backwards compatibility for Phase 0 clients)
+                Ok(hash.clone())
+            }
+            _ => {
+                // Legacy mode: compute hash from proposal fields
+                let legacy_hash = compute_stable_hash(&format!(
+                    "{}:{}:{}",
+                    proposal.proposal_id, proposal.state_snapshot_hash, proposal.requested_action
+                ));
+                Ok(legacy_hash)
+            }
+        }
+    }
+
     /// Replay lineage with verification.
     ///
     /// For edge.propagate entries with attached artifacts:
@@ -374,6 +510,120 @@ pub struct EsvAudit {
     pub compliance_status: String,
 }
 
+/// Verdict for governance evaluation.
+///
+/// This is the authoritative decision boundary. Haltra proposes, Iter decides.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GovernanceVerdict {
+    /// Action is admissible under current governance constraints
+    Allow,
+    /// Action is blocked due to governance violation
+    Block,
+    /// Action requires human review (coherence below threshold)
+    Review,
+}
+
+/// Errors that can occur during governance evaluation (Patch A/B).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "error_code", content = "reason")]
+pub enum GovernanceError {
+    /// RFC 8785 canonical bytes failed verification
+    #[serde(rename = "INVALID_CANONICALIZATION")]
+    InvalidCanonicalization { reason: String },
+    /// Receipt integrity check failed
+    #[serde(rename = "INVALID_RECEIPT")]
+    InvalidReceipt { reason: String },
+    /// Substrate error during evaluation
+    #[serde(rename = "SUBSTRATE_ERROR")]
+    SubstrateError { reason: String },
+}
+
+impl std::fmt::Display for GovernanceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GovernanceError::InvalidCanonicalization { reason } => {
+                write!(f, "Invalid canonicalization: {}", reason)
+            }
+            GovernanceError::InvalidReceipt { reason } => {
+                write!(f, "Invalid receipt: {}", reason)
+            }
+            GovernanceError::SubstrateError { reason } => {
+                write!(f, "Substrate error: {}", reason)
+            }
+        }
+    }
+}
+
+impl std::error::Error for GovernanceError {}
+
+/// Determinism proof returned with governance evaluation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeterminismProof {
+    /// Whether energy drift is within bounds (≤1×10⁻¹⁰)
+    pub drift_ok: bool,
+    /// Current energy drift value
+    pub energy_drift: f64,
+    /// Coherence index [0.0, 1.0]
+    pub coherence: f64,
+}
+
+/// Receipt for governance evaluation (cryptographic audit trail).
+///
+/// Self-contained for auditor verification — includes verdict and version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceReceipt {
+    /// Composite Integrity Hash for this decision
+    pub cih: String,
+    /// SHA-256 hash of the evaluation artifact
+    pub artifact_hash: String,
+    /// Reference for replay verification
+    pub replay_ref: String,
+    /// SHA-256 hash of the canonical proposal (RFC 8785 binding)
+    pub proposal_hash: String,
+    /// Verdict included for self-contained audit verification
+    pub verdict: GovernanceVerdict,
+    /// Iter version that produced this receipt (provenance)
+    pub iter_version: String,
+}
+
+/// Domain-agnostic governance proposal input.
+///
+/// Iter does NOT interpret domain semantics. It evaluates deterministic
+/// admissibility only. Haltra owns domain ethics interpretation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceProposal {
+    /// Unique proposal identifier
+    pub proposal_id: String,
+    /// SHA-256 hash of the state snapshot being evaluated
+    pub state_snapshot_hash: String,
+    /// Constraints to evaluate (opaque to Iter)
+    #[serde(default)]
+    pub constraints: serde_json::Value,
+    /// Requested action (opaque to Iter)
+    pub requested_action: String,
+    /// RFC 8785 (JCS) canonical JSON bytes, base64-encoded
+    #[serde(default)]
+    pub proposal_c14n: Option<String>,
+    /// SHA-256 hash of proposal_c14n bytes (Haltra computes, Iter verifies)
+    #[serde(default)]
+    pub proposal_hash: Option<String>,
+}
+
+/// Result of governance evaluation.
+///
+/// This is the authoritative response from Iter. Haltra must not claim
+/// determinism, ethical validity, or audit integrity independently.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceEvaluation {
+    /// Authoritative verdict: ALLOW, BLOCK, or REVIEW
+    pub verdict: GovernanceVerdict,
+    /// Determinism proof metrics
+    pub determinism: DeterminismProof,
+    /// Cryptographic receipt for audit trail
+    pub receipt: GovernanceReceipt,
+}
+
 fn compute_stable_hash(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
@@ -421,10 +671,6 @@ mod tests {
         assert!(obj.contains_key("healthy"));
         assert!(!obj.contains_key("_mode")); // No mode field
     }
-
-    // ========================================================================
-    // RPSU-01 Tests: Reference Propagation Artifact
-    // ========================================================================
 
     #[test]
     fn propagation_artifact_has_reference_stub_mode() {

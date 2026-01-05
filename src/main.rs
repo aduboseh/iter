@@ -227,6 +227,20 @@ fn handle_stub_request(
                     "name": "lineage.replay",
                     "description": "Replay lineage",
                     "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governance.evaluate",
+                    "description": "Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                        },
+                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+                    }
                 }
             ]
         }),
@@ -316,6 +330,55 @@ fn handle_stub_tool(
         "lineage.replay" => {
             let lineage = runtime.lineage_replay();
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
+        }
+        "governance.evaluate" => {
+            // PHASE 0+: Iter-Haltra Bridge with JCS verification
+            // This is the authoritative governance entry point.
+            // Haltra proposes, Iter decides.
+            let proposal_id = args
+                .get("proposal_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let state_snapshot_hash = args
+                .get("state_snapshot_hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let constraints = args.get("constraints").cloned().unwrap_or(json!({}));
+            let requested_action = args
+                .get("requested_action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            // Patch A: JCS canonical bytes and hash
+            let proposal_c14n = args
+                .get("proposal_c14n")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let proposal_hash = args
+                .get("proposal_hash")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            let proposal = substrate::stub::GovernanceProposal {
+                proposal_id,
+                state_snapshot_hash,
+                constraints,
+                requested_action,
+                proposal_c14n,
+                proposal_hash,
+            };
+
+            match runtime.evaluate_governance(&proposal) {
+                Ok(evaluation) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&evaluation).unwrap()}]})
+                }
+                Err(e) => {
+                    // Return error in MCP format for Patch B loud fail-closed
+                    json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
+                }
+            }
         }
         _ => json!({"error": {"code": 3000, "message": "Unknown tool"}}),
     }
