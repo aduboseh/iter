@@ -15,7 +15,6 @@ use std::fmt;
 ///
 /// These errors represent canonical failure modes produced during
 /// deterministic governance evaluation.
-
 /// MCP Error codes aligned with JSON-RPC 2.0 and the engine boundary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum McpError {
@@ -116,7 +115,6 @@ impl McpError {
 /// These types define the public, schema-stable response structures returned
 /// by the MCP interface. All fields are explicitly sanitized and exclude any
 /// internal substrate state, identifiers, or execution details.
-
 /// Sanitized node state for MCP responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpNodeState {
