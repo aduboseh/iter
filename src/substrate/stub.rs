@@ -15,11 +15,6 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::audit::DecisionPacket;
-use crate::contracts::{EnergyEnvelope, LearningEnvelope, ReasoningEnvelope, SystemState};
-use crate::economics::EconomicsConfig;
-use crate::policy::{PolicyConfig, PolicyEvaluator};
-
 /// Counter for generating sequential IDs
 static NODE_COUNTER: AtomicU64 = AtomicU64::new(0);
 static EDGE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -87,14 +82,6 @@ pub struct StubRuntime {
     nodes: HashMap<u64, StubNode>,
     edges: HashMap<u64, StubEdge>,
     lineage: Vec<LineageEntry>,
-    /// Current tick (ITER-PAR-01)
-    tick: u64,
-    /// Policy evaluator (ITER-PAR-01)
-    policy_evaluator: PolicyEvaluator,
-    /// Economics config (ITER-PAR-01)
-    economics_config: EconomicsConfig,
-    /// Last decision packet (ITER-PAR-01)
-    last_decision_packet: Option<DecisionPacket>,
 }
 
 /// Entry in the immutable lineage log.
@@ -124,34 +111,7 @@ impl StubRuntime {
             nodes: HashMap::new(),
             edges: HashMap::new(),
             lineage: Vec::new(),
-            tick: 0,
-            policy_evaluator: PolicyEvaluator::new(PolicyConfig::default()),
-            economics_config: EconomicsConfig::default(),
-            last_decision_packet: None,
         }
-    }
-
-    /// Creates a new stub runtime with custom policy and economics config.
-    pub fn with_config(policy_config: PolicyConfig, economics_config: EconomicsConfig) -> Self {
-        Self {
-            nodes: HashMap::new(),
-            edges: HashMap::new(),
-            lineage: Vec::new(),
-            tick: 0,
-            policy_evaluator: PolicyEvaluator::new(policy_config),
-            economics_config,
-            last_decision_packet: None,
-        }
-    }
-
-    /// Get current tick.
-    pub fn current_tick(&self) -> u64 {
-        self.tick
-    }
-
-    /// Advance tick.
-    pub fn advance_tick(&mut self) {
-        self.tick += 1;
     }
 
     /// Create a node with placeholder values
@@ -518,175 +478,6 @@ impl StubRuntime {
             checksum,
             propagation_artifact,
         });
-    }
-
-    // ========================================================================
-    // ITER-PAR-01: System State and Decision Packet Methods
-    // ========================================================================
-
-    /// Get current system state (ITER-PAR-01: Deliverable A).
-    ///
-    /// Returns a complete snapshot for governance evaluation including:
-    /// - Energy envelope
-    /// - Reasoning envelope (stub: simulated)
-    /// - Learning envelope (stub: no learning)
-    /// - Policy envelope
-    pub fn system_state(&self) -> Result<SystemState, GovernanceError> {
-        let derived = self.compute_derived_state();
-        let status = self.governor_status();
-
-        // Build energy envelope from derived state
-        let energy = EnergyEnvelope::new(
-            derived.total_energy,
-            0.0, // Stub: no reservoir
-            if status.healthy { 1.0 } else { 0.5 },
-        )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
-
-        // Build reasoning envelope (stub: simulated based on coherence)
-        let reasoning = ReasoningEnvelope::new(
-            status.coherence, // quality = coherence in stub
-            derived.mean_belief, // value_signal from belief
-            0.0, // conflict_signal (stub: no conflict)
-            status.coherence, // control_signal = coherence
-        )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
-
-        // Build learning envelope (stub: no learning)
-        let learning = LearningEnvelope::default_no_learning();
-
-        // Evaluate policy
-        let policy_result = self.policy_evaluator.evaluate(&reasoning, &learning, &energy);
-        let policy = self
-            .policy_evaluator
-            .build_envelope(&policy_result)
-            .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-                reason: e.to_string(),
-            })?;
-
-        Ok(SystemState::new(self.tick, energy, reasoning, learning, policy))
-    }
-
-    /// Build decision packet for current state (ITER-PAR-01: Deliverable D).
-    ///
-    /// Creates a complete audit record with checksum for replay verification.
-    pub fn build_decision_packet(
-        &mut self,
-        scg_build_hash: &str,
-    ) -> Result<DecisionPacket, GovernanceError> {
-        let state = self.system_state()?;
-
-        // Evaluate policy to get evaluated rules
-        let policy_result = self.policy_evaluator.evaluate(
-            &state.reasoning,
-            &state.learning,
-            &state.energy,
-        );
-
-        let packet = DecisionPacket::new(
-            env!("CARGO_PKG_VERSION").to_string(),
-            scg_build_hash.to_string(),
-            &state,
-            None, // No permit in stub
-            self.economics_config.compute_hash(),
-            policy_result.evaluated_rules.iter().map(|s: &&str| s.to_string()).collect(),
-        )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
-
-        self.last_decision_packet = Some(packet.clone());
-
-        // Record in lineage
-        self.record_lineage(
-            "decision.packet",
-            &format!("tick:{},checksum:{}", self.tick, packet.checksum),
-        );
-
-        Ok(packet)
-    }
-
-    /// Get last decision packet (if any).
-    pub fn last_decision_packet(&self) -> Option<&DecisionPacket> {
-        self.last_decision_packet.as_ref()
-    }
-
-    /// Update economics configuration.
-    pub fn set_economics_config(&mut self, config: EconomicsConfig) {
-        self.economics_config = config;
-    }
-
-    /// Get economics configuration.
-    pub fn economics_config(&self) -> &EconomicsConfig {
-        &self.economics_config
-    }
-
-    /// Update policy configuration.
-    pub fn set_policy_config(&mut self, config: PolicyConfig) {
-        self.policy_evaluator = PolicyEvaluator::new(config);
-    }
-
-    /// Get policy configuration.
-    pub fn policy_config(&self) -> &PolicyConfig {
-        self.policy_evaluator.config()
-    }
-
-    /// Evaluate and produce decision packet for SCG state input.
-    ///
-    /// This is the main ITER-PAR-01 entry point for SCG integration.
-    /// Accepts typed contract inputs and produces auditable decision output.
-    pub fn evaluate_scg_state(
-        &mut self,
-        energy: &EnergyEnvelope,
-        reasoning: &ReasoningEnvelope,
-        learning: &LearningEnvelope,
-        scg_build_hash: &str,
-    ) -> Result<DecisionPacket, GovernanceError> {
-        // Evaluate policy
-        let policy_result = self.policy_evaluator.evaluate(reasoning, learning, energy);
-        let policy = self
-            .policy_evaluator
-            .build_envelope(&policy_result)
-            .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-                reason: e.to_string(),
-            })?;
-
-        // Build system state
-        let state = SystemState::new(
-            self.tick,
-            energy.clone(),
-            reasoning.clone(),
-            learning.clone(),
-            policy,
-        );
-
-        // Build decision packet
-        let packet = DecisionPacket::new(
-            env!("CARGO_PKG_VERSION").to_string(),
-            scg_build_hash.to_string(),
-            &state,
-            None,
-            self.economics_config.compute_hash(),
-            policy_result.evaluated_rules.iter().map(|s: &&str| s.to_string()).collect(),
-        )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
-
-        self.last_decision_packet = Some(packet.clone());
-        self.advance_tick();
-
-        // Record in lineage
-        self.record_lineage(
-            "scg.evaluate",
-            &format!("tick:{},decision:{:?}", self.tick - 1, state.policy.decision),
-        );
-
-        Ok(packet)
     }
 }
 

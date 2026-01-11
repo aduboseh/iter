@@ -44,7 +44,6 @@ fn protocol_version_constants_are_consistent() {
 }
 
 #[test]
-#[allow(clippy::assertions_on_constants)]
 fn min_supported_version_is_valid() {
     // MIN_SUPPORTED_MAJOR must be <= current major
     assert!(
@@ -74,7 +73,6 @@ fn current_version_is_compatible() {
 }
 
 #[test]
-#[allow(clippy::absurd_extreme_comparisons)]
 fn same_major_lower_minor_is_compatible() {
     // Only test if minor > 0 to avoid underflow
     // When minor is 0, there's no "lower minor" to test
@@ -249,7 +247,6 @@ fn protocol_version_matches_golden_snapshot() {
 // ============================================================================
 
 #[test]
-#[allow(clippy::assertions_on_constants)]
 fn major_version_is_documented() {
     // If major > 1, there should be migration docs
     // This is a reminder test - fails if major bumps without action
