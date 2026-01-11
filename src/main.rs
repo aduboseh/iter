@@ -1,6 +1,3 @@
-#[cfg(feature = "public_stub")]
-mod substrate;
-
 use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 
@@ -30,7 +27,7 @@ fn print_mode_banner() {
 }
 
 fn run_stdio_server() {
-    use crate::substrate::stub::StubRuntime;
+    use iter_mcp_server::substrate::stub::StubRuntime;
     use std::io::BufWriter;
 
     let mut runtime = StubRuntime::new();
@@ -108,7 +105,7 @@ fn run_stdio_server() {
 
 #[cfg(feature = "public_stub")]
 fn handle_stub_request(
-    runtime: &mut substrate::stub::StubRuntime,
+    runtime: &mut iter_mcp_server::substrate::stub::StubRuntime,
     method: &str,
     req: &serde_json::Value,
 ) -> serde_json::Value {
@@ -258,7 +255,7 @@ fn handle_stub_request(
 
 #[cfg(feature = "public_stub")]
 fn handle_stub_tool(
-    runtime: &mut substrate::stub::StubRuntime,
+    runtime: &mut iter_mcp_server::substrate::stub::StubRuntime,
     tool: &str,
     args: &serde_json::Value,
 ) -> serde_json::Value {
@@ -361,7 +358,7 @@ fn handle_stub_tool(
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
-            let proposal = substrate::stub::GovernanceProposal {
+            let proposal = iter_mcp_server::substrate::stub::GovernanceProposal {
                 proposal_id,
                 state_snapshot_hash,
                 constraints,
