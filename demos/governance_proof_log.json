@@ -1,9 +1,4 @@
 {
-  "timestamp": "2026-01-08T23:45:24.4737550-05:00",
-  "server_path": "C:\\Users\\adubo\\iter\\target\\release\\iter-server.exe",
-  "lineage_checksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-  "lineage_path": "C:\\Users\\adubo\\iter\\demos\\governance_proof.json",
-  "server_version": "1.0.2",
   "phases": [
     {
       "phase": "context_creation",
@@ -25,55 +20,54 @@
     {
       "proposals": [
         {
-          "coherence": 1.0,
-          "proposal": "Conservative",
-          "energy_drift": 0.0,
           "delta": 0.05,
-          "verdict": "ALLOWED",
+          "healthy": true,
+          "energy_drift": 0.0,
+          "coherence": 1.0,
           "drift_ok": true,
-          "healthy": true
+          "verdict": "ALLOWED",
+          "proposal": "Conservative"
         },
         {
-          "coherence": 1.0,
-          "proposal": "Moderate",
-          "energy_drift": 0.0,
           "delta": 0.15,
-          "verdict": "ALLOWED",
+          "healthy": true,
+          "energy_drift": 0.0,
+          "coherence": 1.0,
           "drift_ok": true,
-          "healthy": true
+          "verdict": "ALLOWED",
+          "proposal": "Moderate"
         },
         {
-          "coherence": 1.0,
-          "proposal": "Aggressive",
-          "energy_drift": 0.0,
           "delta": 0.35,
-          "verdict": "ALLOWED",
+          "healthy": true,
+          "energy_drift": 0.0,
+          "coherence": 1.0,
           "drift_ok": true,
-          "healthy": true
+          "verdict": "ALLOWED",
+          "proposal": "Aggressive"
         },
         {
-          "coherence": 1.0,
-          "proposal": "Extreme",
-          "energy_drift": 0.0,
           "delta": 0.55,
-          "verdict": "ALLOWED",
+          "healthy": true,
+          "energy_drift": 0.0,
+          "coherence": 1.0,
           "drift_ok": true,
-          "healthy": true
+          "verdict": "ALLOWED",
+          "proposal": "Extreme"
         },
         {
-          "coherence": 1.0,
-          "proposal": "Reckless",
-          "energy_drift": 0.0,
           "delta": 0.85,
-          "verdict": "ALLOWED",
+          "healthy": true,
+          "energy_drift": 0.0,
+          "coherence": 1.0,
           "drift_ok": true,
-          "healthy": true
+          "verdict": "ALLOWED",
+          "proposal": "Reckless"
         }
       ],
       "phase": "proposal_evaluation"
     },
     {
-      "phase": "determinism_verification",
       "final_governance": {
         "drift_ok": true,
         "energy_drift": 0.0,
@@ -81,12 +75,18 @@
         "node_count": 0,
         "edge_count": 0,
         "healthy": true
-      }
+      },
+      "phase": "determinism_verification"
     },
     {
       "phase": "lineage_verification",
       "entry_count": 0
     }
   ],
-  "protocol_version": "2024-11-05"
+  "lineage_checksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "server_path": "C:\\Users\\adubo\\iter\\target\\release\\iter-server.exe",
+  "protocol_version": "2024-11-05",
+  "server_version": "1.0.2",
+  "lineage_path": "C:\\Users\\adubo\\iter\\demos\\governance_proof.json",
+  "timestamp": "2026-01-09T00:31:05.6297066-05:00"
 }

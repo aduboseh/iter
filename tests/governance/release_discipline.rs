@@ -158,6 +158,7 @@ const SUPPORT_WINDOW_MONTHS: u32 = 6;
 const EOL_ANNOUNCEMENT_MONTHS: u32 = 3;
 
 #[test]
+#[allow(clippy::assertions_on_constants)]
 fn support_window_is_reasonable() {
     assert!(
         SUPPORT_WINDOW_MONTHS >= 6,

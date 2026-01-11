@@ -177,7 +177,6 @@ impl Deprecation {
 ///
 /// The suite is restricted to public, schema-level behavior and avoids any
 /// dependency on internal implementation details.
-
 #[cfg(test)]
 mod tests {
     use super::*;

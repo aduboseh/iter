@@ -23,6 +23,10 @@ path = "src/main.rs"
 name = "iter-verify"
 path = "src/bin/iter_verify.rs"
 
+[[example]]
+name = "governance_demo"
+path = "demos/governance_demo.rs"
+
 [lib]
 name = "iter_mcp_server"
 path = "src/lib.rs"
