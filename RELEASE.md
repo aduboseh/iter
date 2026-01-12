@@ -2,7 +2,7 @@
 
 This document defines how Iter ships: channels, versioning, compatibility, EOL policy, and release gates.
 
-> **Surface Freeze (v1.0.1):** Protocol and SDK surface are stable for 12 months (through December 2025) barring security issues. Any breaking change requires major version bump, migration documentation, and 3-month deprecation notice.
+> **Surface Freeze (v1.0.2):** Protocol and SDK surface are stable for 12 months (through January 2027) barring security issues. Any breaking change requires major version bump, migration documentation, and 3-month deprecation notice.
 
 ## Release Channels
 

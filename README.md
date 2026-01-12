@@ -1,27 +1,61 @@
 # Iter Server
 
-**Deterministic MCP server for governed execution, replayable decision paths, and auditable state transitions.**
+Deterministic governance control plane for auditable decision-making, replayable reasoning paths, and policy-enforced execution.
 
-[![CI](https://github.com/aduboseh/iter/actions/workflows/mcp_integration.yml/badge.svg)](https://github.com/aduboseh/iter/actions/workflows/mcp_integration.yml)
-[![Governance](https://github.com/aduboseh/iter/actions/workflows/verify_rules_consistency.yml/badge.svg)](https://github.com/aduboseh/iter/actions/workflows/verify_rules_consistency.yml)
-[![MCP](https://img.shields.io/badge/MCP-2024--11--05-blue)](https://modelcontextprotocol.io)
+**Determinism · Governance · MCP**
+
+---
 
 ## What is Iter?
 
-Iter Server is a hardened **Model Context Protocol (MCP)** gateway (JSON-RPC 2.0) that exposes a small, governed tool surface while enforcing a strict response sanitization boundary.
+Iter Server is a hardened **Model Context Protocol (MCP)** server (JSON-RPC 2.0) that acts as an **authoritative governance and audit control plane** for decision systems.
 
-> **Surface Freeze:** Protocol and SDK surface are stable for 12 months (through December 2025) barring security issues. See [RELEASE.md](RELEASE.md) for compatibility policy.
+Iter evaluates governance conditions, enforces policy and economic constraints, and emits **replay-sufficient DecisionPackets** that prove exactly why a decision occurred.
 
-It is designed for:
-- deterministic replay
-- decision audit
-- governed execution
-- zero leakage of non-public engine details through responses
+MCP is the transport.  
+Governance, causality, and replay are the product.
 
-Iter is NOT:
-- a general-purpose agent runtime
-- an orchestration framework
-- a low-latency execution engine
+**Surface freeze**  
+Protocol and SDK surface are stable for 12 months (through January 2027), barring security issues.  
+See `RELEASE.md` for compatibility policy.
+
+### Designed for
+- Deterministic governance evaluation  
+- Replayable decision paths (without re-learning)  
+- Policy-enforced reasoning and learning gates  
+- Audit-ready causality with cryptographic verification  
+
+### Iter is not
+- A general-purpose agent runtime  
+- An orchestration framework  
+- A learning or training system  
+- A low-latency execution engine  
+
+Iter does not compute reasoning signals or perform learning.  
+It governs and proves decisions produced by upstream systems.
+
+---
+
+## Governance Artifacts
+
+### DecisionPacket
+
+The primary output of Iter is a **DecisionPacket**.
+
+A DecisionPacket is a replay-sufficient, immutable record that contains everything required to reconstruct a governance outcome without re-running learning or inference.
+
+Each packet includes:
+- System state snapshot (energy, reasoning, learning, policy)
+- Capsule identity and version hashes
+- Policy decisions and explicit reason codes
+- Learning permissions and economic constraints
+- Canonical JSON serialization with SHA-256 checksum
+
+DecisionPackets are deterministic:
+- Identical inputs and configuration produce byte-identical packets
+- Checksums verify integrity across time and systems
+
+---
 
 ## MCP Tools
 
@@ -29,37 +63,40 @@ The MCP surface is intentionally small. All tools are deterministic, side-effect
 
 ### State Operations
 
-| Tool | Description |
-|------|-------------|
-| `node.create` | Create a node with initial values |
-| `node.query` | Query node state by ID |
-| `node.mutate` | Mutate node belief by delta (debug operation) |
+| Tool        | Description                              |
+|-------------|------------------------------------------|
+| node.create | Create a node with initial values         |
+| node.query  | Query node state by ID                   |
+| node.mutate | Mutate node belief by delta (debug only) |
 
 ### Propagation
 
-| Tool | Description |
-|------|-------------|
-| `edge.bind` | Bind an edge between two nodes |
-| `edge.propagate` | Run a deterministic step |
+| Tool           | Description                |
+|----------------|----------------------------|
+| edge.bind      | Bind an edge between nodes |
+| edge.propagate | Run a deterministic step  |
 
 ### Governance & Audit
 
-| Tool | Description |
-|------|-------------|
-| `governor.status` | Query drift/coherence status |
-| `esv.audit` | Audit node ethical state vector |
-| `lineage.replay` | Replay checksum history |
-| `governance.status` | Query governance health status |
+| Tool               | Description                                  |
+|--------------------|----------------------------------------------|
+| governance.status  | Query governance health                      |
+| governor.status    | Query drift and coherence status             |
+| lineage.replay     | Replay checksum history                      |
+
+Governance tools emit DecisionPackets when applicable.
+
+---
 
 ## Quick Start
 
 ```bash
-# Clone and build (public_stub mode - no proprietary dependencies)
+# Clone and build (public_stub mode – no proprietary dependencies)
 git clone https://github.com/aduboseh/iter.git
 cd iter
 cargo build --release
 
-# Run governance tests
+# Run governance invariant tests
 cargo test --test governance_invariants
 
 # Build the server binary
@@ -69,93 +106,96 @@ cargo build --release --bin iter-server
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | cargo run --release --bin iter-server
 ```
 
-> **Note:** Examples (`determinism_demo`, `mcp_client`) compile but require `full_substrate` for meaningful execution. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md) for build mode details.
+Note: Examples compile in public_stub mode and demonstrate governance behavior without proprietary substrates.
+See `ARCHITECTURE_BOUNDARY.md` for build mode details.
 
-### Desktop Client Integration
+---
 
-```json
-{
-  "mcpServers": {
-    "iter": {
-      "command": "/path/to/iter-server"
-    }
-  }
-}
+## Deterministic Governance Demo
+
+A reproducible demo demonstrating deterministic governance over reasoning quality, learning permissions, and economic constraints.
+
+```bash
+cargo run --example governance_demo
 ```
+
+### What the demo shows
+
+- Policy halt on low reasoning quality
+- Learning frozen under scarcity conditions
+- Explicit policy reason codes
+- Byte-identical DecisionPackets across repeated runs
+
+### Properties
+
+- Canonical JSON DecisionPacket with SHA-256 checksum
+- Replay without re-learning or inference
+- Governance outcomes deterministic by construction
+
+---
 
 ## Security & Governance Model
 
-**Iter assumes hostile inputs and untrusted clients by default.**
+Iter assumes hostile inputs and untrusted clients by default.
 
-Every outbound response passes through a deterministic sanitizer backed by forbidden-pattern coverage, Unicode normalization, and zero-width character stripping.
+Every outbound response is deterministic and verifiable.
 
-- Threat model and defenses: [docs/SECURITY.md](docs/SECURITY.md)
-- Forbidden registry overview: [docs/ATTACK_SURFACE.md](docs/ATTACK_SURFACE.md)
+### Enforcement
 
-Governance enforcement:
-- checksum verification (manifests)
-- CODEOWNERS protection
-- CI enforcement
+- Fail-closed contracts (unknown enums rejected)
+- NaN / Inf rejection on all numeric fields
+- Deterministic policy evaluation order
+- Economic authority enforced via config and permits
 
-Details: [docs/GOVERNANCE.md](docs/GOVERNANCE.md)
+### Integrity
+
+- Canonical serialization
+- Cryptographic checksums
+- Append-only audit logs
+
+Details:
+- `docs/SECURITY.md`
+- `docs/ATTACK_SURFACE.md`
+- `docs/GOVERNANCE.md`
+- `docs/contracts_v1.md`
+
+---
 
 ## Kernel Compatibility
 
-Validated against [drift-kernel v1.0.0](https://github.com/aduboseh/drift-kernel/releases/tag/drift-kernel-v1.0.0).
+Validated against drift-kernel v1.0.0.
+
+---
 
 ## Testing
 
-# Governance invariant tests (public_stub mode)
+```bash
+# Governance Invariants
 cargo test --test governance_invariants
 
-# SDK tests (isolated, no substrate deps)
+# Adversarial Governance Tests
+cargo test --test adversarial_governance
 
-# PowerShell (Windows)
-cd sdks\rust
-cargo test
-cd ..\..
-cd sdks\typescript
-npm test
-cd ..\..
+# Replay Contract Tests
+cargo test --test replay_contract
 
-# bash / zsh (Linux, macOS)
-cd sdks/rust && cargo test
-cd sdks/typescript && npm test
-
-> **Note:** Integration tests (`mcp_integration`) require `full_substrate` mode. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md).
-
-Deterministic Governance Proof (Executable)
-
-A reproducible proof demonstrating deterministic governance over stochastic proposals using the Iter MCP server.
-
-This proof shows that, for a fixed governance substrate and policy set, governance outcomes are a deterministic function of inputs and constraints, even when upstream proposals vary in magnitude and intent.
-
-- Script: [`demos/governance_over_stochastic.ps1`](demos/governance_over_stochastic.ps1)
-- Artifacts:
-  - [`demos/governance_proof.json`](demos/governance_proof.json)
-  - [`demos/governance_proof_log.json`](demos/governance_proof_log.json)
-
-- Lineage checksum is computed via SHA-256 and verified identical across executions
-
-- Evaluates five divergent proposals through the same governance path
-
-- Governance verdicts are deterministic across runs
-
-- No model training or learning is performed; governance evaluation only
-
-```powershell
-Run:.\demos\governance_over_stochastic.ps1
+# Golden Vector Determinism
+cargo test --test golden_vectors
 ```
+
+All tests pass deterministically across repeated runs.
+
+---
+
 ## License
 
-Iter is licensed under Apache-2.0. Proprietary substrate components are not included in this repository.
+Iter is licensed under Apache-2.0.
+Proprietary substrate components are not included in this repository.
 
-## Marketplace identity
+---
 
-Name: **Iter**
+## Marketplace Identity
 
-Subtitle: **Deterministic Decision Paths & Audit for Copilot**
+**Name:** Iter
 
-<p align="center">
-  <sub>Only SG Solutions © 2026</sub>
-</p>
+**Subtitle:** Deterministic Governance & Audit Control Plane
