@@ -60,7 +60,8 @@ impl ReasoningEnvelope {
         control_signal: f64,
     ) -> Result<Self, ContractError> {
         let quality = validate_bounded_float(quality, 0.0, 1.0, "reasoning.quality")?;
-        let value_signal = validate_bounded_float(value_signal, 0.0, 1.0, "reasoning.value_signal")?;
+        let value_signal =
+            validate_bounded_float(value_signal, 0.0, 1.0, "reasoning.value_signal")?;
         let conflict_signal =
             validate_bounded_float(conflict_signal, 0.0, 1.0, "reasoning.conflict_signal")?;
         let control_signal =
@@ -168,8 +169,10 @@ impl LearningEnvelope {
         scarcity_streak: u64,
     ) -> Result<Self, ContractError> {
         validate_hash(&version_hash, "learning.version_hash")?;
-        let update_cost = validate_bounded_float(update_cost, 0.0, f64::MAX, "learning.update_cost")?;
-        let update_paid = validate_bounded_float(update_paid, 0.0, f64::MAX, "learning.update_paid")?;
+        let update_cost =
+            validate_bounded_float(update_cost, 0.0, f64::MAX, "learning.update_cost")?;
+        let update_paid =
+            validate_bounded_float(update_paid, 0.0, f64::MAX, "learning.update_paid")?;
         let update_quality =
             validate_bounded_float(update_quality, 0.0, 1.0, "learning.update_quality")?;
 

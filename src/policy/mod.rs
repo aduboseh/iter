@@ -100,7 +100,10 @@ impl PolicyRule for LearningPermissionGate {
 
         // Scarcity streak exceeded => freeze
         if learning.scarcity_streak >= self.max_scarcity_streak {
-            return RuleOutcome::Terminal(PolicyDecision::FreezeLearning, "SCARCITY_STREAK_EXCEEDED");
+            return RuleOutcome::Terminal(
+                PolicyDecision::FreezeLearning,
+                "SCARCITY_STREAK_EXCEEDED",
+            );
         }
 
         RuleOutcome::Continue
@@ -426,7 +429,9 @@ mod tests {
 
         let result = evaluator.evaluate(&reasoning, &learning, &energy);
         assert_eq!(result.decision, PolicyDecision::FreezeLearning);
-        assert!(result.reason_codes.contains(&"INTEGRITY_VIOLATION".to_string()));
+        assert!(result
+            .reason_codes
+            .contains(&"INTEGRITY_VIOLATION".to_string()));
     }
 
     #[test]

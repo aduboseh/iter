@@ -541,34 +541,44 @@ impl StubRuntime {
             0.0, // Stub: no reservoir
             if status.healthy { 1.0 } else { 0.5 },
         )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
+        .map_err(
+            |e: crate::contracts::ContractError| GovernanceError::SubstrateError {
+                reason: e.to_string(),
+            },
+        )?;
 
         // Build reasoning envelope (stub: simulated based on coherence)
         let reasoning = ReasoningEnvelope::new(
-            status.coherence, // quality = coherence in stub
+            status.coherence,    // quality = coherence in stub
             derived.mean_belief, // value_signal from belief
-            0.0, // conflict_signal (stub: no conflict)
-            status.coherence, // control_signal = coherence
+            0.0,                 // conflict_signal (stub: no conflict)
+            status.coherence,    // control_signal = coherence
         )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
+        .map_err(
+            |e: crate::contracts::ContractError| GovernanceError::SubstrateError {
+                reason: e.to_string(),
+            },
+        )?;
 
         // Build learning envelope (stub: no learning)
         let learning = LearningEnvelope::default_no_learning();
 
         // Evaluate policy
-        let policy_result = self.policy_evaluator.evaluate(&reasoning, &learning, &energy);
+        let policy_result = self
+            .policy_evaluator
+            .evaluate(&reasoning, &learning, &energy);
         let policy = self
             .policy_evaluator
             .build_envelope(&policy_result)
-            .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-                reason: e.to_string(),
-            })?;
+            .map_err(
+                |e: crate::contracts::ContractError| GovernanceError::SubstrateError {
+                    reason: e.to_string(),
+                },
+            )?;
 
-        Ok(SystemState::new(self.tick, energy, reasoning, learning, policy))
+        Ok(SystemState::new(
+            self.tick, energy, reasoning, learning, policy,
+        ))
     }
 
     /// Build decision packet for current state (ITER-PAR-01: Deliverable D).
@@ -576,28 +586,32 @@ impl StubRuntime {
     /// Creates a complete audit record with checksum for replay verification.
     pub fn build_decision_packet(
         &mut self,
-        scg_build_hash: &str,
+        substrate_build_hash: &str,
     ) -> Result<DecisionPacket, GovernanceError> {
         let state = self.system_state()?;
 
         // Evaluate policy to get evaluated rules
-        let policy_result = self.policy_evaluator.evaluate(
-            &state.reasoning,
-            &state.learning,
-            &state.energy,
-        );
+        let policy_result =
+            self.policy_evaluator
+                .evaluate(&state.reasoning, &state.learning, &state.energy);
 
         let packet = DecisionPacket::new(
             env!("CARGO_PKG_VERSION").to_string(),
-            scg_build_hash.to_string(),
+            substrate_build_hash.to_string(),
             &state,
             None, // No permit in stub
             self.economics_config.compute_hash(),
-            policy_result.evaluated_rules.iter().map(|s: &&str| s.to_string()).collect(),
+            policy_result
+                .evaluated_rules
+                .iter()
+                .map(|s: &&str| s.to_string())
+                .collect(),
         )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
+        .map_err(
+            |e: crate::contracts::ContractError| GovernanceError::SubstrateError {
+                reason: e.to_string(),
+            },
+        )?;
 
         self.last_decision_packet = Some(packet.clone());
 
@@ -639,21 +653,23 @@ impl StubRuntime {
     ///
     /// This is the main ITER-PAR-01 entry point for SCG integration.
     /// Accepts typed contract inputs and produces auditable decision output.
-    pub fn evaluate_scg_state(
+    pub fn evaluate_substrate_state(
         &mut self,
         energy: &EnergyEnvelope,
         reasoning: &ReasoningEnvelope,
         learning: &LearningEnvelope,
-        scg_build_hash: &str,
+        substrate_build_hash: &str,
     ) -> Result<DecisionPacket, GovernanceError> {
         // Evaluate policy
         let policy_result = self.policy_evaluator.evaluate(reasoning, learning, energy);
         let policy = self
             .policy_evaluator
             .build_envelope(&policy_result)
-            .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-                reason: e.to_string(),
-            })?;
+            .map_err(
+                |e: crate::contracts::ContractError| GovernanceError::SubstrateError {
+                    reason: e.to_string(),
+                },
+            )?;
 
         // Build system state
         let state = SystemState::new(
@@ -667,15 +683,21 @@ impl StubRuntime {
         // Build decision packet
         let packet = DecisionPacket::new(
             env!("CARGO_PKG_VERSION").to_string(),
-            scg_build_hash.to_string(),
+            substrate_build_hash.to_string(),
             &state,
             None,
             self.economics_config.compute_hash(),
-            policy_result.evaluated_rules.iter().map(|s: &&str| s.to_string()).collect(),
+            policy_result
+                .evaluated_rules
+                .iter()
+                .map(|s: &&str| s.to_string())
+                .collect(),
         )
-        .map_err(|e: crate::contracts::ContractError| GovernanceError::SubstrateError {
-            reason: e.to_string(),
-        })?;
+        .map_err(
+            |e: crate::contracts::ContractError| GovernanceError::SubstrateError {
+                reason: e.to_string(),
+            },
+        )?;
 
         self.last_decision_packet = Some(packet.clone());
         self.advance_tick();
@@ -683,7 +705,11 @@ impl StubRuntime {
         // Record in lineage
         self.record_lineage(
             "scg.evaluate",
-            &format!("tick:{},decision:{:?}", self.tick - 1, state.policy.decision),
+            &format!(
+                "tick:{},decision:{:?}",
+                self.tick - 1,
+                state.policy.decision
+            ),
         );
 
         Ok(packet)

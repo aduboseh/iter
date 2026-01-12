@@ -120,7 +120,12 @@ impl LearningPermit {
         max_learning_energy: f64,
         expiry_tick: u64,
     ) -> Result<Self, ContractError> {
-        validate_bounded_float(max_learning_energy, 0.0, f64::MAX, "permit.max_learning_energy")?;
+        validate_bounded_float(
+            max_learning_energy,
+            0.0,
+            f64::MAX,
+            "permit.max_learning_energy",
+        )?;
 
         let mut permit = Self {
             permit_id,
@@ -347,8 +352,7 @@ mod tests {
 
     #[test]
     fn permit_revocation() {
-        let mut permit =
-            LearningPermit::new("permit-1".to_string(), vec![], 100.0, 1000).unwrap();
+        let mut permit = LearningPermit::new("permit-1".to_string(), vec![], 100.0, 1000).unwrap();
         let hash_before = permit.permit_hash.clone();
 
         permit.revoke();

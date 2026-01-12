@@ -61,7 +61,8 @@ fn golden_vector_1_allow_committed() {
     // GOLDEN CHECKSUM: This value MUST be identical across all platforms
     // If this fails on any platform, canonicalization is non-deterministic
     // TODO: Replace placeholder once checksums are stable across CI platforms
-    const _EXPECTED_CHECKSUM: &str = "a9a8a5e8c38b1d9e3f8c9b7e2a1d4c6f8e9b0a3d5c7e2f1a4b6d8e0c2a4f6b8";
+    const _EXPECTED_CHECKSUM: &str =
+        "a9a8a5e8c38b1d9e3f8c9b7e2a1d4c6f8e9b0a3d5c7e2f1a4b6d8e0c2a4f6b8";
 
     // Verify checksum structure (64 hex chars)
     assert_eq!(packet.checksum.len(), 64);
@@ -259,7 +260,11 @@ fn golden_vector_5_large_values() {
         &state,
         None,
         "2222222222222222222222222222222222222222222222222222222222222222".to_string(),
-        vec!["RULE_A".to_string(), "RULE_B".to_string(), "RULE_C".to_string()],
+        vec![
+            "RULE_A".to_string(),
+            "RULE_B".to_string(),
+            "RULE_C".to_string(),
+        ],
     )
     .unwrap();
 

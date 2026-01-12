@@ -50,7 +50,12 @@ fn evaluate_governance(
         all_reasons.push(econ_reason.to_string());
     }
 
-    (final_decision, all_reasons, result.evaluated_rules, econ_reason.to_string())
+    (
+        final_decision,
+        all_reasons,
+        result.evaluated_rules,
+        econ_reason.to_string(),
+    )
 }
 
 /// Build a DecisionPacket from raw state
@@ -71,12 +76,8 @@ fn build_packet(
         tick,
     );
 
-    let policy_envelope = PolicyEnvelope::new(
-        policy_config.compute_hash(),
-        decision,
-        reason_codes,
-    )
-    .unwrap();
+    let policy_envelope =
+        PolicyEnvelope::new(policy_config.compute_hash(), decision, reason_codes).unwrap();
 
     let system_state = SystemState::new(
         tick,
@@ -98,13 +99,12 @@ fn build_packet(
 }
 
 /// Replay a DecisionPacket and verify it produces identical results
-fn replay_packet(packet: &DecisionPacket, policy_config: &PolicyConfig) -> (PolicyDecision, Vec<String>) {
+fn replay_packet(
+    packet: &DecisionPacket,
+    policy_config: &PolicyConfig,
+) -> (PolicyDecision, Vec<String>) {
     let evaluator = PolicyEvaluator::new(policy_config.clone());
-    let result = evaluator.evaluate(
-        &packet.reasoning,
-        &packet.learning,
-        &packet.energy,
-    );
+    let result = evaluator.evaluate(&packet.reasoning, &packet.learning, &packet.energy);
     (result.decision, result.reason_codes)
 }
 
@@ -127,7 +127,14 @@ fn replay_produces_identical_allow_decision() {
     let policy_config = PolicyConfig::default();
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.decision(), PolicyDecision::Allow);
 
@@ -160,7 +167,14 @@ fn replay_produces_identical_deny_decision() {
     };
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.decision(), PolicyDecision::Deny);
 
@@ -193,7 +207,14 @@ fn replay_produces_identical_freeze_learning_decision() {
     };
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.decision(), PolicyDecision::FreezeLearning);
 
@@ -225,7 +246,14 @@ fn replay_produces_identical_degraded_mode_decision() {
     };
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.decision(), PolicyDecision::DegradedMode);
 
@@ -258,8 +286,22 @@ fn identical_inputs_produce_identical_checksums() {
     let policy_config = PolicyConfig::default();
     let economics_config = EconomicsConfig::default();
 
-    let packet1 = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
-    let packet2 = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet1 = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
+    let packet2 = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet1.checksum, packet2.checksum);
 }
@@ -283,8 +325,22 @@ fn different_tick_produces_different_checksum() {
     let policy_config = PolicyConfig::default();
     let economics_config = EconomicsConfig::default();
 
-    let packet1 = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
-    let packet2 = build_packet(101, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet1 = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
+    let packet2 = build_packet(
+        101,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_ne!(packet1.checksum, packet2.checksum);
 }
@@ -312,8 +368,22 @@ fn different_decision_produces_different_checksum() {
     };
     let economics_config = EconomicsConfig::default();
 
-    let packet_allow = build_packet(100, &reasoning, &learning, &energy_good, &policy_config, &economics_config);
-    let packet_deny = build_packet(100, &reasoning, &learning, &energy_bad, &policy_config, &economics_config);
+    let packet_allow = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy_good,
+        &policy_config,
+        &economics_config,
+    );
+    let packet_deny = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy_bad,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet_allow.decision(), PolicyDecision::Allow);
     assert_eq!(packet_deny.decision(), PolicyDecision::Deny);
@@ -347,7 +417,14 @@ fn audit_log_preserves_packet_sequence() {
 
     // Log 10 decisions
     for tick in 0..10 {
-        let packet = build_packet(tick, &reasoning, &learning, &energy, &policy_config, &economics_config);
+        let packet = build_packet(
+            tick,
+            &reasoning,
+            &learning,
+            &energy,
+            &policy_config,
+            &economics_config,
+        );
         log.append(&packet);
     }
 
@@ -381,7 +458,14 @@ fn audit_log_can_export_and_verify() {
     let policy_config = PolicyConfig::default();
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
     let original_checksum = packet.checksum.clone();
 
     log.append(&packet);
@@ -417,13 +501,25 @@ fn deny_packet_contains_denial_reason() {
     };
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.decision(), PolicyDecision::Deny);
-    assert!(!packet.reason_codes().is_empty(), "Deny must have explicit reason");
+    assert!(
+        !packet.reason_codes().is_empty(),
+        "Deny must have explicit reason"
+    );
 
     // The reason must match the actual cause
-    assert!(packet.reason_codes().contains(&"ENERGY_INTEGRITY_BELOW_THRESHOLD".to_string()));
+    assert!(packet
+        .reason_codes()
+        .contains(&"ENERGY_INTEGRITY_BELOW_THRESHOLD".to_string()));
 }
 
 #[test]
@@ -445,7 +541,14 @@ fn packet_policy_hash_matches_config() {
     let policy_config = PolicyConfig::default();
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.policy.policy_hash, policy_config.compute_hash());
 }
@@ -469,7 +572,14 @@ fn packet_economics_hash_matches_config() {
     let policy_config = PolicyConfig::default();
     let economics_config = EconomicsConfig::default();
 
-    let packet = build_packet(100, &reasoning, &learning, &energy, &policy_config, &economics_config);
+    let packet = build_packet(
+        100,
+        &reasoning,
+        &learning,
+        &energy,
+        &policy_config,
+        &economics_config,
+    );
 
     assert_eq!(packet.economics_hash, economics_config.compute_hash());
 }
@@ -501,18 +611,29 @@ fn replay_1000_decisions_deterministically() {
         )
         .unwrap();
 
-        let packet = build_packet(tick, &reasoning, &learning, &energy, &policy_config, &economics_config);
+        let packet = build_packet(
+            tick,
+            &reasoning,
+            &learning,
+            &energy,
+            &policy_config,
+            &economics_config,
+        );
 
         // Replay and verify
         let (replayed_decision, replayed_reasons) = replay_packet(&packet, &policy_config);
 
         assert_eq!(
-            replayed_decision, packet.decision(),
-            "Decision mismatch at tick {}", tick
+            replayed_decision,
+            packet.decision(),
+            "Decision mismatch at tick {}",
+            tick
         );
         assert_eq!(
-            replayed_reasons, packet.reason_codes(),
-            "Reason codes mismatch at tick {}", tick
+            replayed_reasons,
+            packet.reason_codes(),
+            "Reason codes mismatch at tick {}",
+            tick
         );
     }
 }

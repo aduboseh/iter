@@ -34,7 +34,7 @@ pub struct DecisionPacket {
     /// Iter build hash (compile-time)
     pub iter_build_hash: String,
     /// SCG build hash (from contract)
-    pub scg_build_hash: String,
+    pub substrate_build_hash: String,
     /// Decision tick
     pub tick: u64,
     /// Energy snapshot
@@ -63,7 +63,7 @@ impl DecisionPacket {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         iter_build_hash: String,
-        scg_build_hash: String,
+        substrate_build_hash: String,
         state: &SystemState,
         permit_hash: Option<String>,
         economics_hash: String,
@@ -71,7 +71,7 @@ impl DecisionPacket {
     ) -> Result<Self, ContractError> {
         let mut packet = Self {
             iter_build_hash,
-            scg_build_hash,
+            substrate_build_hash,
             tick: state.tick,
             energy: state.energy.clone(),
             reasoning: state.reasoning.clone(),
@@ -154,7 +154,7 @@ struct CanonicalPacket {
     permit_hash: Option<String>,
     policy: CanonicalPolicy,
     reasoning: CanonicalReasoning,
-    scg_build_hash: String,
+    substrate_build_hash: String,
     tick: u64,
 }
 
@@ -225,7 +225,7 @@ impl From<&DecisionPacket> for CanonicalPacket {
                 quality: p.reasoning.quality,
                 value_signal: p.reasoning.value_signal,
             },
-            scg_build_hash: p.scg_build_hash.clone(),
+            substrate_build_hash: p.substrate_build_hash.clone(),
             tick: p.tick,
         }
     }
@@ -302,7 +302,11 @@ impl AuditEvent {
             "reason_codes": self.reason_codes,
         });
         let mut hasher = Sha256::new();
-        hasher.update(serde_json::to_string(&payload).unwrap_or_default().as_bytes());
+        hasher.update(
+            serde_json::to_string(&payload)
+                .unwrap_or_default()
+                .as_bytes(),
+        );
         format!("{:x}", hasher.finalize())
     }
 }

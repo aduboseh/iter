@@ -40,14 +40,14 @@ pub mod types;
 // ITER-PAR-01: Contract and Governance Modules
 // ============================================================================
 
-/// Contract envelopes for SCG-CTX-03 + SCG-INT-04 governance.
-pub mod contracts;
-/// Policy primitives for deterministic rule evaluation.
-pub mod policy;
-/// Economic control plane for learning costs and permits.
-pub mod economics;
 /// Decision packet export for audit and replay.
 pub mod audit;
+/// Contract envelopes for SCG-CTX-03 + SCG-INT-04 governance.
+pub mod contracts;
+/// Economic control plane for learning costs and permits.
+pub mod economics;
+/// Policy primitives for deterministic rule evaluation.
+pub mod policy;
 
 // ============================================================================
 // Public Stub Module (demonstration mode)
@@ -86,10 +86,10 @@ pub use substrate::stub::StubRuntime;
 // ITER-PAR-01 Re-exports (Contract/Policy/Audit types)
 // ============================================================================
 
+pub use audit::{AuditError, AuditEvent, AuditLog, DecisionPacket};
 pub use contracts::{
     ContractError, EnergyEnvelope, LearningEnvelope, LearningStatus, PolicyDecision,
     PolicyEnvelope, ReasoningEnvelope, SystemState,
 };
-pub use policy::{PolicyConfig, PolicyEvaluator, PolicyResult};
 pub use economics::{EconomicsConfig, EconomicsController, LearningPermit};
-pub use audit::{AuditError, AuditEvent, AuditLog, DecisionPacket};
+pub use policy::{PolicyConfig, PolicyEvaluator, PolicyResult};

@@ -54,7 +54,10 @@ fn all_learning_status_variants_parse() {
     let variants = [
         ("COMMITTED", LearningStatus::Committed),
         ("NO_PROPOSAL_NO_DELTA", LearningStatus::NoProposalNoDelta),
-        ("REJECTED_INPUT_QUALITY", LearningStatus::RejectedInputQuality),
+        (
+            "REJECTED_INPUT_QUALITY",
+            LearningStatus::RejectedInputQuality,
+        ),
         ("REJECTED_SCARCITY", LearningStatus::RejectedScarcity),
         ("REJECTED_INTEGRITY", LearningStatus::RejectedIntegrity),
     ];
@@ -225,7 +228,10 @@ fn deny_decision_produces_reason_code() {
     let result = evaluator.evaluate(&reasoning, &learning, &energy);
 
     assert_eq!(result.decision, PolicyDecision::Deny);
-    assert!(!result.reason_codes.is_empty(), "Deny must have reason codes");
+    assert!(
+        !result.reason_codes.is_empty(),
+        "Deny must have reason codes"
+    );
     assert!(result
         .reason_codes
         .contains(&"ENERGY_INTEGRITY_BELOW_THRESHOLD".to_string()));
