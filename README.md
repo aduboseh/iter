@@ -105,14 +105,22 @@ Validated against [drift-kernel v1.0.0](https://github.com/aduboseh/drift-kernel
 
 ## Testing
 
-```bash
 # Governance invariant tests (public_stub mode)
 cargo test --test governance_invariants
 
 # SDK tests (isolated, no substrate deps)
+
+# PowerShell (Windows)
+cd sdks\rust
+cargo test
+cd ..\..
+cd sdks\typescript
+npm test
+cd ..\..
+
+# bash / zsh (Linux, macOS)
 cd sdks/rust && cargo test
 cd sdks/typescript && npm test
-```
 
 > **Note:** Integration tests (`mcp_integration`) require `full_substrate` mode. See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md).
 
