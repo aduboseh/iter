@@ -299,3 +299,147 @@ Iter is stateless; recovery involves redeploying containers and pointing to exis
 4. Resume operations
 
 **RTO:** < 30 minutes for infrastructure redeployment
+---
+
+## Healthcare Data Processing Clarification
+
+**Critical Distinction:** Iter governs actions taken by systems that process PHI; it does not ingest, transform, or persist clinical data.
+
+### PHI Boundary
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     DATA FLOW EXAMPLE                            │
+│                                                                  │
+│  Healthcare AI Agent                                             │
+│  │                                                               │
+│  ├─ Reads PHI from EHR system                                    │
+│  │  (patient diagnosis, medications, lab results)               │
+│  │                                                               │
+│  ├─ Proposes clinical action                                     │
+│  │  "Prescribe medication X at dosage Y"                        │
+│  │                                                               │
+│  ├─ Submits governance request to Iter                           │
+│  │  ┌────────────────────────────────────────────────────┐      │
+│  │  │ Iter Receives:                                     │      │
+│  │  │ • Action type: "prescribe_medication"              │      │
+│  │  │ • Risk score: 0.15                                 │      │
+│  │  │ • Confidence: 0.92                                 │      │
+│  │  │                                                    │      │
+│  │  │ Iter Does NOT Receive:                             │      │
+│  │  │ • Patient name, MRN, or identifiers                │      │
+│  │  │ • Diagnosis codes or clinical details              │      │
+│  │  │ • Medication names or dosages                      │      │
+│  │  └────────────────────────────────────────────────────┘      │
+│  │                                                               │
+│  └─ Receives governance decision                                 │
+│     "ALLOW" or "REQUIRE_REVIEW"                                  │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Governance-Only Data Model
+
+Iter processes **governance-relevant metadata**, not clinical data:
+
+- Action classifications (e.g., "high_risk_intervention")
+- Confidence scores and uncertainty bounds
+- Policy compliance flags
+- Agent identity and authorization context
+
+**What Iter does not store:**
+- Patient identifiers (names, MRNs, SSNs)
+- Clinical observations (diagnoses, lab values, vitals)
+- Treatment details (medications, procedures, orders)
+
+### HIPAA Compliance Implications
+
+Because Iter does not store PHI:
+
+1. **Not a Covered Entity or Business Associate** (in typical deployments)
+2. **No HIPAA Security Rule applicability** to Iter data stores
+3. **Simplified audit scope** for healthcare customers
+
+**Exception:** If a customer configures Iter to receive PHI-containing inputs (against design guidance), Iter's Azure-hosted infrastructure can support BAA execution. However, default deployment intentionally avoids this requirement.
+
+### Recommended Integration Pattern
+
+Healthcare customers should:
+
+1. **Pre-process agent requests** to strip PHI before submitting to Iter
+2. **Use risk scores and action types** as governance inputs, not clinical details
+3. **Store PHI-containing agent logs separately** from Iter's decision ledger
+
+This pattern maintains full governance capability while keeping Iter outside HIPAA compliance scope, reducing operational burden.
+---
+
+## Healthcare Data Processing Clarification
+
+**Critical Distinction:** Iter governs actions taken by systems that process PHI; it does not ingest, transform, or persist clinical data.
+
+### PHI Boundary
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     DATA FLOW EXAMPLE                            │
+│                                                                  │
+│  Healthcare AI Agent                                             │
+│  │                                                               │
+│  ├─ Reads PHI from EHR system                                    │
+│  │  (patient diagnosis, medications, lab results)               │
+│  │                                                               │
+│  ├─ Proposes clinical action                                     │
+│  │  "Prescribe medication X at dosage Y"                        │
+│  │                                                               │
+│  ├─ Submits governance request to Iter                           │
+│  │  ┌────────────────────────────────────────────────────┐      │
+│  │  │ Iter Receives:                                     │      │
+│  │  │ • Action type: "prescribe_medication"              │      │
+│  │  │ • Risk score: 0.15                                 │      │
+│  │  │ • Confidence: 0.92                                 │      │
+│  │  │                                                    │      │
+│  │  │ Iter Does NOT Receive:                             │      │
+│  │  │ • Patient name, MRN, or identifiers                │      │
+│  │  │ • Diagnosis codes or clinical details              │      │
+│  │  │ • Medication names or dosages                      │      │
+│  │  └────────────────────────────────────────────────────┘      │
+│  │                                                               │
+│  └─ Receives governance decision                                 │
+│     "ALLOW" or "REQUIRE_REVIEW"                                  │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Governance-Only Data Model
+
+Iter processes **governance-relevant metadata**, not clinical data:
+
+- Action classifications (e.g., "high_risk_intervention")
+- Confidence scores and uncertainty bounds
+- Policy compliance flags
+- Agent identity and authorization context
+
+**What Iter does not store:**
+- Patient identifiers (names, MRNs, SSNs)
+- Clinical observations (diagnoses, lab values, vitals)
+- Treatment details (medications, procedures, orders)
+
+### HIPAA Compliance Implications
+
+Because Iter does not store PHI:
+
+1. **Not a Covered Entity or Business Associate** (in typical deployments)
+2. **No HIPAA Security Rule applicability** to Iter data stores
+3. **Simplified audit scope** for healthcare customers
+
+**Exception:** If a customer configures Iter to receive PHI-containing inputs (against design guidance), Iter's Azure-hosted infrastructure can support BAA execution. However, default deployment intentionally avoids this requirement.
+
+### Recommended Integration Pattern
+
+Healthcare customers should:
+
+1. **Pre-process agent requests** to strip PHI before submitting to Iter
+2. **Use risk scores and action types** as governance inputs, not clinical details
+3. **Store PHI-containing agent logs separately** from Iter's decision ledger
+
+This pattern maintains full governance capability while keeping Iter outside HIPAA compliance scope, reducing operational burden.

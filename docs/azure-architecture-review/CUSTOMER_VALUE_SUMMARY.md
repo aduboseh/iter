@@ -273,3 +273,27 @@ Only SG Solutions
 ---
 
 *Iter: Deterministic Governance for Auditable AI*
+---
+
+## Executive Summary (One-Sentence Positioning)
+
+**Iter enables regulated organizations to deploy AI systems that can be stopped, explained, and replayed under audit.**
+
+This positioning directly addresses the three highest-risk concerns in enterprise AI adoption:
+- **Stopped:** Fail-closed enforcement prevents unauthorized actions
+- **Explained:** Every decision includes explicit reason codes and policy references
+- **Replayed:** Deterministic DecisionPackets reconstruct historical decisions without re-inference
+
+Use this framing in executive briefings, RFP responses, and partner conversations.
+---
+
+## Executive Summary (One-Sentence Positioning)
+
+**Iter enables regulated organizations to deploy AI systems that can be stopped, explained, and replayed under audit.**
+
+This positioning directly addresses the three highest-risk concerns in enterprise AI adoption:
+- **Stopped:** Fail-closed enforcement prevents unauthorized actions
+- **Explained:** Every decision includes explicit reason codes and policy references
+- **Replayed:** Deterministic DecisionPackets reconstruct historical decisions without re-inference
+
+Use this framing in executive briefings, RFP responses, and partner conversations.

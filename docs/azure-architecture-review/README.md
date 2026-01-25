@@ -103,3 +103,8 @@ These steps demonstrate representative capabilities; additional internal tests a
 ---
 
 *Only SG Solutions © 2025-2026*
+### E. Operational Resilience
+
+| Document | Description |
+|----------|-------------|
+| [FAILURE_MODES.md](./FAILURE_MODES.md) | Fail-closed behavior and safe-fail semantics |

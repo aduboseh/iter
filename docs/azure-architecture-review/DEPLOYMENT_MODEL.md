@@ -259,3 +259,223 @@ Iter is stateless; all persistent state is external (DecisionPackets, audit logs
 | Southeast Asia | APAC deployments |
 
 Multi-region deployment follows active-passive model with traffic manager.
+---
+
+## Lifecycle Framing: Day-0 / Day-1 / Day-2 Operations
+
+### Day-0: Marketplace Provisioning
+
+**Objective:** Instantiate Iter infrastructure in customer Azure subscription
+
+**Activities:**
+1. Customer initiates deployment from Azure Marketplace
+2. Iter ARM template provisions:
+   - AKS cluster (or integrates with existing cluster)
+   - Azure Cosmos DB account (governance state)
+   - Azure Storage account (decision ledger)
+   - Managed Identity for Iter service principal
+3. Network configuration applied (private endpoint, vNet integration)
+4. Health checks confirm service availability
+
+**Success Criteria:**
+- Iter API responds to `tools/list` with 200 OK
+- Managed Identity can authenticate to Cosmos DB
+- Storage account accessible via private endpoint
+
+**Typical Duration:** 15–30 minutes (automated)
+
+---
+
+### Day-1: Identity + Policy Bootstrap
+
+**Objective:** Configure Entra ID integration and install initial governance policies
+
+**Activities:**
+1. **Identity Binding**
+   - Customer grants Iter Managed Identity access to required Azure resources
+   - Entra ID application registration created for consumer authentication
+   - RBAC roles assigned (Governance Admin, Policy Auditor)
+
+2. **Policy Installation**
+   - Default "safe-start" policy installed (DENY all until explicitly allowed)
+   - Customer imports policy templates for their use case:
+     - Healthcare: clinical decision review gates
+     - Financial: model risk management thresholds
+     - General: basic quality and safety constraints
+
+3. **Test Governance Request**
+   - Customer submits sample decision to Iter
+   - Verifies DecisionPacket returned with expected outcome
+   - Confirms AuditEvent written to ledger
+
+**Success Criteria:**
+- Consumer can authenticate via Entra ID
+- Policy evaluation returns deterministic results
+- Audit ledger queryable via Azure Storage
+
+**Typical Duration:** 2–4 hours (semi-automated with validation)
+
+---
+
+### Day-2: Policy Evolution + Audit Replay
+
+**Objective:** Ongoing governance operations and compliance maintenance
+
+**Activities:**
+
+1. **Policy Lifecycle Management**
+   - Update policies to reflect changing business rules
+   - Version policies with semantic versioning
+   - Test policy changes in isolated namespace before production promotion
+
+2. **Audit and Compliance**
+   - Schedule daily exports of DecisionPackets for archive
+   - Execute replay operations to verify historical decisions
+   - Generate compliance reports (e.g., monthly governance summaries)
+
+3. **Operational Monitoring**
+   - Monitor Iter latency and availability via Azure Monitor
+   - Alert on policy violation patterns (e.g., high DENY rates)
+   - Scale AKS nodes based on decision volume
+
+4. **Incident Response**
+   - When AI system behavior is questioned, retrieve relevant DecisionPackets
+   - Replay decisions to reconstruct governance logic
+   - Update policies to close identified gaps
+
+**Key Operations:**
+
+| Operation | Frequency | Tooling |
+|-----------|-----------|---------|
+| Policy updates | Weekly–Monthly | Git + CI/CD pipeline |
+| Audit exports | Daily | Azure Storage lifecycle policy |
+| Compliance reporting | Monthly | Custom scripts + Azure Monitor |
+| Replay verification | On-demand | Iter replay API |
+
+**Success Criteria:**
+- Zero unplanned policy bypasses
+- <5 minute MTTR for governance investigations (via replay)
+- 100% audit coverage (no missing DecisionPackets)
+
+---
+
+### Operational Maturity Model
+
+| Maturity Level | Day-0 | Day-1 | Day-2 |
+|----------------|-------|-------|-------|
+| **Deployed** | ✅ Service running | ✅ Identity configured | ✅ Policies active |
+| **Observable** | Health checks | Basic telemetry | Full audit pipeline |
+| **Governed** | Default deny | Test policies | Production policies |
+| **Compliant** | N/A | Baseline policies | 7-year retention |
+
+This lifecycle framing ensures customers understand Iter as an **operable service**, not just deployable infrastructure.
+---
+
+## Lifecycle Framing: Day-0 / Day-1 / Day-2 Operations
+
+### Day-0: Marketplace Provisioning
+
+**Objective:** Instantiate Iter infrastructure in customer Azure subscription
+
+**Activities:**
+1. Customer initiates deployment from Azure Marketplace
+2. Iter ARM template provisions:
+   - AKS cluster (or integrates with existing cluster)
+   - Azure Cosmos DB account (governance state)
+   - Azure Storage account (decision ledger)
+   - Managed Identity for Iter service principal
+3. Network configuration applied (private endpoint, vNet integration)
+4. Health checks confirm service availability
+
+**Success Criteria:**
+- Iter API responds to `tools/list` with 200 OK
+- Managed Identity can authenticate to Cosmos DB
+- Storage account accessible via private endpoint
+
+**Typical Duration:** 15–30 minutes (automated)
+
+---
+
+### Day-1: Identity + Policy Bootstrap
+
+**Objective:** Configure Entra ID integration and install initial governance policies
+
+**Activities:**
+1. **Identity Binding**
+   - Customer grants Iter Managed Identity access to required Azure resources
+   - Entra ID application registration created for consumer authentication
+   - RBAC roles assigned (Governance Admin, Policy Auditor)
+
+2. **Policy Installation**
+   - Default "safe-start" policy installed (DENY all until explicitly allowed)
+   - Customer imports policy templates for their use case:
+     - Healthcare: clinical decision review gates
+     - Financial: model risk management thresholds
+     - General: basic quality and safety constraints
+
+3. **Test Governance Request**
+   - Customer submits sample decision to Iter
+   - Verifies DecisionPacket returned with expected outcome
+   - Confirms AuditEvent written to ledger
+
+**Success Criteria:**
+- Consumer can authenticate via Entra ID
+- Policy evaluation returns deterministic results
+- Audit ledger queryable via Azure Storage
+
+**Typical Duration:** 2–4 hours (semi-automated with validation)
+
+---
+
+### Day-2: Policy Evolution + Audit Replay
+
+**Objective:** Ongoing governance operations and compliance maintenance
+
+**Activities:**
+
+1. **Policy Lifecycle Management**
+   - Update policies to reflect changing business rules
+   - Version policies with semantic versioning
+   - Test policy changes in isolated namespace before production promotion
+
+2. **Audit and Compliance**
+   - Schedule daily exports of DecisionPackets for archive
+   - Execute replay operations to verify historical decisions
+   - Generate compliance reports (e.g., monthly governance summaries)
+
+3. **Operational Monitoring**
+   - Monitor Iter latency and availability via Azure Monitor
+   - Alert on policy violation patterns (e.g., high DENY rates)
+   - Scale AKS nodes based on decision volume
+
+4. **Incident Response**
+   - When AI system behavior is questioned, retrieve relevant DecisionPackets
+   - Replay decisions to reconstruct governance logic
+   - Update policies to close identified gaps
+
+**Key Operations:**
+
+| Operation | Frequency | Tooling |
+|-----------|-----------|---------|
+| Policy updates | Weekly–Monthly | Git + CI/CD pipeline |
+| Audit exports | Daily | Azure Storage lifecycle policy |
+| Compliance reporting | Monthly | Custom scripts + Azure Monitor |
+| Replay verification | On-demand | Iter replay API |
+
+**Success Criteria:**
+- Zero unplanned policy bypasses
+- <5 minute MTTR for governance investigations (via replay)
+- 100% audit coverage (no missing DecisionPackets)
+
+---
+
+### Operational Maturity Model
+
+| Maturity Level | Day-0 | Day-1 | Day-2 |
+|----------------|-------|-------|-------|
+| **Deployed** | ✅ Service running | ✅ Identity configured | ✅ Policies active |
+| **Observable** | Health checks | Basic telemetry | Full audit pipeline |
+| **Governed** | Default deny | Test policies | Production policies |
+| **Compliant** | N/A | Baseline policies | 7-year retention |
+
+This lifecycle framing ensures customers understand Iter as an **operable service**, not just deployable infrastructure.
