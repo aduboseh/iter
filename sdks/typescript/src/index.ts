@@ -113,6 +113,13 @@ export class RequestError extends SdkError {
   }
 }
 
+export class BackpressureError extends SdkError {
+  constructor(public readonly maxInflight: number) {
+    super(`Backpressure: maxInflight=${maxInflight} exceeded`);
+    this.name = "BackpressureError";
+  }
+}
+
 // ============================================================================
 // Response Types (MCP-aligned)
 // ============================================================================
@@ -160,8 +167,11 @@ export class IterClient {
     { resolve: (value: RpcResponse) => void; reject: (error: Error) => void }
   > = new Map();
   private lineReader: readline.Interface | null = null;
+  private readonly maxInflight: number;
 
-  private constructor() {}
+  private constructor(maxInflight: number = 1) {
+    this.maxInflight = maxInflight;
+  }
 
   /** Get the current trace context */
   get traceContext(): TraceContext | null {
@@ -169,8 +179,11 @@ export class IterClient {
   }
 
   /** Connect to an Iter server process */
-  static async connect(binaryPath: string): Promise<IterClient> {
-    const client = new IterClient();
+  static async connect(
+    binaryPath: string,
+    options?: { maxInflight?: number }
+  ): Promise<IterClient> {
+    const client = new IterClient(options?.maxInflight ?? 1);
 
     client.process = spawn(binaryPath, [], {
       stdio: ["pipe", "pipe", "ignore"],
@@ -227,6 +240,10 @@ export class IterClient {
 
   /** Send a raw JSON-RPC request */
   async send(method: string, params?: unknown): Promise<RpcResponse> {
+    if (this.responseQueue.size >= this.maxInflight) {
+      throw new BackpressureError(this.maxInflight);
+    }
+
     if (!this.stdin) {
       throw new ConnectionError("Not connected");
     }

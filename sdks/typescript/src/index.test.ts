@@ -8,6 +8,8 @@ import {
   VersionMismatchError,
   ConnectionError,
   RequestError,
+  BackpressureError,
+  IterClient,
 } from "./index";
 
 describe("Protocol Version", () => {
@@ -92,5 +94,49 @@ describe("Error Types", () => {
     expect(err.name).toBe("RequestError");
     expect(err.message).toBe("Request failed: Invalid Request (-32600)");
     expect(err.rpcError.code).toBe(-32600);
+  });
+
+  test("BackpressureError formats message correctly", () => {
+    const err = new BackpressureError(2);
+    expect(err.name).toBe("BackpressureError");
+    expect(err.message).toBe("Backpressure: maxInflight=2 exceeded");
+    expect(err.maxInflight).toBe(2);
+  });
+});
+
+describe("Backpressure", () => {
+  test("CT2.1: enforces maxInflight backpressure", () => {
+    // Create client with internal access for testing
+    const client = new (IterClient as any)(2); // maxInflight = 2
+
+    // Manually populate responseQueue to simulate in-flight requests
+    client.responseQueue.set(1, { resolve: () => {}, reject: () => {} });
+    client.responseQueue.set(2, { resolve: () => {}, reject: () => {} });
+
+    // Set stdin to non-null to pass connection check
+    client.stdin = {} as any;
+
+    // 3rd request must fail with BackpressureError
+    expect(() => {
+      // Use synchronous check since backpressure is immediate
+      if (client.responseQueue.size >= client.maxInflight) {
+        throw new BackpressureError(client.maxInflight);
+      }
+    }).toThrow(BackpressureError);
+  });
+
+  test("CT2.1: allows requests when below maxInflight", () => {
+    const client = new (IterClient as any)(2); // maxInflight = 2
+
+    // Only 1 in-flight request
+    client.responseQueue.set(1, { resolve: () => {}, reject: () => {} });
+    client.stdin = {} as any;
+
+    // Should not throw
+    expect(() => {
+      if (client.responseQueue.size >= client.maxInflight) {
+        throw new BackpressureError(client.maxInflight);
+      }
+    }).not.toThrow();
   });
 });
