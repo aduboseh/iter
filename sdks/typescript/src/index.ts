@@ -120,6 +120,16 @@ export class BackpressureError extends SdkError {
   }
 }
 
+export class RequestTimeoutError extends SdkError {
+  constructor(
+    public readonly method: string,
+    public readonly timeoutMs: number
+  ) {
+    super(`Request timeout: ${method} exceeded ${timeoutMs}ms`);
+    this.name = "RequestTimeoutError";
+  }
+}
+
 // ============================================================================
 // Response Types (MCP-aligned)
 // ============================================================================
@@ -209,6 +219,11 @@ export class IterClient {
         if (pending) {
           client.responseQueue.delete(response.id as number);
           pending.resolve(response);
+        } else {
+          // R1.2.4: Late response (likely timed out) — log and ignore
+          console.warn(
+            `[Iter SDK] Ignoring response for unknown/timed-out request ID: ${response.id}`
+          );
         }
       } catch (e) {
         // Ignore malformed lines
@@ -239,7 +254,11 @@ export class IterClient {
   }
 
   /** Send a raw JSON-RPC request */
-  async send(method: string, params?: unknown): Promise<RpcResponse> {
+  async send(
+    method: string,
+    params?: unknown,
+    timeoutMs: number = 30000
+  ): Promise<RpcResponse> {
     if (this.responseQueue.size >= this.maxInflight) {
       throw new BackpressureError(this.maxInflight);
     }
@@ -259,7 +278,23 @@ export class IterClient {
     };
 
     return new Promise((resolve, reject) => {
-      this.responseQueue.set(id, { resolve, reject });
+      // Set up timeout for request eviction
+      const timer = setTimeout(() => {
+        this.responseQueue.delete(id);
+        reject(new RequestTimeoutError(method, timeoutMs));
+      }, timeoutMs);
+
+      this.responseQueue.set(id, {
+        resolve: (response) => {
+          clearTimeout(timer);
+          resolve(response);
+        },
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      });
+
       this.stdin!.write(JSON.stringify(request) + "\n");
     });
   }
