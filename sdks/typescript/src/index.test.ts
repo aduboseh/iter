@@ -10,8 +10,10 @@ import {
   RequestError,
   BackpressureError,
   RequestTimeoutError,
+  ConnectionClosedError,
   IterClient,
 } from "./index";
+
 
 describe("Protocol Version", () => {
   test("SDK_PROTOCOL_VERSION is valid", () => {
@@ -241,3 +243,274 @@ describe("Timeouts", () => {
     await promise;
   });
 });
+
+describe("CT4.1: Graceful Shutdown", () => {
+  class FakeChildProcess {
+    public pid = 12345;
+    public killed = false;
+    private exitHandlers: Array<() => void> = [];
+    private closeHandlers: Array<() => void> = [];
+    private _shouldExitOnSigterm = true;
+    private _shouldExitOnSigkill = true;
+
+    constructor(options?: { exitOnSigterm?: boolean; exitOnSigkill?: boolean }) {
+      this._shouldExitOnSigterm = options?.exitOnSigterm ?? true;
+      this._shouldExitOnSigkill = options?.exitOnSigkill ?? true;
+    }
+
+    once(event: string, handler: () => void) {
+      if (event === "exit") this.exitHandlers.push(handler);
+      if (event === "close") this.closeHandlers.push(handler);
+    }
+
+    removeListener(event: string, handler: () => void) {
+      if (event === "exit") {
+        this.exitHandlers = this.exitHandlers.filter((h) => h !== handler);
+      }
+      if (event === "close") {
+        this.closeHandlers = this.closeHandlers.filter((h) => h !== handler);
+      }
+    }
+
+    kill(signal?: string): boolean {
+      if (signal === "SIGTERM" && this._shouldExitOnSigterm) {
+        Promise.resolve().then(() => {
+          this.killed = true;
+          this.emitExit();
+        });
+        return true;
+      }
+
+      if (signal === "SIGKILL" && this._shouldExitOnSigkill) {
+        Promise.resolve().then(() => {
+          this.killed = true;
+          this.emitExit();
+        });
+        return true;
+      }
+
+      // Signal sent but process doesn't respond — killed stays false
+      return true;
+    }
+
+    private emitExit() {
+      this.exitHandlers.forEach((h) => h());
+      this.closeHandlers.forEach((h) => h());
+    }
+  }
+  async function flushAsync(): Promise<void> {
+    await Promise.resolve();
+    await jest.runOnlyPendingTimersAsync();
+    await Promise.resolve();
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers({ legacyFakeTimers: false });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("CT4.1-A: drains pending requests within 5s", async () => {
+
+    const client = new (IterClient as any)(2);
+    const fakeProc = new FakeChildProcess();
+
+    client["process"] = fakeProc as any;
+    client["stdin"] = { write: jest.fn() } as any;
+    client["_state"] = "open";
+
+    const promise1 = client.send("test1", {});
+    const promise2 = client.send("test2", {});
+
+    const entry1 = client["responseQueue"].get(1);
+    const entry2 = client["responseQueue"].get(2);
+
+    setTimeout(() => {
+      entry1?.resolve({ jsonrpc: "2.0", id: 1, result: {} });
+      entry2?.resolve({ jsonrpc: "2.0", id: 2, result: {} });
+      client["responseQueue"].delete(1);
+      client["responseQueue"].delete(2);
+    }, 10);
+
+    const closePromise = client.close();
+    await jest.advanceTimersByTimeAsync(10);
+    await flushAsync();
+    await jest.advanceTimersByTimeAsync(100);
+    await flushAsync();
+    await jest.advanceTimersByTimeAsync(8000);
+    await flushAsync();
+    await jest.runOnlyPendingTimersAsync();
+    await flushAsync();
+
+    await expect(promise1).resolves.toBeDefined();
+    await expect(promise2).resolves.toBeDefined();
+
+    await closePromise;
+
+    expect(client["_state"]).toBe("closed");
+    expect(client["responseQueue"].size).toBe(0);
+  });
+
+  test("CT4.1-B: fails undrained requests after 5s timeout", async () => {
+
+    const client = new (IterClient as any)(1);
+    const fakeProc = new FakeChildProcess();
+
+    client["process"] = fakeProc as any;
+    client["stdin"] = { write: jest.fn() } as any;
+    client["_state"] = "open";
+
+    const promise = client.send("hang", {});
+
+    // Attach rejection handler immediately to avoid unhandled rejection
+    let requestError: Error | null = null;
+    promise.catch((e: Error) => { requestError = e; });
+
+    // Start close
+    const closePromise = client.close();
+
+    // Advance past the 5s drain timeout (200 iterations of 25ms each)
+    for (let i = 0; i < 200; i++) {
+      await jest.advanceTimersByTimeAsync(25);
+      await flushAsync();
+    }
+
+    // The request should now be rejected with ConnectionClosedError
+    expect(requestError).toBeInstanceOf(ConnectionClosedError);
+
+    // Advance through SIGTERM wait (2s) and process exit
+    for (let i = 0; i < 80; i++) {
+      await jest.advanceTimersByTimeAsync(25);
+      await flushAsync();
+    }
+
+    // closePromise should resolve (not reject) after successful process termination
+    await closePromise;
+
+    expect(client["responseQueue"].size).toBe(0);
+  });
+
+  test("CT4.1-C: executes SIGTERM then SIGKILL when needed", async () => {
+
+    const client = new (IterClient as any)(1);
+    const fakeProc = new FakeChildProcess({
+      exitOnSigterm: false,
+      exitOnSigkill: true,
+    });
+
+    const killSpy = jest.spyOn(fakeProc, "kill");
+
+    client["process"] = fakeProc as any;
+    client["stdin"] = { write: jest.fn() } as any;
+    client["_state"] = "open";
+
+    const closePromise = client.close();
+
+    // Advance past drain (no pending requests, so immediate)
+    await flushAsync();
+
+    // Advance through SIGTERM wait (2s = 80 iterations of 25ms)
+    for (let i = 0; i < 80; i++) {
+      await jest.advanceTimersByTimeAsync(25);
+      await flushAsync();
+    }
+
+    // Advance through SIGKILL wait (1s = 40 iterations of 25ms)
+    for (let i = 0; i < 40; i++) {
+      await jest.advanceTimersByTimeAsync(25);
+      await flushAsync();
+    }
+
+    await closePromise;
+
+    expect(killSpy).toHaveBeenCalledWith("SIGTERM");
+    expect(killSpy).toHaveBeenCalledWith("SIGKILL");
+    expect(killSpy).toHaveBeenCalledTimes(2);
+  });
+
+  test("CT4.1-D: fails closed if process never exits", async () => {
+
+    const client = new (IterClient as any)(1);
+    const fakeProc = new FakeChildProcess({
+      exitOnSigterm: false,
+      exitOnSigkill: false,
+    });
+
+    client["process"] = fakeProc as any;
+    client["stdin"] = { write: jest.fn() } as any;
+    client["_state"] = "open";
+
+    // Attach rejection handler immediately to avoid unhandled rejection
+    let closeError: Error | null = null;
+    const closePromise = client.close();
+    closePromise.catch((e: Error) => { closeError = e; });
+
+    // Advance past drain (no pending requests)
+    await flushAsync();
+
+    // Advance through SIGTERM wait (2s)
+    for (let i = 0; i < 80; i++) {
+      await jest.advanceTimersByTimeAsync(25);
+      await flushAsync();
+    }
+
+    // Advance through SIGKILL wait (1s)
+    for (let i = 0; i < 40; i++) {
+      await jest.advanceTimersByTimeAsync(25);
+      await flushAsync();
+    }
+
+    expect(closeError).toBeInstanceOf(ConnectionError);
+    expect(closeError!.message).toMatch(/zombie/i);
+  });
+
+  test("CT4.1-E: rejects new requests after close initiated", async () => {
+
+    const client = new (IterClient as any)(1);
+    const fakeProc = new FakeChildProcess();
+
+    client["process"] = fakeProc as any;
+    client["stdin"] = { write: jest.fn() } as any;
+    client["_state"] = "open";
+
+    const closePromise = client.close();
+
+    await expect(client.send("test", {})).rejects.toThrow(ConnectionClosedError);
+
+    await jest.advanceTimersByTimeAsync(8000);
+    await flushAsync();
+    await jest.runOnlyPendingTimersAsync();
+    await flushAsync();
+    await expect(closePromise).resolves.toBeUndefined();
+
+    await expect(client.send("test2", {})).rejects.toThrow(ConnectionClosedError);
+  });
+
+  test("CT4.1-F: close() is idempotent", async () => {
+
+    const client = new (IterClient as any)(1);
+    const fakeProc = new FakeChildProcess();
+
+    client["process"] = fakeProc as any;
+    client["stdin"] = { write: jest.fn() } as any;
+    client["_state"] = "open";
+
+    const closePromises = [client.close(), client.close(), client.close()];
+
+    await jest.advanceTimersByTimeAsync(8000);
+    await flushAsync();
+    await jest.runOnlyPendingTimersAsync();
+    await flushAsync();
+
+    await expect(Promise.all(closePromises)).resolves.toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+
+    expect(client["_state"]).toBe("closed");
+  });
+});
+
