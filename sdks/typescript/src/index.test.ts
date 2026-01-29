@@ -29,6 +29,137 @@ describe("Protocol Version", () => {
   });
 });
 
+describe("CT5.1: Stderr & Malformed Output", () => {
+  async function flushAsync(): Promise<void> {
+    await Promise.resolve();
+    await jest.runOnlyPendingTimersAsync();
+    await Promise.resolve();
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers({ legacyFakeTimers: false });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("CT5.1-A: stderr is attached to ConnectionError on process error", async () => {
+    const client = new (IterClient as any)(1);
+
+    let stderrOnData: ((chunk: Buffer) => void) | null = null;
+    const stderr = {
+      on: jest.fn((event: string, cb: (chunk: Buffer) => void) => {
+        if (event === "data") stderrOnData = cb;
+      }),
+    };
+
+    const handlers: Record<string, Function> = {};
+    const proc = {
+      stderr,
+      on: jest.fn((event: string, cb: Function) => {
+        handlers[event] = cb;
+      }),
+    } as any;
+
+    client["attachProcessHandlers"](proc);
+
+    // Simulate stderr output
+    expect(stderrOnData).toBeTruthy();
+    stderrOnData!(Buffer.from("boom-stderr\n", "utf8"));
+
+    const reject = jest.fn();
+    client["responseQueue"].set(1, { resolve: jest.fn(), reject });
+
+    handlers["error"]?.(new Error("boom"));
+
+    expect(reject).toHaveBeenCalledTimes(1);
+    const err = reject.mock.calls[0][0] as Error;
+    expect(err).toBeInstanceOf(ConnectionError);
+    expect(err.message).toContain("boom");
+    expect(err.message).toContain("stderr:");
+    expect(err.message).toContain("boom-stderr");
+
+    await flushAsync();
+  });
+
+  test("CT5.1-B: stderr ring buffer is capped at 10KB by byte length", async () => {
+    const client = new (IterClient as any)(1);
+
+    let stderrOnData: ((chunk: Buffer) => void) | null = null;
+    const stderr = {
+      on: jest.fn((event: string, cb: (chunk: Buffer) => void) => {
+        if (event === "data") stderrOnData = cb;
+      }),
+    };
+
+    const handlers: Record<string, Function> = {};
+    const proc = {
+      stderr,
+      on: jest.fn((event: string, cb: Function) => {
+        handlers[event] = cb;
+      }),
+    } as any;
+
+    client["attachProcessHandlers"](proc);
+
+    // 6KB of 'a' then 6KB of 'b' => total 12KB; buffer must retain last 10KB
+    expect(stderrOnData).toBeTruthy();
+    stderrOnData!(Buffer.alloc(6 * 1024, "a"));
+    stderrOnData!(Buffer.alloc(6 * 1024, "b"));
+
+    expect(client["_stderrBytes"].length).toBeLessThanOrEqual(10 * 1024);
+    expect(client["_stderrBytes"].length).toBe(10 * 1024);
+
+    const snapshot = client["_stderrBytes"].toString("utf8");
+    expect(snapshot.endsWith("b".repeat(6 * 1024))).toBe(true);
+
+    // Trigger error to ensure attachment uses snapshot and does not exceed cap
+    const reject = jest.fn();
+    client["responseQueue"].set(1, { resolve: jest.fn(), reject });
+    handlers["error"]?.(new Error("crash"));
+
+    const err = reject.mock.calls[0][0] as Error;
+    expect(err.message).toContain("stderr:");
+
+    await flushAsync();
+  });
+
+  test("CT5.1-C: malformed stdout is fail-closed and close() is invoked once", async () => {
+    const client = new (IterClient as any)(1);
+
+    const closeSpy = jest.fn().mockResolvedValue(undefined);
+    client.close = closeSpy;
+
+    // 1) With pending request: first malformed line must fail-closed immediately
+    const reject = jest.fn();
+    client["responseQueue"].set(1, { resolve: jest.fn(), reject });
+
+    client["handleStdoutLine"]("not-json");
+
+    expect(reject).toHaveBeenCalledTimes(1);
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+
+    // Additional malformed lines must not trigger additional close() calls
+    client["handleStdoutLine"]("not-json-2");
+    client["handleStdoutLine"]("not-json-3");
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+
+    // 2) With no pending requests: close triggers at threshold (<= 3)
+    const client2 = new (IterClient as any)(1);
+    const closeSpy2 = jest.fn().mockResolvedValue(undefined);
+    client2.close = closeSpy2;
+
+    client2["handleStdoutLine"]("bad-1");
+    client2["handleStdoutLine"]("bad-2");
+    expect(closeSpy2).toHaveBeenCalledTimes(0);
+    client2["handleStdoutLine"]("bad-3");
+    expect(closeSpy2).toHaveBeenCalledTimes(1);
+
+    await flushAsync();
+  });
+});
+
 describe("Version Compatibility", () => {
   test("accepts current version", () => {
     expect(isVersionCompatible("1.0.0")).toBe(true);
