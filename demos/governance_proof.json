@@ -1,11 +1,6 @@
 {
-    "entry_count":  0,
-    "exported_at":  "2026-02-03T20:28:33.7233731-05:00",
-    "checksum":  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "lineage":  {
-                    "value":  [
-
-                              ],
-                    "Count":  0
-                }
+  "lineage": null,
+  "exported_at": "2026-02-03T23:12:11.2401100-05:00",
+  "checksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "entry_count": 0
 }

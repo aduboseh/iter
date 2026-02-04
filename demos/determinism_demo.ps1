@@ -1,9 +1,17 @@
 # Iter MCP Tool Demo
 # Demonstrates repeatable tool behavior via MCP
 #
+# Requires PowerShell 7+
+# Run from iter/demos: pwsh ./determinism_demo.ps1
+#
 # NOTE:
 # This demo illustrates observable behavior of the Iter MCP tool surface.
 # It does not describe internal execution logic, governance rules, or validation criteria.
+
+# Check PowerShell version
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw "This demo requires PowerShell 7+ (pwsh)."
+}
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
