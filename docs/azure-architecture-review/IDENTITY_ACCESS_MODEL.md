@@ -302,3 +302,89 @@ let client = IterClient::connect_with_credential(
     "api://iter-governance/.default"
 )?;
 ```
+---
+
+## Tenant Isolation Guarantees
+
+Iter enforces contractual tenant isolation at three distinct layers:
+
+### Policy Namespace Isolation
+
+**Guarantee:** Policy definitions are tenant-scoped and cryptographically bound to tenant identity.
+
+- Policy objects are stored with `tenant_id` as partition key
+- Cross-tenant policy reads return empty sets, not access-denied errors
+- Policy evaluation context includes tenant scope verification before execution
+
+### Decision Ledger Isolation
+
+**Guarantee:** DecisionPackets and AuditEvents are scoped to originating tenant with no cross-tenant read paths.
+
+- Audit streams are written to tenant-specific storage partitions
+- Ledger queries require tenant-scoped credentials; operator access requires explicit tenant consent
+- Replay operations verify tenant identity match before reconstructing decisions
+
+### Runtime Isolation
+
+**Guarantee:** No shared state exists between tenant evaluation contexts.
+
+- Each governance evaluation runs in an isolated execution context
+- Memory and compute resources are tenant-partitioned at the process level
+- Telemetry and logging include tenant identifiers but prevent cross-tenant correlation
+
+### Operator Access Model
+
+**Platform operators cannot:**
+- Read tenant policy definitions without tenant-granted RBAC role
+- Access DecisionPackets or audit ledgers without tenant authorization
+- Observe governance outcomes across tenant boundaries
+
+**Platform operators can:**
+- Monitor aggregate system health metrics (no per-tenant detail)
+- Perform infrastructure operations (scaling, patching) without data access
+- Respond to tenant-initiated support requests with time-limited, audited access grants
+
+This isolation model meets Microsoft Marketplace multi-tenancy requirements and supports compliance regimes (HIPAA, GDPR) that prohibit data commingling.
+---
+
+## Tenant Isolation Guarantees
+
+Iter enforces contractual tenant isolation at three distinct layers:
+
+### Policy Namespace Isolation
+
+**Guarantee:** Policy definitions are tenant-scoped and cryptographically bound to tenant identity.
+
+- Policy objects are stored with `tenant_id` as partition key
+- Cross-tenant policy reads return empty sets, not access-denied errors
+- Policy evaluation context includes tenant scope verification before execution
+
+### Decision Ledger Isolation
+
+**Guarantee:** DecisionPackets and AuditEvents are scoped to originating tenant with no cross-tenant read paths.
+
+- Audit streams are written to tenant-specific storage partitions
+- Ledger queries require tenant-scoped credentials; operator access requires explicit tenant consent
+- Replay operations verify tenant identity match before reconstructing decisions
+
+### Runtime Isolation
+
+**Guarantee:** No shared state exists between tenant evaluation contexts.
+
+- Each governance evaluation runs in an isolated execution context
+- Memory and compute resources are tenant-partitioned at the process level
+- Telemetry and logging include tenant identifiers but prevent cross-tenant correlation
+
+### Operator Access Model
+
+**Platform operators cannot:**
+- Read tenant policy definitions without tenant-granted RBAC role
+- Access DecisionPackets or audit ledgers without tenant authorization
+- Observe governance outcomes across tenant boundaries
+
+**Platform operators can:**
+- Monitor aggregate system health metrics (no per-tenant detail)
+- Perform infrastructure operations (scaling, patching) without data access
+- Respond to tenant-initiated support requests with time-limited, audited access grants
+
+This isolation model meets Microsoft Marketplace multi-tenancy requirements and supports compliance regimes (HIPAA, GDPR) that prohibit data commingling.

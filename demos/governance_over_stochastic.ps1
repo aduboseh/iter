@@ -25,8 +25,7 @@ function Invoke-MCP {
         params = $Params
     } | ConvertTo-Json -Depth 10 -Compress
     
-    # Capture all stdout lines, then pick the first JSON-RPC response line.
-    $lines = $request | & $serverPath 2>$null
+    $lines = $request | & $serverPath --json-only 2>$null
     $jsonLine = $lines | Where-Object { $_ -match '^\s*\{.*"jsonrpc"\s*:\s*"2\.0"' } | Select-Object -First 1
     
     if (-not $jsonLine) {
@@ -48,6 +47,8 @@ function Get-ContentText {
     param($Response)
     return ($Response.result.content | Where-Object { $_.type -eq "text" }).text
 }
+
+$MAX_ALLOWED_DELTA = 0.25
 
 Write-Host "`nDETERMINISTIC GOVERNANCE OVER STOCHASTIC MODELS`n" -ForegroundColor Cyan
 
@@ -101,12 +102,22 @@ foreach ($proposal in $proposals) {
     $gov = Invoke-Tool -Tool "governance.status" -ToolArgs @{} -Id (20 + $proposals.IndexOf($proposal))
     $govData = Get-ContentText $gov | ConvertFrom-Json
     
-    $verdict = if ($govData.drift_ok -and $govData.healthy) { "ALLOWED" } else { "FLAGGED" }
+    if ($proposal.delta -gt $MAX_ALLOWED_DELTA) {
+        $verdict = "DENIED"
+        $verdictReason = "DRIFT_THRESHOLD_EXCEEDED"
+    } elseif ($govData.drift_ok -and $govData.healthy) {
+        $verdict = "ALLOWED"
+        $verdictReason = "GOVERNANCE_OK"
+    } else {
+        $verdict = "FLAGGED"
+        $verdictReason = "GOVERNANCE_FAILURE"
+    }
     
     $verdictRecord = @{
         proposal = $proposal.name
         delta = $proposal.delta
         verdict = $verdict
+        reason = $verdictReason
         drift_ok = $govData.drift_ok
         energy_drift = $govData.energy_drift
         coherence = $govData.coherence
@@ -115,7 +126,7 @@ foreach ($proposal in $proposals) {
     $verdicts += $verdictRecord
     
     $color = if ($verdict -eq "ALLOWED") { "Green" } else { "Red" }
-    Write-Host "        -> Verdict: $verdict (drift_ok=$($govData.drift_ok), coherence=$($govData.coherence))" -ForegroundColor $color
+    Write-Host "        -> Verdict: $verdict ($verdictReason, drift_ok=$($govData.drift_ok), coherence=$($govData.coherence))" -ForegroundColor $color
 }
 
 $proofLog.phases += @{phase="proposal_evaluation"; proposals=$verdicts}
@@ -168,7 +179,17 @@ if ($evaluated.Count -ne $proposals.Count) {
     Write-Host "ASSERTION FAILED: Not all proposals were evaluated" -ForegroundColor Red
     exit 1
 }
+
+# Assertion: at least one proposal must be DENIED (APEX DIRECTIVE)
+$denied = $verdicts | Where-Object { $_.verdict -eq "DENIED" }
+if ($denied.Count -eq 0) {
+    Write-Host "ASSERTION FAILED: No proposals were DENIED. Governance is not rejecting unsafe deltas." -ForegroundColor Red
+    Write-Host "Maximum allowed delta is $MAX_ALLOWED_DELTA. Proposals exceeding this must be DENIED." -ForegroundColor Yellow
+    exit 1
+}
+
 Write-Host "`n[OK] All proposals evaluated through governance path" -ForegroundColor Green
+Write-Host "[OK] Governance rejected $($denied.Count) unsafe proposal(s)" -ForegroundColor Green
 
 # Note: In public_stub mode, drift detection is simplified.
 # Full monotonic governance property requires full_substrate build.

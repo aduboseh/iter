@@ -187,3 +187,34 @@ This diagram does NOT show:
 - Performance/optimization details
 
 These are validated in private CI and available under NDA to partners and auditors.
+
+---
+
+## System Invariants
+
+### Execution-Blocking Semantics
+
+**Failure Mode Guarantee:** Iter unavailability results in execution denial, not degraded execution.
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    FAILURE MODE BEHAVIOR                        │
+├────────────────────────────────────────────────────────────────┤
+│ Condition                    │ Result                          │
+├──────────────────────────────┼─────────────────────────────────┤
+│ Iter service unavailable     │ Consumer execution DENIED       │
+│ Policy evaluation timeout    │ Consumer execution DENIED       │
+│ Invalid policy state         │ Consumer execution DENIED       │
+│ Identity verification failure│ Consumer execution DENIED       │
+│ Network partition            │ Consumer execution DENIED       │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Design Principle:** Deny-by-default is architecturally enforced. No execution path exists that bypasses governance evaluation.
+
+**Operational Impact:**
+- Iter operates as a control plane dependency, not an optional enhancement
+- Consumers must implement circuit-breaker patterns for Iter availability
+- High-availability deployment (multi-AZ, health-checked) is required for production use
+
+This fail-safe posture ensures AI systems cannot operate outside governance boundaries under any failure scenario.

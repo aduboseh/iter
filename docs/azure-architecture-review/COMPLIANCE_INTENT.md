@@ -211,3 +211,115 @@ For compliance, audit, or certification inquiries:
 Email: armontidubosehill@gmail.com
 
 Detailed governance rules and internal compliance documentation available under NDA for audit, compliance, or partnership review.
+---
+
+## Primary Compliance Artifact: Decision Evidence Ledger
+
+Iter's core compliance deliverable is the **Decision Evidence Ledger**—a cryptographically verifiable, deterministically reproducible record of all governance decisions.
+
+### Ledger Structure
+
+Each ledger entry is a self-contained DecisionPacket containing:
+
+| Field | Purpose | Audit Value |
+|-------|---------|-------------|
+| **Policy Version** | Exact policy hash applied | Proves which rules governed the decision |
+| **Input Hash** | SHA-256 of input state | Enables replay without storing sensitive data |
+| **Decision Outcome** | ALLOW / DENY / REQUIRE_REVIEW | Direct evidence of enforcement action |
+| **Reason Codes** | Explicit policy gate results | Machine-readable explainability |
+| **Timestamp** | ISO 8601 UTC | Temporal ordering and retention compliance |
+| **Checksum** | SHA-256 of entire packet | Tamper detection |
+
+### Replay Determinism
+
+**Key Property:** Given a DecisionPacket and its input state, Iter can reconstruct the exact decision without re-executing AI models.
+
+This property satisfies three critical audit requirements:
+
+1. **Incident Investigation:** Reconstruct decisions made during a compliance event without access to live systems
+2. **Regulatory Demonstration:** Prove policy enforcement retroactively to auditors
+3. **Litigation Hold:** Preserve decision evidence independently of operational infrastructure
+
+### Auditor Workflow
+
+```
+1. Auditor requests DecisionPackets for date range
+   → Iter exports ledger subset as JSONL file
+
+2. Auditor selects sample decisions for verification
+   → Iter replays each decision and produces checksum
+
+3. Auditor compares original vs. replayed checksums
+   → Byte-identical match proves integrity
+
+4. Auditor reviews reason codes for policy compliance
+   → Explicit gates show enforcement logic
+```
+
+### Compliance Regime Alignment
+
+| Regulation | Ledger Support |
+|------------|----------------|
+| **SOC 2 (CC6.1)** | Logical access controls evidenced by decision outcomes |
+| **ISO 27001 (A.12.4.1)** | Event logging with integrity protection (checksums) |
+| **HIPAA (§164.312(b))** | Audit controls for systems accessing PHI |
+| **GDPR (Article 22)** | Automated decision explainability (reason codes) |
+| **NIST AI RMF (Govern 1.2)** | Accountability mechanisms for AI system actions |
+
+The Decision Evidence Ledger is designed as a first-class compliance artifact, not a byproduct of system operations.
+---
+
+## Primary Compliance Artifact: Decision Evidence Ledger
+
+Iter's core compliance deliverable is the **Decision Evidence Ledger**—a cryptographically verifiable, deterministically reproducible record of all governance decisions.
+
+### Ledger Structure
+
+Each ledger entry is a self-contained DecisionPacket containing:
+
+| Field | Purpose | Audit Value |
+|-------|---------|-------------|
+| **Policy Version** | Exact policy hash applied | Proves which rules governed the decision |
+| **Input Hash** | SHA-256 of input state | Enables replay without storing sensitive data |
+| **Decision Outcome** | ALLOW / DENY / REQUIRE_REVIEW | Direct evidence of enforcement action |
+| **Reason Codes** | Explicit policy gate results | Machine-readable explainability |
+| **Timestamp** | ISO 8601 UTC | Temporal ordering and retention compliance |
+| **Checksum** | SHA-256 of entire packet | Tamper detection |
+
+### Replay Determinism
+
+**Key Property:** Given a DecisionPacket and its input state, Iter can reconstruct the exact decision without re-executing AI models.
+
+This property satisfies three critical audit requirements:
+
+1. **Incident Investigation:** Reconstruct decisions made during a compliance event without access to live systems
+2. **Regulatory Demonstration:** Prove policy enforcement retroactively to auditors
+3. **Litigation Hold:** Preserve decision evidence independently of operational infrastructure
+
+### Auditor Workflow
+
+```
+1. Auditor requests DecisionPackets for date range
+   → Iter exports ledger subset as JSONL file
+
+2. Auditor selects sample decisions for verification
+   → Iter replays each decision and produces checksum
+
+3. Auditor compares original vs. replayed checksums
+   → Byte-identical match proves integrity
+
+4. Auditor reviews reason codes for policy compliance
+   → Explicit gates show enforcement logic
+```
+
+### Compliance Regime Alignment
+
+| Regulation | Ledger Support |
+|------------|----------------|
+| **SOC 2 (CC6.1)** | Logical access controls evidenced by decision outcomes |
+| **ISO 27001 (A.12.4.1)** | Event logging with integrity protection (checksums) |
+| **HIPAA (§164.312(b))** | Audit controls for systems accessing PHI |
+| **GDPR (Article 22)** | Automated decision explainability (reason codes) |
+| **NIST AI RMF (Govern 1.2)** | Accountability mechanisms for AI system actions |
+
+The Decision Evidence Ledger is designed as a first-class compliance artifact, not a byproduct of system operations.

@@ -2,19 +2,22 @@ use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 
 fn main() {
-    // Local identity closure: print the actual executable path and CWD at runtime.
-    // (Shows up in some MCP client logs as stderr.)
-    match std::env::current_exe() {
-        Ok(p) => eprintln!("ITER LOCAL PROOF — PATH = {}", p.display()),
-        Err(e) => eprintln!("ITER LOCAL PROOF — PATH = <error: {}>", e),
-    }
-    match std::env::current_dir() {
-        Ok(p) => eprintln!("ITER CWD = {}", p.display()),
-        Err(e) => eprintln!("ITER CWD = <error: {}>", e),
+    let args: Vec<String> = std::env::args().collect();
+    let json_only = args.iter().any(|a| a == "--json-only");
+
+    if !json_only {
+        match std::env::current_exe() {
+            Ok(p) => eprintln!("ITER LOCAL PROOF — PATH = {}", p.display()),
+            Err(e) => eprintln!("ITER LOCAL PROOF — PATH = <error: {}>", e),
+        }
+        match std::env::current_dir() {
+            Ok(p) => eprintln!("ITER CWD = {}", p.display()),
+            Err(e) => eprintln!("ITER CWD = <error: {}>", e),
+        }
+        print_mode_banner();
     }
 
-    print_mode_banner();
-    run_stdio_server();
+    run_stdio_server(json_only);
 }
 
 fn print_mode_banner() {
@@ -26,7 +29,7 @@ fn print_mode_banner() {
     eprintln!();
 }
 
-fn run_stdio_server() {
+fn run_stdio_server(json_only: bool) {
     use iter_mcp_server::substrate::stub::StubRuntime;
     use std::io::BufWriter;
 
@@ -36,10 +39,12 @@ fn run_stdio_server() {
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = BufWriter::new(stdout.lock());
 
-    eprintln!(
-        "Iter server running in STDIO mode (stub) — v{}",
-        env!("CARGO_PKG_VERSION")
-    );
+    if !json_only {
+        eprintln!(
+            "Iter server running in STDIO mode (stub) — v{}",
+            env!("CARGO_PKG_VERSION")
+        );
+    }
 
     loop {
         let mut line = String::new();
@@ -79,7 +84,9 @@ fn run_stdio_server() {
                         let _ = writer.flush();
                     }
                     Err(e) => {
-                        eprintln!("Failed to parse JSON-RPC request: {}", e);
+                        if !json_only {
+                            eprintln!("Failed to parse JSON-RPC request: {}", e);
+                        }
                         let error_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": serde_json::Value::Null,
@@ -96,7 +103,9 @@ fn run_stdio_server() {
                 }
             }
             Err(e) => {
-                eprintln!("Error reading from stdin: {}", e);
+                if !json_only {
+                    eprintln!("Error reading from stdin: {}", e);
+                }
                 break;
             }
         }
