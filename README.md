@@ -190,6 +190,8 @@ Available SDKs
 
 Rust SDK – First-class, reference implementation
 
+TypeScript SDK – Node.js client for MCP integrations
+
 Python SDK – Thin client for orchestration and testing
 
 CLI – Deterministic inspection, replay, and governance queries
