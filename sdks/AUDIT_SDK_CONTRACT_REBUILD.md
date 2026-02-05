@@ -42,14 +42,14 @@
 
 | Invariant | Status | Evidence |
 |---------|--------|----------|
-| State machine | PASS | sdks/rust/src/lib.rs:27-35 |
-| send() gated on OPEN | PASS | sdks/rust/src/lib.rs:118-136 |
-| stdout during drain | PASS | sdks/rust/src/lib.rs:79-108 |
-| bounded drain | PASS | sdks/rust/src/lib.rs:172-201 |
-| close idempotent | PASS | sdks/rust/src/lib.rs:157-171 |
-| backpressure | PASS | sdks/rust/src/lib.rs:139-145 |
-| request timeout | PASS | sdks/rust/src/lib.rs:154-164 |
-| fail-closed | FAIL | Not implemented; no protocol violation handler in Rust |
+| State machine | PASS | sdks/rust/src/lib.rs:34-42 |
+| send() gated on OPEN | PASS | sdks/rust/src/lib.rs:152-170 |
+| stdout during drain | PASS | sdks/rust/src/lib.rs:214-289 |
+| bounded drain | PASS | sdks/rust/src/lib.rs:240-269 |
+| close idempotent | PASS | sdks/rust/src/lib.rs:222-239 |
+| backpressure | PASS | sdks/rust/src/lib.rs:172-178 |
+| request timeout | PASS | sdks/rust/src/lib.rs:206-214 |
+| fail-closed | PASS | sdks/rust/src/lib.rs:304-383 |
 
 ## Test Execution Logs
 

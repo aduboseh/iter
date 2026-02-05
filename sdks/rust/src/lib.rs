@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     Arc,
 };
 use std::time::Duration;
@@ -27,6 +27,8 @@ pub const MIN_SERVER_VERSION: &str = "1.0.0";
 pub const MAX_SERVER_VERSION: &str = "1.99.99";
 
 const STDERR_RING_MAX_BYTES: usize = 10 * 1024;
+const MAX_PROTOCOL_VIOLATIONS: usize = 3;
+const PROTOCOL_VIOLATION_ERROR_CODE: i32 = -32000;
 
 // ==============================
 // State Machine
@@ -180,6 +182,8 @@ pub struct IterClient {
     trace_context: Arc<Mutex<Option<TraceContext>>>,
 
     close_lock: Arc<Mutex<()>>,
+    protocol_violation_count: AtomicUsize,
+    circuit_breaker_tripped: AtomicBool,
 }
 
 impl IterClient {
@@ -215,21 +219,85 @@ impl IterClient {
         {
             let state_c = Arc::clone(&state);
             let queue_c = Arc::clone(&response_queue);
+            let process_c = Arc::clone(&process);
+
+            let violation_count = Arc::new(AtomicUsize::new(0));
+            let breaker = Arc::new(AtomicBool::new(false));
+
+            let violation_count_c = Arc::clone(&violation_count);
+            let breaker_c = Arc::clone(&breaker);
+
             tokio::spawn(async move {
                 let mut lines = BufReader::new(stdout).lines();
-                loop {
-                    let st = *state_c.lock().await;
-                    if st == State::Closed {
-                        break;
-                    }
 
+                while *state_c.lock().await != State::Closed {
                     match lines.next_line().await {
                         Ok(Some(line)) => {
-                            if let Ok(resp) = serde_json::from_str::<RpcResponse>(&line) {
-                                if let Some(id) = resp.id.as_u64() {
+                            match serde_json::from_str::<serde_json::Value>(&line) {
+                                Ok(v) => {
+                                    let jsonrpc_ok = v
+                                        .get("jsonrpc")
+                                        .and_then(|x| x.as_str())
+                                        .map(|s| s == "2.0")
+                                        .unwrap_or(false);
+
+                                    let id_opt = v.get("id").and_then(|x| x.as_u64());
+
+                                    if !jsonrpc_ok || id_opt.is_none() {
+                                        if trip_breaker_if_needed(
+                                            "invalid JSON-RPC envelope",
+                                            &state_c,
+                                            &queue_c,
+                                            &process_c,
+                                            &violation_count_c,
+                                            &breaker_c,
+                                        )
+                                        .await
+                                        {
+                                            break;
+                                        }
+                                        continue;
+                                    }
+
+                                    let id = id_opt.unwrap();
+
+                                    let resp_parse = serde_json::from_value::<RpcResponse>(v);
+                                    let resp = match resp_parse {
+                                        Ok(r) => r,
+                                        Err(_) => {
+                                            if trip_breaker_if_needed(
+                                                "unparseable JSON-RPC response",
+                                                &state_c,
+                                                &queue_c,
+                                                &process_c,
+                                                &violation_count_c,
+                                                &breaker_c,
+                                            )
+                                            .await
+                                            {
+                                                break;
+                                            }
+                                            continue;
+                                        }
+                                    };
+
                                     let mut q = queue_c.lock().await;
                                     if let Some(tx) = q.remove(&id) {
                                         let _ = tx.send(resp);
+                                    }
+                                }
+                                Err(_) => {
+                                    if trip_breaker_if_needed(
+                                        "malformed stdout (non-JSON)",
+                                        &state_c,
+                                        &queue_c,
+                                        &process_c,
+                                        &violation_count_c,
+                                        &breaker_c,
+                                    )
+                                    .await
+                                    {
+                                        break;
                                     }
                                 }
                             }
@@ -239,6 +307,9 @@ impl IterClient {
                     }
                 }
             });
+
+            // Bind these atomics into the client (single source of truth)
+            // NOTE: We keep the client-side counters too; the task owns the effective breaker state.
         }
 
         // stderr task: ring buffer
@@ -270,6 +341,8 @@ impl IterClient {
             stderr_ring,
             trace_context,
             close_lock,
+            protocol_violation_count: AtomicUsize::new(0),
+            circuit_breaker_tripped: AtomicBool::new(false),
         })
     }
 
@@ -335,7 +408,8 @@ impl IterClient {
         // wait for response or timeout
         match timeout(Duration::from_millis(timeout_ms), rx).await {
             Ok(Ok(resp)) => Ok(resp),
-            Ok(Err(_)) | Err(_) => Err(SdkError::RequestTimeout {
+            Ok(Err(_)) => Err(SdkError::ConnectionFailed("Connection closed (fail-closed)".into())),
+            Err(_) => Err(SdkError::RequestTimeout {
                 method: method_s,
                 timeout_ms,
             }),
@@ -479,6 +553,74 @@ async fn wait_for_drain(
             return;
         }
         tokio::time::sleep(Duration::from_millis(step)).await;
+    }
+}
+
+async fn trip_breaker_if_needed(
+    reason: &str,
+    state: &Arc<Mutex<State>>,
+    queue: &Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
+    process: &Arc<Mutex<Child>>,
+    violation_count: &Arc<AtomicUsize>,
+    breaker: &Arc<AtomicBool>,
+) -> bool {
+    if breaker.load(Ordering::SeqCst) {
+        return true;
+    }
+
+    let pending = queue.lock().await.len();
+    let n = violation_count.fetch_add(1, Ordering::SeqCst) + 1;
+
+    let should_trip = pending > 0 || n >= MAX_PROTOCOL_VIOLATIONS;
+    if !should_trip {
+        return false;
+    }
+
+    if breaker.swap(true, Ordering::SeqCst) {
+        return true;
+    }
+
+    {
+        let mut st = state.lock().await;
+        if *st != State::Closed {
+            *st = State::Closing;
+        }
+    }
+
+    fail_closed_reject_pending(reason, queue).await;
+
+    {
+        let mut p = process.lock().await;
+        if p.try_wait().ok().flatten().is_none() {
+            let _ = p.kill().await;
+            let _ = timeout(Duration::from_secs(3), p.wait()).await;
+        }
+    }
+
+    {
+        let mut st = state.lock().await;
+        *st = State::Closed;
+    }
+
+    true
+}
+
+async fn fail_closed_reject_pending(
+    reason: &str,
+    queue: &Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
+) {
+    let mut q = queue.lock().await;
+    for (id, tx) in q.drain() {
+        let resp = RpcResponse {
+            jsonrpc: "2.0".into(),
+            result: None,
+            error: Some(RpcError {
+                code: PROTOCOL_VIOLATION_ERROR_CODE,
+                message: format!("Protocol violation: {reason}"),
+            }),
+            id: serde_json::json!(id),
+        };
+        let _ = tx.send(resp);
     }
 }
 
