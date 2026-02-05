@@ -1,4 +1,4 @@
-use iter_sdk::{State, SdkError};
+use iter_sdk::{SdkError, State};
 
 #[tokio::test]
 async fn ct41g_drain_window_contract_surface() {

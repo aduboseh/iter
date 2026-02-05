@@ -1,5 +1,7 @@
 # SDK Lifecycle Contract
 
+## Version: 1.0.0
+
 ## Contract Status
 
 **UNDER RECONSTITUTION (evidence-first).**  
