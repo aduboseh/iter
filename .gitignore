@@ -1,4 +1,15 @@
 /target
+**/target/
+
+# Node
+**/node_modules/
+**/dist/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
 
 # Transient logs and outputs
 *.log
