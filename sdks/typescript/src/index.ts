@@ -113,6 +113,34 @@ export class RequestError extends SdkError {
   }
 }
 
+export class BackpressureError extends SdkError {
+  constructor(public readonly maxInflight: number) {
+    super(`Backpressure: maxInflight=${maxInflight} exceeded`);
+    this.name = "BackpressureError";
+  }
+}
+
+export class RequestTimeoutError extends SdkError {
+  constructor(
+    public readonly method: string,
+    public readonly timeoutMs: number
+  ) {
+    super(`Request timeout: ${method} exceeded ${timeoutMs}ms`);
+    this.name = "RequestTimeoutError";
+  }
+}
+
+export class ConnectionClosedError extends SdkError {
+  constructor(
+    message: string = "Connection closed",
+    public readonly pendingCountAtClose?: number
+  ) {
+    super(message);
+    this.name = "ConnectionClosedError";
+  }
+}
+
+
 // ============================================================================
 // Response Types (MCP-aligned)
 // ============================================================================
@@ -150,6 +178,9 @@ export interface GovernorStatus {
 
 /** Iter MCP client (STDIO transport) */
 export class IterClient {
+  private static readonly STDERR_RING_MAX_BYTES = 10 * 1024;
+  private static readonly MAX_PROTOCOL_VIOLATIONS = 3;
+
   private process: ChildProcess | null = null;
   private stdin: Writable | null = null;
   private stdout: Readable | null = null;
@@ -160,8 +191,18 @@ export class IterClient {
     { resolve: (value: RpcResponse) => void; reject: (error: Error) => void }
   > = new Map();
   private lineReader: readline.Interface | null = null;
+  private readonly maxInflight: number;
+  private _state: "open" | "closing" | "closed" = "open";
+  private _closePromise: Promise<void> | null = null;
 
-  private constructor() {}
+  private _stderrBytes: Buffer = Buffer.alloc(0);
+  private _protocolViolationCount = 0;
+  private _circuitBreakerCloseStarted = false;
+
+  private constructor(maxInflight: number = 1) {
+    this.maxInflight = maxInflight;
+  }
+
 
   /** Get the current trace context */
   get traceContext(): TraceContext | null {
@@ -169,11 +210,14 @@ export class IterClient {
   }
 
   /** Connect to an Iter server process */
-  static async connect(binaryPath: string): Promise<IterClient> {
-    const client = new IterClient();
+  static async connect(
+    binaryPath: string,
+    options?: { maxInflight?: number }
+  ): Promise<IterClient> {
+    const client = new IterClient(options?.maxInflight ?? 1);
 
     client.process = spawn(binaryPath, [], {
-      stdio: ["pipe", "pipe", "ignore"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     if (!client.process.stdin || !client.process.stdout) {
@@ -183,6 +227,8 @@ export class IterClient {
     client.stdin = client.process.stdin;
     client.stdout = client.process.stdout;
 
+    client.attachProcessHandlers(client.process);
+
     // Set up line-based response reading
     client.lineReader = readline.createInterface({
       input: client.stdout,
@@ -190,30 +236,7 @@ export class IterClient {
     });
 
     client.lineReader.on("line", (line) => {
-      try {
-        const response: RpcResponse = JSON.parse(line);
-        const pending = client.responseQueue.get(response.id as number);
-        if (pending) {
-          client.responseQueue.delete(response.id as number);
-          pending.resolve(response);
-        }
-      } catch (e) {
-        // Ignore malformed lines
-      }
-    });
-
-    client.process.on("error", (err) => {
-      for (const pending of client.responseQueue.values()) {
-        pending.reject(new ConnectionError(err.message));
-      }
-      client.responseQueue.clear();
-    });
-
-    client.process.on("exit", () => {
-      for (const pending of client.responseQueue.values()) {
-        pending.reject(new ConnectionError("Process exited"));
-      }
-      client.responseQueue.clear();
+      client.handleStdoutLine(line);
     });
 
     return client;
@@ -226,10 +249,25 @@ export class IterClient {
   }
 
   /** Send a raw JSON-RPC request */
-  async send(method: string, params?: unknown): Promise<RpcResponse> {
+  async send(
+    method: string,
+    params?: unknown,
+    timeoutMs: number = 30000
+  ): Promise<RpcResponse> {
+    if (this._state !== "open") {
+      throw new ConnectionClosedError(
+        "Client is closing or closed, cannot send request"
+      );
+    }
+
+    if (this.responseQueue.size >= this.maxInflight) {
+      throw new BackpressureError(this.maxInflight);
+    }
+
     if (!this.stdin) {
       throw new ConnectionError("Not connected");
     }
+
 
     this.requestId++;
     const id = this.requestId;
@@ -242,7 +280,25 @@ export class IterClient {
     };
 
     return new Promise((resolve, reject) => {
-      this.responseQueue.set(id, { resolve, reject });
+      // Set up timeout for request eviction
+      const timer = setTimeout(() => {
+        this.responseQueue.delete(id);
+        reject(new RequestTimeoutError(method, timeoutMs));
+      }, timeoutMs);
+
+      this.responseQueue.set(id, {
+        resolve: (response) => {
+          this.responseQueue.delete(id);
+          clearTimeout(timer);
+          resolve(response);
+        },
+        reject: (error) => {
+          this.responseQueue.delete(id);
+          clearTimeout(timer);
+          reject(error);
+        },
+      });
+
       this.stdin!.write(JSON.stringify(request) + "\n");
     });
   }
@@ -290,17 +346,228 @@ export class IterClient {
   }
 
   /** Close the connection */
-  close(): void {
+  async close(): Promise<void> {
+    if (this._closePromise) {
+      return this._closePromise;
+    }
+
+    this._closePromise = this.performClose();
+    return this._closePromise;
+  }
+
+  private async waitForDrain(timeoutMs: number): Promise<void> {
+    const intervalMs = 25;
+    const maxIterations = Math.ceil(timeoutMs / intervalMs);
+    let iterations = 0;
+
+    while (this.responseQueue.size > 0 && iterations < maxIterations) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      iterations++;
+    }
+  }
+
+  private async waitForExit(timeoutMs: number): Promise<boolean> {
+    if (!this.process) return true;
+
+    return new Promise<boolean>((resolve) => {
+      const proc = this.process!;
+      let done = false;
+
+      const finish = (exitObserved: boolean) => {
+        if (done) return;
+        done = true;
+        proc.removeListener("exit", onExit);
+        proc.removeListener("close", onExit);
+        resolve(exitObserved);
+      };
+
+      const onExit = () => finish(true);
+
+      proc.once("exit", onExit);
+      proc.once("close", onExit);
+      setTimeout(() => finish(false), timeoutMs);
+    });
+  }
+
+  private async performClose(): Promise<void> {
+    this._state = "closing";
+
+    await this.waitForDrain(5000);
+
+    const pendingCount = this.responseQueue.size;
+    if (pendingCount > 0) {
+      const error = new ConnectionClosedError(
+        "Client closed during drain, request did not complete in time",
+        pendingCount
+      );
+      for (const pending of this.responseQueue.values()) {
+        pending.reject(error);
+      }
+      this.responseQueue.clear();
+    }
+
     if (this.lineReader) {
       this.lineReader.close();
       this.lineReader = null;
     }
-    if (this.process) {
-      this.process.kill();
-      this.process = null;
+
+    if (this.process && !this.process.killed) {
+      this.process.kill("SIGTERM");
+
+      const exitedAfterSigterm = await this.waitForExit(2000);
+
+      if (!exitedAfterSigterm && this.process && !this.process.killed) {
+        this.process.kill("SIGKILL");
+
+        const exitedAfterSigkill = await this.waitForExit(1000);
+
+        if (!exitedAfterSigkill) {
+          throw this.makeConnectionErrorWithStderr(
+            "Failed to reap process after SIGKILL (zombie detected)"
+          );
+        }
+      }
     }
+
+    this.process = null;
     this.stdin = null;
     this.stdout = null;
+    this._state = "closed";
+  }
+
+
+  private appendStderrBytes(chunk: Buffer) {
+    if (chunk.length === 0) return;
+
+    const max = IterClient.STDERR_RING_MAX_BYTES;
+    if (chunk.length >= max) {
+      this._stderrBytes = chunk.subarray(chunk.length - max);
+      return;
+    }
+
+    const combined = Buffer.concat([this._stderrBytes, chunk]);
+    if (combined.length <= max) {
+      this._stderrBytes = combined;
+      return;
+    }
+
+    this._stderrBytes = combined.subarray(combined.length - max);
+  }
+
+  private getStderrSnapshotText(): string {
+    if (this._stderrBytes.length === 0) return "";
+
+    return this._stderrBytes
+      .toString("utf8")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
+  }
+
+  private makeConnectionErrorWithStderr(message: string): ConnectionError {
+    const stderr = this.getStderrSnapshotText();
+    if (!stderr) return new ConnectionError(message);
+
+    return new ConnectionError(`${message}\nstderr:\n${stderr}`);
+  }
+
+  private attachProcessHandlers(proc: ChildProcess) {
+    if (proc.stderr) {
+      proc.stderr.on("data", (chunk: Buffer) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+        this.appendStderrBytes(buf);
+      });
+    }
+
+    proc.on("error", (err) => {
+      const error = this.makeConnectionErrorWithStderr(err.message);
+      for (const pending of this.responseQueue.values()) {
+        pending.reject(error);
+      }
+      this.responseQueue.clear();
+    });
+
+    proc.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      const nonZeroExit = typeof code === "number" && code !== 0;
+      const msg = nonZeroExit
+        ? `Process exited with code ${code}${signal ? ` signal ${signal}` : ""}`
+        : `Process exited${signal ? ` signal ${signal}` : ""}`;
+
+      const error = nonZeroExit
+        ? this.makeConnectionErrorWithStderr(msg)
+        : new ConnectionError(msg);
+
+      for (const pending of this.responseQueue.values()) {
+        pending.reject(error);
+      }
+      this.responseQueue.clear();
+    });
+  }
+
+  private failClosedProtocolViolation(reason: string) {
+    if (this._state === "closed") return;
+
+    const error = new ConnectionError(reason);
+    for (const pending of this.responseQueue.values()) {
+      pending.reject(error);
+    }
+    this.responseQueue.clear();
+
+    if (!this._circuitBreakerCloseStarted) {
+      this._circuitBreakerCloseStarted = true;
+      void this.close().catch(() => {});
+    }
+  }
+
+  private handleStdoutLine(line: string) {
+    if (this._state !== "open") return;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      this._protocolViolationCount++;
+
+      // Not attributable to a request ID. If any request is in-flight, fail-closed immediately.
+      if (this.responseQueue.size > 0) {
+        this.failClosedProtocolViolation("Protocol violation: malformed stdout");
+        return;
+      }
+
+      if (this._protocolViolationCount >= IterClient.MAX_PROTOCOL_VIOLATIONS) {
+        this.failClosedProtocolViolation("Protocol violation: malformed stdout");
+      }
+      return;
+    }
+
+    const response = parsed as Partial<RpcResponse> & { id?: unknown };
+    const id = response.id;
+    const hasAttributableId = typeof id === "number" || typeof id === "string";
+
+    if (!hasAttributableId) {
+      this._protocolViolationCount++;
+      if (this._protocolViolationCount >= IterClient.MAX_PROTOCOL_VIOLATIONS) {
+        this.failClosedProtocolViolation("Protocol violation: invalid JSON-RPC");
+      }
+      return;
+    }
+
+    const pending = this.responseQueue.get(id as number);
+    if (!pending) {
+      console.warn(
+        `[Iter SDK] Ignoring response for unknown/timed-out request ID: ${id}`
+      );
+      return;
+    }
+
+    if (response.jsonrpc !== "2.0") {
+      this.responseQueue.delete(id as number);
+      pending.reject(
+        new RequestError({ code: -32700, message: "Malformed JSON-RPC response" })
+      );
+      return;
+    }
+
+    pending.resolve(response as RpcResponse);
   }
 
   private parseToolResult<T>(response: RpcResponse): T {
