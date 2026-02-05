@@ -1,7 +1,7 @@
 //! Iter Rust SDK (async, contract-aligned)
 //
 // AUDIT NOTE:
-// Rust SDK does not yet implement fail-closed protocol violation handling.
+// Rust SDK implements fail-closed protocol violation handling.
 // See sdks/AUDIT_SDK_CONTRACT_REBUILD.md (Rust section).
 
 use serde::{Deserialize, Serialize};
@@ -178,11 +178,14 @@ pub struct IterClient {
     response_queue: Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
     max_inflight: usize,
 
+    #[allow(dead_code)]
     stderr_ring: Arc<Mutex<Vec<u8>>>,
     trace_context: Arc<Mutex<Option<TraceContext>>>,
 
     close_lock: Arc<Mutex<()>>,
+    #[allow(dead_code)]
     protocol_violation_count: AtomicUsize,
+    #[allow(dead_code)]
     circuit_breaker_tripped: AtomicBool,
 }
 
@@ -210,7 +213,9 @@ impl IterClient {
         let process = Arc::new(Mutex::new(child));
         let stdin = Arc::new(Mutex::new(stdin));
         let state = Arc::new(Mutex::new(State::Open));
-        let response_queue = Arc::new(Mutex::new(HashMap::<u64, oneshot::Sender<RpcResponse>>::new()));
+        let response_queue = Arc::new(Mutex::new(
+            HashMap::<u64, oneshot::Sender<RpcResponse>>::new(),
+        ));
         let stderr_ring = Arc::new(Mutex::new(Vec::with_capacity(STDERR_RING_MAX_BYTES)));
         let trace_context = Arc::new(Mutex::new(None));
         let close_lock = Arc::new(Mutex::new(()));
@@ -232,20 +237,40 @@ impl IterClient {
 
                 while *state_c.lock().await != State::Closed {
                     match lines.next_line().await {
-                        Ok(Some(line)) => {
-                            match serde_json::from_str::<serde_json::Value>(&line) {
-                                Ok(v) => {
-                                    let jsonrpc_ok = v
-                                        .get("jsonrpc")
-                                        .and_then(|x| x.as_str())
-                                        .map(|s| s == "2.0")
-                                        .unwrap_or(false);
+                        Ok(Some(line)) => match serde_json::from_str::<serde_json::Value>(&line) {
+                            Ok(v) => {
+                                let jsonrpc_ok = v
+                                    .get("jsonrpc")
+                                    .and_then(|x| x.as_str())
+                                    .map(|s| s == "2.0")
+                                    .unwrap_or(false);
 
-                                    let id_opt = v.get("id").and_then(|x| x.as_u64());
+                                let id_opt = v.get("id").and_then(|x| x.as_u64());
 
-                                    if !jsonrpc_ok || id_opt.is_none() {
+                                if !jsonrpc_ok || id_opt.is_none() {
+                                    if trip_breaker_if_needed(
+                                        "invalid JSON-RPC envelope",
+                                        &state_c,
+                                        &queue_c,
+                                        &process_c,
+                                        &violation_count_c,
+                                        &breaker_c,
+                                    )
+                                    .await
+                                    {
+                                        break;
+                                    }
+                                    continue;
+                                }
+
+                                let id = id_opt.unwrap();
+
+                                let resp_parse = serde_json::from_value::<RpcResponse>(v);
+                                let resp = match resp_parse {
+                                    Ok(r) => r,
+                                    Err(_) => {
                                         if trip_breaker_if_needed(
-                                            "invalid JSON-RPC envelope",
+                                            "unparseable JSON-RPC response",
                                             &state_c,
                                             &queue_c,
                                             &process_c,
@@ -258,50 +283,28 @@ impl IterClient {
                                         }
                                         continue;
                                     }
+                                };
 
-                                    let id = id_opt.unwrap();
-
-                                    let resp_parse = serde_json::from_value::<RpcResponse>(v);
-                                    let resp = match resp_parse {
-                                        Ok(r) => r,
-                                        Err(_) => {
-                                            if trip_breaker_if_needed(
-                                                "unparseable JSON-RPC response",
-                                                &state_c,
-                                                &queue_c,
-                                                &process_c,
-                                                &violation_count_c,
-                                                &breaker_c,
-                                            )
-                                            .await
-                                            {
-                                                break;
-                                            }
-                                            continue;
-                                        }
-                                    };
-
-                                    let mut q = queue_c.lock().await;
-                                    if let Some(tx) = q.remove(&id) {
-                                        let _ = tx.send(resp);
-                                    }
-                                }
-                                Err(_) => {
-                                    if trip_breaker_if_needed(
-                                        "malformed stdout (non-JSON)",
-                                        &state_c,
-                                        &queue_c,
-                                        &process_c,
-                                        &violation_count_c,
-                                        &breaker_c,
-                                    )
-                                    .await
-                                    {
-                                        break;
-                                    }
+                                let mut q = queue_c.lock().await;
+                                if let Some(tx) = q.remove(&id) {
+                                    let _ = tx.send(resp);
                                 }
                             }
-                        }
+                            Err(_) => {
+                                if trip_breaker_if_needed(
+                                    "malformed stdout (non-JSON)",
+                                    &state_c,
+                                    &queue_c,
+                                    &process_c,
+                                    &violation_count_c,
+                                    &breaker_c,
+                                )
+                                .await
+                                {
+                                    break;
+                                }
+                            }
+                        },
                         Ok(None) => break,
                         Err(_) => break,
                     }
@@ -400,7 +403,9 @@ impl IterClient {
         // write request (stdin is shared)
         {
             let mut stdin = self.stdin.lock().await;
-            stdin.write_all(serde_json::to_string(&req)?.as_bytes()).await?;
+            stdin
+                .write_all(serde_json::to_string(&req)?.as_bytes())
+                .await?;
             stdin.write_all(b"\n").await?;
             stdin.flush().await?;
         }
@@ -408,7 +413,9 @@ impl IterClient {
         // wait for response or timeout
         match timeout(Duration::from_millis(timeout_ms), rx).await {
             Ok(Ok(resp)) => Ok(resp),
-            Ok(Err(_)) => Err(SdkError::ConnectionFailed("Connection closed (fail-closed)".into())),
+            Ok(Err(_)) => Err(SdkError::ConnectionFailed(
+                "Connection closed (fail-closed)".into(),
+            )),
             Err(_) => Err(SdkError::RequestTimeout {
                 method: method_s,
                 timeout_ms,
@@ -624,9 +631,7 @@ async fn fail_closed_reject_pending(
     }
 }
 
-fn parse_tool_result<T: serde::de::DeserializeOwned>(
-    response: RpcResponse,
-) -> Result<T> {
+fn parse_tool_result<T: serde::de::DeserializeOwned>(response: RpcResponse) -> Result<T> {
     if let Some(err) = response.error {
         return Err(SdkError::RequestFailed {
             code: err.code,
@@ -650,8 +655,7 @@ fn parse_tool_result<T: serde::de::DeserializeOwned>(
             message: "Invalid tool response format".into(),
         })?;
 
-    serde_json::from_str(content)
-        .map_err(SdkError::Json)
+    serde_json::from_str(content).map_err(SdkError::Json)
 }
 
 // ==============================
@@ -664,11 +668,7 @@ pub fn is_version_compatible(server_version: &str) -> bool {
         if p.len() != 3 {
             return None;
         }
-        Some((
-            p[0].parse().ok()?,
-            p[1].parse().ok()?,
-            p[2].parse().ok()?,
-        ))
+        Some((p[0].parse().ok()?, p[1].parse().ok()?, p[2].parse().ok()?))
     }
     let server = match parse(server_version) {
         Some(v) => v,
