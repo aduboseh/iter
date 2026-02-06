@@ -263,12 +263,7 @@ fn alias_equivalence_repeat_determinism() {
 
     // Call the same alias pair twice to verify cross-call determinism within same process
     for _ in 0..2 {
-        assert_alias_equivalent(
-            &mut client,
-            "governor.health",
-            "governor.status",
-            json!({}),
-        );
+        assert_alias_equivalent(&mut client, "governor.health", "governor.status", json!({}));
     }
 
     client.close();
