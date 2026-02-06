@@ -17,15 +17,49 @@ This package reflects architectural design intent and current implementation sta
 
 ## Document Index
 
-### A. Architecture Artifacts
+### A. Architecture Core
 
 | Document | Description |
 |----------|-------------|
+| [architecture/system-boundary.md](./architecture/system-boundary.md) | Boundary definition: what is inside/outside Iter's control |
+| [architecture/trust-model.md](./architecture/trust-model.md) | What Iter verifies vs refuses to trust |
+| [architecture/invariants.md](./architecture/invariants.md) | Non-negotiable system invariants and enforcement mechanisms |
+| [architecture/non-goals.md](./architecture/non-goals.md) | Explicit list of capabilities Iter does not provide |
 | [ARCHITECTURE_DIAGRAM.md](./ARCHITECTURE_DIAGRAM.md) | High-level reference architecture (external-safe) |
 | [COMPONENT_RESPONSIBILITY.md](./COMPONENT_RESPONSIBILITY.md) | Component ownership and responsibility boundaries |
 | [DEPLOYMENT_MODEL.md](./DEPLOYMENT_MODEL.md) | Runtime topology and scaling approach |
 
-### B. Azure Alignment
+### B. Governance
+
+| Document | Description |
+|----------|-------------|
+| [governance/governance-model.md](./governance/governance-model.md) | Governance FSM, states, and transitions |
+| [governance/decision-packet.md](./governance/decision-packet.md) | DecisionPacket schema and checksum guarantees |
+| [governance/replay-and-lineage.md](./governance/replay-and-lineage.md) | Replay mechanics and deterministic regeneration |
+| [governance/failure-modes.md](./governance/failure-modes.md) | Failure modes and fail-closed behavior |
+
+### C. MCP Protocol
+
+| Document | Description |
+|----------|-------------|
+| [mcp/tool-surface.md](./mcp/tool-surface.md) | MCP tool definitions and guarantees |
+| [mcp/tool-contracts.md](./mcp/tool-contracts.md) | Tool contract stability and versioning |
+| [mcp/forbidden-behaviors.md](./mcp/forbidden-behaviors.md) | Hard constraints on tool behavior |
+
+### D. SDK & Integration
+
+| Document | Description |
+|----------|-------------|
+| [sdk/contract-versioning.md](./sdk/contract-versioning.md) | SDK version compatibility rules |
+| [sdk/determinism-guarantees.md](./sdk/determinism-guarantees.md) | SDK determinism parity with server |
+
+### E. Demos
+
+| Document | Description |
+|----------|-------------|
+| [demos/demo-scope.md](./demos/demo-scope.md) | Demo scope and narrative control |
+
+### F. Azure Alignment
 
 | Document | Description |
 |----------|-------------|
@@ -33,14 +67,14 @@ This package reflects architectural design intent and current implementation sta
 | [IDENTITY_ACCESS_MODEL.md](./IDENTITY_ACCESS_MODEL.md) | Entra ID, Managed Identity, RBAC posture |
 | [OBSERVABILITY_TELEMETRY.md](./OBSERVABILITY_TELEMETRY.md) | Logging, metrics, and audit architecture |
 
-### C. Compliance & Governance
+### G. Compliance & Governance
 
 | Document | Description |
 |----------|-------------|
 | [COMPLIANCE_INTENT.md](./COMPLIANCE_INTENT.md) | SOC 2, ISO 27001, NIST AI RMF roadmap |
 | [DATA_HANDLING_RETENTION.md](./DATA_HANDLING_RETENTION.md) | Data storage, handling, and retention policy |
 
-### D. Product Positioning
+### H. Product Positioning
 
 | Document | Description |
 |----------|-------------|
@@ -48,21 +82,49 @@ This package reflects architectural design intent and current implementation sta
 
 ---
 
-## Quick Reference
+## What Iter Is
 
-**What Iter Is:**
-- Deterministic governance control plane
-- Auditable decision verification system
-- Policy enforcement layer for AI systems
+Iter is a deterministic governance control plane for AI systems.
 
-**What Iter Is NOT:**
-- Not an LLM or foundation model
-- Not a model training system
-- Not an orchestration framework
+**Core Function:**
+- Evaluates governance conditions against system state
+- Enforces constraints before execution
+- Emits cryptographically verified DecisionPackets
 
-**Protocol:** MCP (Model Context Protocol) over JSON-RPC 2.0
+**Determinism:**
+- Same input always produces same decision
+- Same decision always produces same checksum
+- Checksum mismatch = governance fault
 
-**Primary Output:** DecisionPacket — replay-sufficient, cryptographically verified governance artifact
+**Trust Boundary:**
+- Iter verifies inputs, not intent
+- Iter enforces policy, not ethics
+- Iter gates execution, not orchestration
+
+**Primary Output:**
+- DecisionPacket: replay-sufficient, immutable, checksummed governance artifact
+
+## What Iter Is NOT
+
+Iter does not:
+- Reason, infer, plan, or learn
+- Orchestrate agents or workflows
+- Train models or optimize prompts
+- Store long-term memory or state
+- Decide business outcomes or interpret ethics
+- Generate content or reasoning signals
+
+## Architectural Invariants
+
+1. **Determinism:** Identical inputs + configuration produce byte-identical DecisionPackets
+2. **Fail-Closed:** Unknown inputs, NaN, Inf, invalid enums = immediate rejection
+3. **Side-Effect Isolation:** Governance evaluation produces no external side effects
+4. **Replay Stability:** DecisionPacket contains everything required to reconstruct decision without re-inference
+5. **Governance Precedence:** No execution path bypasses governance evaluation
+
+## Protocol
+
+MCP (Model Context Protocol) over JSON-RPC 2.0
 
 ---
 
