@@ -287,6 +287,37 @@ fn handle_stub_request(
                         },
                         "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
                     }
+                },
+                {
+                    "name": "decision.preview",
+                    "description": "Non-authoritative governance simulation (canonical, Phase 2)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                        },
+                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+                    }
+                },
+                {
+                    "name": "audit.search",
+                    "description": "Search governance decision history with filters (canonical, Phase 2)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "principal": { "type": "string", "description": "Filter by principal" },
+                            "action": { "type": "string", "description": "Filter by action" },
+                            "resource": { "type": "string", "description": "Filter by resource" },
+                            "decision": { "type": "string", "description": "Filter by decision verdict" },
+                            "policy_id": { "type": "string", "description": "Filter by policy ID" },
+                            "from": { "type": "string", "description": "Start timestamp (RFC3339)" },
+                            "to": { "type": "string", "description": "End timestamp (RFC3339)" },
+                            "limit": { "type": "integer", "description": "Max results (default 100, max 1000)" }
+                        }
+                    }
                 }
             ]
         }),
@@ -299,6 +330,45 @@ fn handle_stub_request(
             handle_stub_tool(runtime, tool_name, args)
         }
         _ => json!({"error": "Unknown method"}),
+    }
+}
+
+#[cfg(feature = "public_stub")]
+fn parse_governance_proposal(
+    args: &serde_json::Value,
+) -> iter_mcp_server::substrate::stub::GovernanceProposal {
+    let proposal_id = args
+        .get("proposal_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let state_snapshot_hash = args
+        .get("state_snapshot_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let constraints = args.get("constraints").cloned().unwrap_or(json!({}));
+    let requested_action = args
+        .get("requested_action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let proposal_c14n = args
+        .get("proposal_c14n")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let proposal_hash = args
+        .get("proposal_hash")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    iter_mcp_server::substrate::stub::GovernanceProposal {
+        proposal_id,
+        state_snapshot_hash,
+        constraints,
+        requested_action,
+        proposal_c14n,
+        proposal_hash,
     }
 }
 
@@ -378,53 +448,32 @@ fn handle_stub_tool(
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
         "governance.evaluate" | "decision.check" => {
-            // PHASE 0+: Iter-Haltra Bridge with JCS verification
-            // This is the authoritative governance entry point.
-            // Haltra proposes, Iter decides.
-            let proposal_id = args
-                .get("proposal_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string();
-            let state_snapshot_hash = args
-                .get("state_snapshot_hash")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let constraints = args.get("constraints").cloned().unwrap_or(json!({}));
-            let requested_action = args
-                .get("requested_action")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string();
-            // Patch A: JCS canonical bytes and hash
-            let proposal_c14n = args
-                .get("proposal_c14n")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let proposal_hash = args
-                .get("proposal_hash")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-
-            let proposal = iter_mcp_server::substrate::stub::GovernanceProposal {
-                proposal_id,
-                state_snapshot_hash,
-                constraints,
-                requested_action,
-                proposal_c14n,
-                proposal_hash,
-            };
-
+            let proposal = parse_governance_proposal(args);
             match runtime.evaluate_governance(&proposal) {
                 Ok(evaluation) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&evaluation).unwrap()}]})
                 }
                 Err(e) => {
-                    // Return error in MCP format for Patch B loud fail-closed
                     json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
                 }
             }
+        }
+        "decision.preview" => {
+            let proposal = parse_governance_proposal(args);
+            match runtime.preview_governance(&proposal) {
+                Ok(preview) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&preview).unwrap()}]})
+                }
+                Err(e) => {
+                    json!({"error": {"code": 5001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
+                }
+            }
+        }
+        "audit.search" => {
+            let filter: iter_mcp_server::substrate::stub::AuditSearchFilter =
+                serde_json::from_value(args.clone()).unwrap_or_default();
+            let result = runtime.search_decisions(&filter);
+            json!({"content": [{"type": "text", "text": serde_json::to_string(&result).unwrap()}]})
         }
         _ => json!({"error": {"code": 3000, "message": "Unknown tool"}}),
     }

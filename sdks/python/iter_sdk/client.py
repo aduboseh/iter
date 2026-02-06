@@ -212,6 +212,68 @@ class IterClient:
         })
         return self._parse_tool_result(response)
 
+    async def decision_preview(
+        self,
+        proposal_id: str,
+        state_snapshot_hash: str,
+        requested_action: str,
+        constraints: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Non-authoritative governance simulation (canonical, Phase 2).
+
+        Returns DecisionPreview artifact (simulation: true, not stored in lineage).
+        """
+        args: Dict[str, Any] = {
+            "proposal_id": proposal_id,
+            "state_snapshot_hash": state_snapshot_hash,
+            "requested_action": requested_action,
+        }
+        if constraints is not None:
+            args["constraints"] = constraints
+        response = await self.send("tools/call", {
+            "name": "decision.preview",
+            "arguments": args,
+        })
+        return self._parse_tool_result(response)
+
+    async def audit_search(
+        self,
+        principal: Optional[str] = None,
+        action: Optional[str] = None,
+        resource: Optional[str] = None,
+        decision: Optional[str] = None,
+        policy_id: Optional[str] = None,
+        from_ts: Optional[str] = None,
+        to_ts: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> Any:
+        """Search governance decision history (canonical, Phase 2).
+
+        Returns deterministic results ordered by (timestamp_utc, decision_id) ASC.
+        """
+        args: Dict[str, Any] = {}
+        if principal is not None:
+            args["principal"] = principal
+        if action is not None:
+            args["action"] = action
+        if resource is not None:
+            args["resource"] = resource
+        if decision is not None:
+            args["decision"] = decision
+        if policy_id is not None:
+            args["policy_id"] = policy_id
+        if from_ts is not None:
+            args["from"] = from_ts
+        if to_ts is not None:
+            args["to"] = to_ts
+        if limit is not None:
+            args["limit"] = limit
+        response = await self.send("tools/call", {
+            "name": "audit.search",
+            "arguments": args,
+        })
+        return self._parse_tool_result(response)
+
     async def governor_status(self) -> GovernorStatus:
         """Get governor status.
 

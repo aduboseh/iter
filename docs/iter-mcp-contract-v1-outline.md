@@ -28,14 +28,14 @@ All public MCP tools follow these canonical families:
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
 | `decision.check` | `governance.evaluate` | 1 (alias) | Authoritative PDP gate. Evaluates governance proposal and returns verdict (ALLOW/DENY). |
-| `decision.preview` | *(to be added)* | 2 | Non-authoritative simulation. Returns projected decision without committing. |
+|| `decision.preview` | **ACTIVE** | 2 | Non-authoritative simulation. Returns projected decision without committing. |
 | `decision.explain` | *(to be added)* | 3 | Structured explanation of decision rationale with policy trace. |
 
 ### Audit Tools (`audit.*`)
 
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
-| `audit.search` | *(to be added)* | 2 | Search decisions by criteria (time range, principal, action, outcome). |
+|| `audit.search` | **ACTIVE** | 2 | Search decisions by criteria (time range, principal, action, outcome). |
 | `audit.export` | `esv.audit` | 1 (alias) | Export audit bundle for compliance/archival. Currently node-scoped; may expand to full bundles. |
 | `audit.replay` | `lineage.replay` | 1 (alias) | Deterministic replay of decision history. Verifies checksums and reconstructs lineage. |
 
@@ -185,9 +185,10 @@ Exportable audit artifact for compliance/archival.
    - Identical query parameters → identical result set and order.
    - Applies to fixed underlying store (no concurrent writes).
 
-3. **Phase 0 Status**
-   - Currently documented as requirement; not yet enforced.
-   - Implementation in Phase 2.
+3. **Phase 2 Status**
+   - Ordering and determinism enforced for `audit.search`.
+   - Results ordered by `(timestamp_utc, decision_id) ASC`.
+   - Default limit: 100. Max limit: 1000.
 
 **Example:**
 ```
@@ -273,3 +274,32 @@ All alias pairs share identical handlers and schemas. No behavior changes introd
 Legacy IDs remain active but marked deprecated (`retire_by_version: v3.0`).
 SDKs (TypeScript, Rust, Python) expose canonical methods as primary API surface.
 Phase 0 JSON inventory and checksum are unchanged.
+
+## Phase 2 Status (Applied 2026-02-06)
+
+New governance UX tools registered in MCP server and SDKs:
+
+### `decision.preview`
+- Non-authoritative governance simulation.
+- Returns `DecisionPreview` artifact (DISTINCT from `DecisionPacket`).
+- `simulation: true`, `preview_version: "1.0"`, `derived_from: "decision.check@1"`.
+- Uses same verdict logic as `decision.check` but does NOT record lineage.
+- Deterministic: identical inputs produce identical previews.
+- Error code: `5001` (simulation unavailable).
+
+### `audit.search`
+- Searches governance decision history with filters.
+- Filters: `principal`, `action`, `resource`, `decision`, `policy_id`, `from`, `to`, `limit`.
+- Default limit: 100. Max limit: 1000.
+- Results ordered by `(timestamp_utc, decision_id) ASC`.
+- Deterministic: identical queries produce identical result sets.
+
+### SDK Coverage
+- TypeScript: `decisionPreview()`, `auditSearch()` + `DecisionPreview`, `AuditSearchFilter`, `AuditSearchResult` interfaces.
+- Rust: `decision_preview()`, `audit_search()` methods.
+- Python: `decision_preview()`, `audit_search()` methods.
+
+### Test Coverage
+- `tests/mcp_governance_ux.rs`: 10 integration tests covering Phase 2 invariants.
+- Preview: artifact shape, determinism, non-mutation, verdict parity with decision.check.
+- Search: empty results, post-evaluate results, deterministic ordering, limit enforcement.

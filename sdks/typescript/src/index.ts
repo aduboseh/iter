@@ -172,6 +172,49 @@ export interface GovernorStatus {
   healthy: boolean;
 }
 
+export interface DecisionPreview {
+  preview_version: string;
+  simulation: boolean;
+  request: Record<string, unknown>;
+  verdict: string;
+  determinism: {
+    drift_ok: boolean;
+    energy_drift: number;
+    coherence: number;
+  };
+  constraints: Record<string, unknown>;
+  obligations: Record<string, unknown>;
+  policy_trace: string[];
+  checksum_preview: string;
+  derived_from: string;
+}
+
+export interface AuditSearchFilter {
+  principal?: string;
+  action?: string;
+  resource?: string;
+  decision?: string;
+  policy_id?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface DecisionSummary {
+  decision_id: string;
+  principal: string;
+  action: string;
+  resource: string;
+  decision: string;
+  timestamp: string;
+}
+
+export interface AuditSearchResult {
+  results: DecisionSummary[];
+  count: number;
+  ordering: string;
+}
+
 // ============================================================================
 // Client
 // ============================================================================
@@ -399,6 +442,37 @@ export class IterClient {
     });
 
     return this.parseToolResult<unknown>(response);
+  }
+
+  /**
+   * Non-authoritative governance simulation (canonical, Phase 2).
+   * Returns DecisionPreview artifact (simulation: true, not stored in lineage).
+   */
+  async decisionPreview(args: {
+    proposal_id: string;
+    state_snapshot_hash: string;
+    requested_action: string;
+    constraints?: Record<string, unknown>;
+  }): Promise<DecisionPreview> {
+    const response = await this.send("tools/call", {
+      name: "decision.preview",
+      arguments: args,
+    });
+
+    return this.parseToolResult<DecisionPreview>(response);
+  }
+
+  /**
+   * Search governance decision history with filters (canonical, Phase 2).
+   * Returns deterministic results ordered by (timestamp_utc, decision_id) ASC.
+   */
+  async auditSearch(filter?: AuditSearchFilter): Promise<AuditSearchResult> {
+    const response = await this.send("tools/call", {
+      name: "audit.search",
+      arguments: filter ?? {},
+    });
+
+    return this.parseToolResult<AuditSearchResult>(response);
   }
 
   /**

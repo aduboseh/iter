@@ -570,6 +570,62 @@ impl IterClient {
         Ok(result)
     }
 
+    pub async fn decision_preview(
+        &mut self,
+        proposal_id: &str,
+        state_snapshot_hash: &str,
+        requested_action: &str,
+        constraints: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
+        let mut args = serde_json::json!({
+            "proposal_id": proposal_id,
+            "state_snapshot_hash": state_snapshot_hash,
+            "requested_action": requested_action,
+        });
+        if let Some(c) = constraints {
+            args["constraints"] = c;
+        }
+        let response = self
+            .send(
+                "tools/call",
+                Some(serde_json::json!({
+                    "name": "decision.preview",
+                    "arguments": args
+                })),
+                30000,
+            )
+            .await?;
+
+        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
+            code: -1,
+            message: "No result".into(),
+        })?;
+        Ok(result)
+    }
+
+    pub async fn audit_search(
+        &mut self,
+        filter: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
+        let args = filter.unwrap_or_else(|| serde_json::json!({}));
+        let response = self
+            .send(
+                "tools/call",
+                Some(serde_json::json!({
+                    "name": "audit.search",
+                    "arguments": args
+                })),
+                30000,
+            )
+            .await?;
+
+        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
+            code: -1,
+            message: "No result".into(),
+        })?;
+        Ok(result)
+    }
+
     #[deprecated(note = "Use governor_health() instead. Will be removed in v3.0.")]
     pub async fn governor_status(&mut self) -> Result<GovernorStatus> {
         let response = self

@@ -309,6 +309,112 @@ impl StubRuntime {
         &self.lineage
     }
 
+    /// Preview a governance proposal without committing to lineage.
+    ///
+    /// Returns a DecisionPreview artifact (non-authoritative).
+    /// MUST NOT mutate lineage, graph, or any governed state.
+    pub fn preview_governance(
+        &self,
+        proposal: &GovernanceProposal,
+    ) -> Result<DecisionPreview, GovernanceError> {
+        let verified_proposal_hash = self.verify_proposal_hash(proposal)?;
+        let status = self.governor_status();
+
+        let verdict = if !status.healthy || !status.drift_ok {
+            GovernanceVerdict::Block
+        } else if status.coherence >= 0.7 {
+            GovernanceVerdict::Allow
+        } else {
+            GovernanceVerdict::Review
+        };
+
+        let determinism = DeterminismProof {
+            drift_ok: status.drift_ok,
+            energy_drift: status.energy_drift,
+            coherence: status.coherence,
+        };
+
+        let preview_payload = serde_json::json!({
+            "proposal_id": proposal.proposal_id,
+            "proposal_hash": verified_proposal_hash,
+            "state_snapshot_hash": proposal.state_snapshot_hash,
+            "verdict": verdict,
+        });
+        let checksum_preview =
+            compute_stable_hash(&serde_json::to_string(&preview_payload).unwrap_or_default());
+
+        Ok(DecisionPreview {
+            preview_version: "1.0".to_string(),
+            simulation: true,
+            request: serde_json::json!({
+                "proposal_id": proposal.proposal_id,
+                "state_snapshot_hash": proposal.state_snapshot_hash,
+                "requested_action": proposal.requested_action,
+            }),
+            verdict,
+            determinism,
+            constraints: serde_json::json!({}),
+            obligations: serde_json::json!({}),
+            policy_trace: vec![],
+            checksum_preview,
+            derived_from: "decision.check@1".to_string(),
+        })
+    }
+
+    /// Search lineage for governance decisions matching filters.
+    ///
+    /// Returns results in deterministic order: (sequence ASC) which maps to
+    /// (timestamp_utc, decision_id) ASC in production.
+    /// Default limit: 100. Max limit: 1000.
+    pub fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
+        let limit = filter.limit.unwrap_or(100).min(1000).max(1) as usize;
+
+        let mut results: Vec<DecisionSummary> = self
+            .lineage
+            .iter()
+            .filter(|entry| entry.operation == "governance.evaluate")
+            .filter(|entry| {
+                if let Some(ref decision_filter) = filter.decision {
+                    entry
+                        .checksum
+                        .contains(&decision_filter.to_lowercase())
+                        || decision_filter == "ALLOW"
+                        || decision_filter == "BLOCK"
+                        || decision_filter == "REVIEW"
+                } else {
+                    true
+                }
+            })
+            .map(|entry| {
+                let timestamp =
+                    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+                DecisionSummary {
+                    decision_id: format!("decision-{}", entry.sequence),
+                    principal: "governance".to_string(),
+                    action: "evaluate".to_string(),
+                    resource: "proposal".to_string(),
+                    decision: "ALLOW".to_string(),
+                    timestamp,
+                }
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            a.timestamp
+                .cmp(&b.timestamp)
+                .then_with(|| a.decision_id.cmp(&b.decision_id))
+        });
+
+        results.truncate(limit);
+        let count = results.len();
+
+        AuditSearchResult {
+            results,
+            count,
+            ordering: "(timestamp_utc,decision_id) ASC".to_string(),
+        }
+    }
+
     /// Evaluate a governance proposal and return authoritative verdict.
     ///
     /// This is the PHASE 0+ entry point for Haltra consumption.
@@ -890,6 +996,74 @@ pub struct GovernanceEvaluation {
     pub determinism: DeterminismProof,
     /// Cryptographic receipt for audit trail
     pub receipt: GovernanceReceipt,
+}
+
+/// Non-authoritative simulation result from decision.preview.
+///
+/// DISTINCT from DecisionPacket: not stored in audit lineage,
+/// not replay-addressable, carries simulation: true.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecisionPreview {
+    /// Schema version for preview artifacts
+    pub preview_version: String,
+    /// Always true — marks this as non-authoritative
+    pub simulation: bool,
+    /// Original request payload
+    pub request: serde_json::Value,
+    /// Projected verdict (same logic as decision.check)
+    pub verdict: GovernanceVerdict,
+    /// Determinism proof metrics
+    pub determinism: DeterminismProof,
+    /// Applicable constraints (opaque)
+    pub constraints: serde_json::Value,
+    /// Advisory obligations (not enforced)
+    pub obligations: serde_json::Value,
+    /// Policy rules evaluated
+    pub policy_trace: Vec<String>,
+    /// Checksum of request + verdict (not stored in lineage)
+    pub checksum_preview: String,
+    /// Canonical tool ID this simulation derives from
+    pub derived_from: String,
+}
+
+/// Filter for audit.search queries.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AuditSearchFilter {
+    #[serde(default)]
+    pub principal: Option<String>,
+    #[serde(default)]
+    pub action: Option<String>,
+    #[serde(default)]
+    pub resource: Option<String>,
+    #[serde(default)]
+    pub decision: Option<String>,
+    #[serde(default)]
+    pub policy_id: Option<String>,
+    #[serde(default)]
+    pub from: Option<String>,
+    #[serde(default)]
+    pub to: Option<String>,
+    #[serde(default)]
+    pub limit: Option<u64>,
+}
+
+/// Single decision summary returned by audit.search.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecisionSummary {
+    pub decision_id: String,
+    pub principal: String,
+    pub action: String,
+    pub resource: String,
+    pub decision: String,
+    pub timestamp: String,
+}
+
+/// Result set from audit.search.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditSearchResult {
+    pub results: Vec<DecisionSummary>,
+    pub count: usize,
+    pub ordering: String,
 }
 
 fn compute_stable_hash(input: &str) -> String {
