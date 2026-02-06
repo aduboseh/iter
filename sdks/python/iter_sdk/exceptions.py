@@ -1,5 +1,9 @@
 """Iter SDK Exception Types"""
 
+class RpcError(Exception):
+    """Base RPC error for iter SDK."""
+    pass
+
 
 class SdkError(Exception):
     """Base SDK error."""
