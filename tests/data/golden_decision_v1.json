@@ -1,0 +1,40 @@
+{
+  "iter_build_hash": "1.0.2",
+  "substrate_build_hash": "scg-11.12.0",
+  "tick": 1000,
+  "energy": {
+    "nodes": 100.0,
+    "reservoir": 10.0,
+    "integrity": 0.95
+  },
+  "reasoning": {
+    "quality": 0.95,
+    "value_signal": 0.5,
+    "conflict_signal": 0.1,
+    "control_signal": 0.8
+  },
+  "learning": {
+    "capsule_id": "capsule_alpha",
+    "epoch": 42,
+    "version_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "update_cost": 0.5,
+    "update_paid": 0.5,
+    "update_quality": 1.0,
+    "status": "COMMITTED",
+    "scarcity_streak": 0
+  },
+  "policy": {
+    "policy_hash": "b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2",
+    "decision": "ALLOW",
+    "reason_codes": []
+  },
+  "economics_hash": "econ_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+  "evaluated_rules": [
+    "ENERGY_INTEGRITY_GATE",
+    "REASONING_QUALITY_GATE",
+    "INPUT_QUALITY_GATE",
+    "LEARNING_PERMISSION_GATE",
+    "LEARNING_QUALITY_GATE"
+  ],
+  "checksum": "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe"
+}

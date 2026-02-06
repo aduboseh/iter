@@ -29,6 +29,7 @@ use crate::contracts::{
 /// - Policy snapshot (hash, evaluated rules, decision, reason codes)
 /// - Permits/budgets if used
 /// - Checksum over the packet
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionPacket {
     /// Iter build hash (compile-time)
@@ -87,9 +88,13 @@ impl DecisionPacket {
     }
 
     /// Compute SHA-256 checksum of packet (excluding checksum field).
+    ///
+    /// Uses RFC 8785 JCS for deterministic canonicalization.
+    /// Clones the packet with checksum zeroed before serialization.
     fn compute_checksum(&self) -> String {
-        // Canonical JSON with sorted keys
-        let canonical = self.to_canonical_json();
+        let mut input = self.clone();
+        input.checksum = String::new();
+        let canonical = serde_json_canonicalizer::to_string(&input).unwrap_or_default();
         let mut hasher = Sha256::new();
         hasher.update(canonical.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -97,7 +102,7 @@ impl DecisionPacket {
 
     /// Verify packet checksum.
     pub fn verify_checksum(&self) -> Result<(), AuditError> {
-        let computed = self.compute_checksum_for_verify();
+        let computed = self.compute_checksum();
         if computed != self.checksum {
             return Err(AuditError::ChecksumMismatch {
                 expected: self.checksum.clone(),
@@ -105,21 +110,6 @@ impl DecisionPacket {
             });
         }
         Ok(())
-    }
-
-    /// Compute checksum for verification (same as compute_checksum but for existing packet).
-    fn compute_checksum_for_verify(&self) -> String {
-        // Create copy without checksum
-        let mut copy = self.clone();
-        copy.checksum = String::new();
-        copy.compute_checksum()
-    }
-
-    /// Serialize to canonical JSON (sorted keys, stable floats).
-    fn to_canonical_json(&self) -> String {
-        // Use serde_json with sorted keys
-        // Note: For production, use a proper canonical JSON library (RFC 8785)
-        serde_json::to_string(&CanonicalPacket::from(self)).unwrap_or_default()
     }
 
     /// Export packet as canonical JSON string.
@@ -140,94 +130,6 @@ impl DecisionPacket {
     /// Get reason codes for decision.
     pub fn reason_codes(&self) -> &[String] {
         &self.policy.reason_codes
-    }
-}
-
-/// Canonical representation for hashing (sorted keys).
-#[derive(Serialize)]
-struct CanonicalPacket {
-    economics_hash: String,
-    energy: CanonicalEnergy,
-    evaluated_rules: Vec<String>,
-    iter_build_hash: String,
-    learning: CanonicalLearning,
-    permit_hash: Option<String>,
-    policy: CanonicalPolicy,
-    reasoning: CanonicalReasoning,
-    substrate_build_hash: String,
-    tick: u64,
-}
-
-#[derive(Serialize)]
-struct CanonicalEnergy {
-    integrity: f64,
-    nodes: f64,
-    reservoir: f64,
-}
-
-#[derive(Serialize)]
-struct CanonicalReasoning {
-    conflict_signal: f64,
-    control_signal: f64,
-    quality: f64,
-    value_signal: f64,
-}
-
-#[derive(Serialize)]
-struct CanonicalLearning {
-    capsule_id: String,
-    epoch: u64,
-    scarcity_streak: u64,
-    status: String,
-    update_cost: f64,
-    update_paid: f64,
-    update_quality: f64,
-    version_hash: String,
-}
-
-#[derive(Serialize)]
-struct CanonicalPolicy {
-    decision: String,
-    policy_hash: String,
-    reason_codes: Vec<String>,
-}
-
-impl From<&DecisionPacket> for CanonicalPacket {
-    fn from(p: &DecisionPacket) -> Self {
-        Self {
-            economics_hash: p.economics_hash.clone(),
-            energy: CanonicalEnergy {
-                integrity: p.energy.integrity,
-                nodes: p.energy.nodes,
-                reservoir: p.energy.reservoir,
-            },
-            evaluated_rules: p.evaluated_rules.clone(),
-            iter_build_hash: p.iter_build_hash.clone(),
-            learning: CanonicalLearning {
-                capsule_id: p.learning.capsule_id.clone(),
-                epoch: p.learning.epoch,
-                scarcity_streak: p.learning.scarcity_streak,
-                status: format!("{:?}", p.learning.status).to_uppercase(),
-                update_cost: p.learning.update_cost,
-                update_paid: p.learning.update_paid,
-                update_quality: p.learning.update_quality,
-                version_hash: p.learning.version_hash.clone(),
-            },
-            permit_hash: p.permit_hash.clone(),
-            policy: CanonicalPolicy {
-                decision: format!("{:?}", p.policy.decision).to_uppercase(),
-                policy_hash: p.policy.policy_hash.clone(),
-                reason_codes: p.policy.reason_codes.clone(),
-            },
-            reasoning: CanonicalReasoning {
-                conflict_signal: p.reasoning.conflict_signal,
-                control_signal: p.reasoning.control_signal,
-                quality: p.reasoning.quality,
-                value_signal: p.reasoning.value_signal,
-            },
-            substrate_build_hash: p.substrate_build_hash.clone(),
-            tick: p.tick,
-        }
     }
 }
 
@@ -270,11 +172,18 @@ pub struct AuditEvent {
     pub reason_codes: Vec<String>,
     /// Event checksum
     pub checksum: String,
+    /// RFC 3339 timestamp recorded at event creation.
+    /// Not included in checksum — used for search result ordering.
+    #[serde(default)]
+    pub created_at: String,
 }
 
 impl AuditEvent {
     /// Create event from packet.
     pub fn from_packet(sequence: u64, packet: &DecisionPacket) -> Self {
+        let created_at = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+            .to_string();
         let mut event = Self {
             sequence,
             tick: packet.tick,
@@ -287,6 +196,7 @@ impl AuditEvent {
             learning_status: packet.learning.status.reason_code().to_string(),
             reason_codes: packet.policy.reason_codes.clone(),
             checksum: String::new(),
+            created_at,
         };
         event.checksum = event.compute_checksum();
         event

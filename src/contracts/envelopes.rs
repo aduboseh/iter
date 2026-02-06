@@ -11,6 +11,7 @@ use super::validation::{validate_bounded_float, validate_hash, ContractError};
 ///
 /// # Fields
 /// All energy values are non-negative. Integrity in [0.0, 1.0].
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EnergyEnvelope {
     /// Total energy across all nodes
@@ -39,6 +40,7 @@ impl EnergyEnvelope {
 ///
 /// # Fields
 /// All signals in [0.0, 1.0].
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReasoningEnvelope {
     /// Reasoning quality [0.0, 1.0] - payment ratio
@@ -83,6 +85,7 @@ impl ReasoningEnvelope {
 /// Learning update status - closed enum per SCG-INT-04.
 ///
 /// Unknown values fail closed.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum LearningStatus {
@@ -135,6 +138,7 @@ impl LearningStatus {
 /// - update_cost/paid/quality: Economics
 /// - status: Outcome of learning tick
 /// - scarcity_streak: Consecutive scarcity rejections
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LearningEnvelope {
     /// Capsule identifier
@@ -204,6 +208,7 @@ impl LearningEnvelope {
 }
 
 /// Policy decision - closed enum.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PolicyDecision {
@@ -237,6 +242,7 @@ impl PolicyDecision {
 }
 
 /// Policy envelope - governance decision with audit trail.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PolicyEnvelope {
     /// SHA-256 hash of policy configuration (hex-encoded)
@@ -267,6 +273,7 @@ impl PolicyEnvelope {
 ///
 /// # Invariants
 /// - INV-ITER-02: Identical SystemState + config => identical decision
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SystemState {
     /// Current tick

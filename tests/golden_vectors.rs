@@ -1,9 +1,9 @@
-//! Golden Vector Tests for Cross-Platform Determinism
+//! Golden Vector Tests — RFC 8785 JCS Checksums
 //!
-//! These tests verify that canonicalization produces identical checksums
-//! across different platforms (Windows, Linux, macOS) and architectures.
+//! These tests verify that JCS canonicalization produces identical checksums
+//! across all platforms. Checksums are hardcoded and enforced.
 //!
-//! INVARIANT: Same input => same canonical bytes => same checksum.
+//! INVARIANT: Same input => same JCS bytes => same checksum.
 //! If these tests fail on any platform, canonicalization is broken.
 
 use iter_mcp_server::audit::DecisionPacket;
@@ -11,6 +11,13 @@ use iter_mcp_server::contracts::{
     EnergyEnvelope, LearningEnvelope, LearningStatus, PolicyDecision, PolicyEnvelope,
     ReasoningEnvelope, SystemState,
 };
+use iter_mcp_server::economics::EconomicsConfig;
+use iter_mcp_server::governed::GovernedRuntime;
+use iter_mcp_server::policy::PolicyConfig;
+use iter_mcp_server::runtime::{
+    replay_decision, GovernanceMode, GovernanceRuntime, GovernanceVerdict,
+};
+use iter_mcp_server::substrate::stub::{GovernanceProposal, StubRuntime};
 
 /// Golden Vector 1: Basic ALLOW decision with committed learning
 ///
@@ -58,22 +65,10 @@ fn golden_vector_1_allow_committed() {
     )
     .unwrap();
 
-    // GOLDEN CHECKSUM: This value MUST be identical across all platforms
-    // If this fails on any platform, canonicalization is non-deterministic
-    // TODO: Replace placeholder once checksums are stable across CI platforms
-    const _EXPECTED_CHECKSUM: &str =
-        "a9a8a5e8c38b1d9e3f8c9b7e2a1d4c6f8e9b0a3d5c7e2f1a4b6d8e0c2a4f6b8";
-
-    // Verify checksum structure (64 hex chars)
-    assert_eq!(packet.checksum.len(), 64);
-    assert!(packet.checksum.chars().all(|c| c.is_ascii_hexdigit()));
-
-    // NOTE: The expected checksum above is a placeholder.
-    // Run this test once to get the actual checksum, then update EXPECTED_CHECKSUM.
-    // After that, the test becomes a golden vector that must pass on all platforms.
-    println!("GOLDEN_VECTOR_1 checksum: {}", packet.checksum);
-
-    // Verify checksum is self-consistent
+    assert_eq!(
+        packet.checksum, "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe",
+        "GOLDEN_VECTOR_1 checksum mismatch — JCS canonicalization changed"
+    );
     assert!(packet.verify_checksum().is_ok());
 }
 
@@ -122,10 +117,11 @@ fn golden_vector_2_freeze_scarcity() {
     )
     .unwrap();
 
-    println!("GOLDEN_VECTOR_2 checksum: {}", packet.checksum);
+    assert_eq!(
+        packet.checksum, "478342ff53d3a8b5c0e365f7348a88fb323107b5ad76d44f5cdedba24bc85eca",
+        "GOLDEN_VECTOR_2 checksum mismatch — JCS canonicalization changed"
+    );
     assert!(packet.verify_checksum().is_ok());
-
-    // Verify reason codes present for freeze decision
     assert!(!packet.policy.reason_codes.is_empty());
 }
 
@@ -172,10 +168,11 @@ fn golden_vector_3_degraded_mode() {
     )
     .unwrap();
 
-    println!("GOLDEN_VECTOR_3 checksum: {}", packet.checksum);
+    assert_eq!(
+        packet.checksum, "06c8c50c10ebdaece5faa46d7fd4a31a5fc9f983f3e2e9b84f9acff3b332e33d",
+        "GOLDEN_VECTOR_3 checksum mismatch — JCS canonicalization changed"
+    );
     assert!(packet.verify_checksum().is_ok());
-
-    // Verify permit hash is included
     assert!(packet.permit_hash.is_some());
 }
 
@@ -219,7 +216,10 @@ fn golden_vector_4_boundary_values() {
     )
     .unwrap();
 
-    println!("GOLDEN_VECTOR_4 checksum: {}", packet.checksum);
+    assert_eq!(
+        packet.checksum, "3aa4e02e0c337496be175572b15c04dc19a785a382880d46091364465309bcbb",
+        "GOLDEN_VECTOR_4 checksum mismatch — JCS canonicalization changed"
+    );
     assert!(packet.verify_checksum().is_ok());
 }
 
@@ -268,7 +268,10 @@ fn golden_vector_5_large_values() {
     )
     .unwrap();
 
-    println!("GOLDEN_VECTOR_5 checksum: {}", packet.checksum);
+    assert_eq!(
+        packet.checksum, "2ec1473fda2fbb78abaa0eb16b5edcd12353bd132a6f0b6b572269a0c69a93ea",
+        "GOLDEN_VECTOR_5 checksum mismatch — JCS canonicalization changed"
+    );
     assert!(packet.verify_checksum().is_ok());
 }
 
@@ -315,6 +318,198 @@ fn determinism_iteration_test() {
             checksum, first,
             "Checksum mismatch at iteration {}: {} != {}",
             i, checksum, first
+        );
+    }
+}
+
+/// Golden Vector 6: Governed-mode evaluate -> replay cycle
+///
+/// Proves the full governed path:
+/// 1. GovernedRuntime.evaluate() produces a DecisionPacket
+/// 2. replay_decision() verifies and reproduces the verdict
+/// 3. Packet checksum survives the roundtrip
+#[test]
+fn golden_vector_6_governed_replay_cycle() {
+    let mut graph = StubRuntime::new();
+    graph.create_node(0.8, 100.0);
+    graph.create_node(0.6, 50.0);
+
+    let policy_config = PolicyConfig::default();
+    let economics_config = EconomicsConfig::default();
+    let mut rt = GovernedRuntime::new(graph, policy_config.clone(), economics_config);
+
+    let proposal = GovernanceProposal {
+        proposal_id: "golden-governed-001".to_string(),
+        state_snapshot_hash: "a".repeat(64),
+        constraints: serde_json::json!({}),
+        requested_action: "deploy".to_string(),
+        proposal_c14n: None,
+        proposal_hash: None,
+    };
+
+    let outcome = rt.evaluate(&proposal).expect("governed evaluate");
+    assert_eq!(outcome.mode, GovernanceMode::Governed);
+    assert!(outcome.authoritative_pdp);
+    assert!(outcome.replay_sufficient);
+
+    let packet = outcome.packet.as_ref().expect("governed must emit packet");
+    assert!(packet.verify_checksum().is_ok());
+
+    let policy_version = outcome
+        .policy_version
+        .as_ref()
+        .expect("must have policy_version");
+    let schema_version = &outcome.schema_version;
+
+    let replayed =
+        replay_decision(packet, policy_version, schema_version).expect("replay must succeed");
+
+    assert_eq!(replayed.verdict, outcome.verdict);
+    assert_eq!(replayed.mode, GovernanceMode::Governed);
+    assert!(replayed.authoritative_pdp);
+    assert!(replayed.replay_sufficient);
+
+    let replayed_packet = replayed.packet.expect("replay must return packet");
+    assert_eq!(replayed_packet.checksum, packet.checksum);
+}
+
+/// Golden Vector 7: replay_decision rejects policy_version mismatch
+#[test]
+fn golden_vector_7_replay_rejects_version_mismatch() {
+    let mut graph = StubRuntime::new();
+    graph.create_node(0.8, 100.0);
+
+    let mut rt = GovernedRuntime::new(graph, PolicyConfig::default(), EconomicsConfig::default());
+
+    let proposal = GovernanceProposal {
+        proposal_id: "mismatch-test".to_string(),
+        state_snapshot_hash: "b".repeat(64),
+        constraints: serde_json::json!({}),
+        requested_action: "deploy".to_string(),
+        proposal_c14n: None,
+        proposal_hash: None,
+    };
+
+    let outcome = rt.evaluate(&proposal).expect("evaluate");
+    let packet = outcome.packet.as_ref().expect("packet");
+
+    let result = replay_decision(packet, "sha256:wrong_hash", "decision_packet:v1");
+    assert!(
+        result.is_err(),
+        "replay must reject policy_version mismatch"
+    );
+
+    let result = replay_decision(
+        packet,
+        outcome.policy_version.as_ref().unwrap(),
+        "decision_packet:v999",
+    );
+    assert!(
+        result.is_err(),
+        "replay must reject schema_version mismatch"
+    );
+}
+
+/// RFC 8785 JCS canonicalization regression test.
+///
+/// Validates that serde_json_canonicalizer produces expected output for
+/// a known input. If this test fails after a dependency update, the
+/// canonicalizer behavior has changed and all checksums are suspect.
+#[test]
+fn rfc8785_canonicalizer_regression() {
+    let input = serde_json::json!({
+        "z_last": true,
+        "a_first": 1,
+        "m_middle": [3, 2, 1],
+        "nested": {
+            "beta": "b",
+            "alpha": "a"
+        }
+    });
+
+    let canonical =
+        serde_json_canonicalizer::to_string(&input).expect("canonicalization must succeed");
+
+    assert_eq!(
+        canonical,
+        r#"{"a_first":1,"m_middle":[3,2,1],"nested":{"alpha":"a","beta":"b"},"z_last":true}"#,
+        "JCS must sort keys alphabetically and preserve array order"
+    );
+
+    let input_reordered = serde_json::json!({
+        "m_middle": [3, 2, 1],
+        "nested": {
+            "alpha": "a",
+            "beta": "b"
+        },
+        "a_first": 1,
+        "z_last": true
+    });
+
+    let canonical_reordered = serde_json_canonicalizer::to_string(&input_reordered)
+        .expect("canonicalization must succeed");
+
+    assert_eq!(
+        canonical, canonical_reordered,
+        "JCS must produce identical output regardless of input key order"
+    );
+}
+
+/// Policy hash stability test.
+///
+/// Confirms that PolicyConfig::compute_hash is deterministic across
+/// repeat invocations on identical config. If this fails, policy_version
+/// comparisons in replay_decision will reject valid packets.
+#[test]
+fn policy_hash_stability() {
+    let config1 = PolicyConfig::default();
+    let config2 = PolicyConfig::default();
+
+    let hash1_a = config1.compute_hash();
+    let hash1_b = config1.compute_hash();
+    let hash2 = config2.compute_hash();
+
+    assert_eq!(
+        hash1_a, hash1_b,
+        "PolicyConfig::compute_hash must be deterministic across repeat calls"
+    );
+    assert_eq!(
+        hash1_a, hash2,
+        "Identical PolicyConfig values must produce identical hashes"
+    );
+    assert!(!hash1_a.is_empty(), "PolicyConfig hash must not be empty");
+}
+
+/// Golden Vector 8: Governed verdict matches policy evaluator decision
+#[test]
+fn golden_vector_8_governed_verdict_from_policy() {
+    let mut graph = StubRuntime::new();
+    graph.create_node(0.9, 100.0);
+    graph.create_node(0.8, 80.0);
+
+    let mut rt = GovernedRuntime::new(graph, PolicyConfig::default(), EconomicsConfig::default());
+
+    let proposal = GovernanceProposal {
+        proposal_id: "verdict-test".to_string(),
+        state_snapshot_hash: "c".repeat(64),
+        constraints: serde_json::json!({}),
+        requested_action: "deploy".to_string(),
+        proposal_c14n: None,
+        proposal_hash: None,
+    };
+
+    let outcome = rt.evaluate(&proposal).expect("evaluate");
+
+    assert_eq!(
+        outcome.verdict,
+        GovernanceVerdict::Allow,
+        "healthy graph with default policy must produce Allow"
+    );
+
+    for code in &outcome.reason_codes {
+        assert!(
+            code.as_str().starts_with("policy."),
+            "governed reason code must use policy.* namespace"
         );
     }
 }

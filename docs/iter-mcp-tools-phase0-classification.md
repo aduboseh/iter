@@ -56,11 +56,11 @@ Unsafe or debug-only operations that mutate state without full governance review
 
 ### `decision.*` (PDP / Governance Gate)
 - `decision.check` ← current: `governance.evaluate`
-- `decision.preview` ← to be added (non-authoritative simulation)
+- `decision.preview` ← **ACTIVE** (non-authoritative simulation, Phase 2)
 - `decision.explain` ← to be added (structured explanation)
 
 ### `audit.*` (Audit & Replay)
-- `audit.search` ← to be added (search decisions by criteria)
+- `audit.search` ← **ACTIVE** (search decisions by criteria, Phase 2)
 - `audit.export` ← current: `esv.audit`
 - `audit.replay` ← current: `lineage.replay`
 
@@ -137,3 +137,10 @@ All alias pairs share identical handlers and schemas. No behavior changes introd
 Legacy IDs remain active but marked deprecated (`retire_by_version: v3.0`).
 Kernel tools (`node.*`, `edge.*`) are NOT aliased in Phase 1.
 Phase 0 JSON inventory (`raw-tools-list.phase0.json`) and checksum are unchanged.
+
+## Phase 2 Status (Applied 2026-02-06)
+
+New tools added to public MCP surface (total tools: 12):
+
+- `decision.preview` — Non-authoritative governance simulation. Returns `DecisionPreview` artifact.
+- `audit.search` — Search governance decision history with filters. Deterministic ordering.
