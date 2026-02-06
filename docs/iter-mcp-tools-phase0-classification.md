@@ -120,3 +120,20 @@ All required fields are documented in schemas.
 ## Conclusion
 
 Phase 0 classification complete. All 10 tools categorized and mapped to target canonical IDs. No behavior changes made; this is a reality freeze only.
+
+---
+
+## Phase 1 Status (Applied 2026-02-06)
+
+Canonical aliases registered for the following 5 public/governance tool pairs:
+
+- `decision.check` ↔ `governance.evaluate` (PUBLIC_GOVERNANCE)
+- `audit.export` ↔ `esv.audit` (AUDIT/REPLAY)
+- `audit.replay` ↔ `lineage.replay` (AUDIT/REPLAY)
+- `governance.health` ↔ `governance.status` (OPS/STATUS)
+- `governor.health` ↔ `governor.status` (OPS/STATUS)
+
+All alias pairs share identical handlers and schemas. No behavior changes introduced.
+Legacy IDs remain active but marked deprecated (`retire_by_version: v3.0`).
+Kernel tools (`node.*`, `edge.*`) are NOT aliased in Phase 1.
+Phase 0 JSON inventory (`raw-tools-list.phase0.json`) and checksum are unchanged.

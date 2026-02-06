@@ -210,17 +210,38 @@ fn handle_stub_request(
                 },
                 {
                     "name": "governor.status",
-                    "description": "Query governor status",
+                    "description": "[DEPRECATED: use governor.health] Query governor status",
                     "inputSchema": { "type": "object", "properties": {} }
                 },
                 {
                     "name": "governance.status",
-                    "description": "Query governance health",
+                    "description": "[DEPRECATED: use governance.health] Query governance health",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governor.health",
+                    "description": "Governor coherence and drift metrics (canonical)",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governance.health",
+                    "description": "Governance subsystem health summary (canonical)",
                     "inputSchema": { "type": "object", "properties": {} }
                 },
                 {
                     "name": "esv.audit",
-                    "description": "Audit node ESV",
+                    "description": "[DEPRECATED: use audit.export] Audit node ESV",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                        },
+                        "required": ["node_id"]
+                    }
+                },
+                {
+                    "name": "audit.export",
+                    "description": "Export audit bundle for compliance/archival (canonical)",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -231,12 +252,31 @@ fn handle_stub_request(
                 },
                 {
                     "name": "lineage.replay",
-                    "description": "Replay lineage",
+                    "description": "[DEPRECATED: use audit.replay] Replay lineage",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "audit.replay",
+                    "description": "Deterministic replay of decision history (canonical)",
                     "inputSchema": { "type": "object", "properties": {} }
                 },
                 {
                     "name": "governance.evaluate",
-                    "description": "Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+                    "description": "[DEPRECATED: use decision.check] Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                        },
+                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+                    }
+                },
+                {
+                    "name": "decision.check",
+                    "description": "Authoritative PDP decision gate (canonical)",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -319,11 +359,11 @@ fn handle_stub_tool(
             let msg = runtime.propagate();
             json!({"content": [{"type": "text", "text": msg}]})
         }
-        "governor.status" | "governance.status" => {
+        "governor.status" | "governance.status" | "governor.health" | "governance.health" => {
             let status = runtime.governor_status();
             json!({"content": [{"type": "text", "text": serde_json::to_string(&status).unwrap()}]})
         }
-        "esv.audit" => {
+        "esv.audit" | "audit.export" => {
             let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
             let id: u64 = id_str.parse().unwrap_or(0);
             match runtime.esv_audit(id) {
@@ -333,11 +373,11 @@ fn handle_stub_tool(
                 None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
-        "lineage.replay" => {
+        "lineage.replay" | "audit.replay" => {
             let lineage = runtime.lineage_replay();
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
-        "governance.evaluate" => {
+        "governance.evaluate" | "decision.check" => {
             // PHASE 0+: Iter-Haltra Bridge with JCS verification
             // This is the authoritative governance entry point.
             // Haltra proposes, Iter decides.
