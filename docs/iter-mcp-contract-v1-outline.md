@@ -404,3 +404,15 @@ Operator command to validate and export a DecisionPacket file.
 - `tests/data/golden_decision_v1.json`: materialized Golden Vector 1 DecisionPacket.
 - Checksum: `acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe`.
 - Operator documentation: `docs/iter-operator-tools.md`.
+
+## Phase 5 Status — Spec Hardening & Externalization (Applied 2026-02-06)
+
+- JSON Schemas (Draft 7, `additionalProperties: false`) are checked into `schemas/v1/`:
+  - `decision_packet`, `decision_preview`, `decision_check_request`, and `audit_search` (filter/result definitions).
+- `examples/generate_schemas.rs` regenerates schemas via `cargo run --features schema-gen --example generate_schemas`.
+- Claim gates:
+  - `tests/schema_integrity.rs` serializes canonical structs and validates them against the committed schemas (DecisionPacket fixture + decision preview/check/audit samples).
+  - `tests/doc_examples_integrity.rs` validates `tests/data/golden_decision_v1.json` against the DecisionPacket schema; markdown-tag extraction will be added when docs include machine-tagged blocks.
+- External consumers should follow `docs/iter-external-spec-v1.md` for integration workflows and schema links.
+
+Any struct change that alters the wire contract must regenerate the schemas (new versions will live under `schemas/v{N}`).

@@ -270,7 +270,10 @@ fn audit_search_empty_lineage_returns_zero_results() {
         .get("count")
         .and_then(|c| c.as_u64())
         .expect("audit.search must return count");
-    assert_eq!(count, 0, "audit.search on empty lineage must return 0 results");
+    assert_eq!(
+        count, 0,
+        "audit.search on empty lineage must return 0 results"
+    );
 
     let results = result
         .get("results")
@@ -302,10 +305,7 @@ fn audit_search_returns_decisions_after_governance_evaluate() {
 
     let result = client.extract_tool_text("audit.search", json!({}));
 
-    let count = result
-        .get("count")
-        .and_then(|c| c.as_u64())
-        .expect("count");
+    let count = result.get("count").and_then(|c| c.as_u64()).expect("count");
     assert!(
         count >= 1,
         "audit.search must return at least 1 result after governance.evaluate. Got: {}",
@@ -373,10 +373,7 @@ fn audit_search_respects_limit() {
 
     let result = client.extract_tool_text("audit.search", json!({"limit": 2}));
 
-    let count = result
-        .get("count")
-        .and_then(|c| c.as_u64())
-        .expect("count");
+    let count = result.get("count").and_then(|c| c.as_u64()).expect("count");
     assert!(
         count <= 2,
         "audit.search with limit=2 must return at most 2 results. Got: {}",

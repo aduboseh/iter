@@ -1,0 +1,164 @@
+{
+  "$id": "https://iter.dev/schemas/v1/audit_search.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "AuditSearchFilter": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "description": "Filter for audit.search queries.",
+      "properties": {
+        "action": {
+          "default": null,
+          "description": "Filter by action type.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decision": {
+          "default": null,
+          "description": "Filter by decision verdict.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from": {
+          "default": null,
+          "description": "Start of time range (RFC 3339).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": null,
+          "description": "Maximum number of results to return.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "policy_id": {
+          "default": null,
+          "description": "Filter by policy identifier.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "principal": {
+          "default": null,
+          "description": "Filter by principal identity.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resource": {
+          "default": null,
+          "description": "Filter by target resource.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to": {
+          "default": null,
+          "description": "End of time range (RFC 3339).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "AuditSearchFilter",
+      "type": "object"
+    },
+    "AuditSearchResult": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "definitions": {
+        "DecisionSummary": {
+          "additionalProperties": false,
+          "description": "Single decision summary returned by audit.search.",
+          "properties": {
+            "action": {
+              "description": "Action that was evaluated.",
+              "type": "string"
+            },
+            "decision": {
+              "description": "Resulting verdict string.",
+              "type": "string"
+            },
+            "decision_id": {
+              "description": "Unique identifier for this decision.",
+              "type": "string"
+            },
+            "principal": {
+              "description": "Principal that initiated the decision.",
+              "type": "string"
+            },
+            "resource": {
+              "description": "Resource the action targeted.",
+              "type": "string"
+            },
+            "timestamp": {
+              "description": "RFC 3339 timestamp of the decision.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "action",
+            "decision",
+            "decision_id",
+            "principal",
+            "resource",
+            "timestamp"
+          ],
+          "type": "object"
+        }
+      },
+      "description": "Result set from audit.search.",
+      "properties": {
+        "count": {
+          "description": "Number of results returned.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "ordering": {
+          "description": "Sort order description.",
+          "type": "string"
+        },
+        "results": {
+          "description": "Matched decision summaries.",
+          "items": {
+            "$ref": "#/definitions/DecisionSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "count",
+        "ordering",
+        "results"
+      ],
+      "title": "AuditSearchResult",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "filter": {
+      "$ref": "#/definitions/AuditSearchFilter"
+    },
+    "result": {
+      "$ref": "#/definitions/AuditSearchResult"
+    }
+  },
+  "title": "audit.search filter/result schemas",
+  "type": "object"
+}

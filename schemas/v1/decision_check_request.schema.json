@@ -1,0 +1,47 @@
+{
+  "$id": "https://iter.dev/schemas/v1/decision_check_request.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Domain-agnostic governance proposal input.\n\nIter does NOT interpret domain semantics. It evaluates deterministic admissibility only. Haltra owns domain ethics interpretation.",
+  "properties": {
+    "constraints": {
+      "default": null,
+      "description": "Constraints to evaluate (opaque to Iter)"
+    },
+    "proposal_c14n": {
+      "default": null,
+      "description": "RFC 8785 (JCS) canonical JSON bytes, base64-encoded",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "proposal_hash": {
+      "default": null,
+      "description": "SHA-256 hash of proposal_c14n bytes (Haltra computes, Iter verifies)",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "proposal_id": {
+      "description": "Unique proposal identifier",
+      "type": "string"
+    },
+    "requested_action": {
+      "description": "Requested action (opaque to Iter)",
+      "type": "string"
+    },
+    "state_snapshot_hash": {
+      "description": "SHA-256 hash of the state snapshot being evaluated",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "requested_action",
+    "state_snapshot_hash"
+  ],
+  "title": "GovernanceProposal",
+  "type": "object"
+}

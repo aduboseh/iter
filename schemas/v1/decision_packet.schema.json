@@ -1,0 +1,323 @@
+{
+  "$id": "https://iter.dev/schemas/v1/decision_packet.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "EnergyEnvelope": {
+      "additionalProperties": false,
+      "description": "Energy envelope - thermodynamic state summary.\n\n# Fields All energy values are non-negative. Integrity in [0.0, 1.0].",
+      "properties": {
+        "integrity": {
+          "description": "System integrity ratio [0.0, 1.0]",
+          "format": "double",
+          "type": "number"
+        },
+        "nodes": {
+          "description": "Total energy across all nodes",
+          "format": "double",
+          "type": "number"
+        },
+        "reservoir": {
+          "description": "Energy in reservoir",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "integrity",
+        "nodes",
+        "reservoir"
+      ],
+      "type": "object"
+    },
+    "LearningEnvelope": {
+      "additionalProperties": false,
+      "description": "Learning envelope - capsule state and update audit.\n\n# Fields - capsule_id: Unique capsule identifier - epoch: Update count - version_hash: SHA-256 of capsule state (hex-encoded) - update_cost/paid/quality: Economics - status: Outcome of learning tick - scarcity_streak: Consecutive scarcity rejections",
+      "properties": {
+        "capsule_id": {
+          "description": "Capsule identifier",
+          "type": "string"
+        },
+        "epoch": {
+          "description": "Current epoch (update count)",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "scarcity_streak": {
+          "description": "Consecutive scarcity rejections",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "status": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/LearningStatus"
+            }
+          ],
+          "description": "Outcome of learning tick"
+        },
+        "update_cost": {
+          "description": "Cost of proposed update",
+          "format": "double",
+          "type": "number"
+        },
+        "update_paid": {
+          "description": "Amount actually paid",
+          "format": "double",
+          "type": "number"
+        },
+        "update_quality": {
+          "description": "Payment quality (paid / cost)",
+          "format": "double",
+          "type": "number"
+        },
+        "version_hash": {
+          "description": "SHA-256 hash of capsule state (hex-encoded, 64 chars)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capsule_id",
+        "epoch",
+        "scarcity_streak",
+        "status",
+        "update_cost",
+        "update_paid",
+        "update_quality",
+        "version_hash"
+      ],
+      "type": "object"
+    },
+    "LearningStatus": {
+      "description": "Learning update status - closed enum per SCG-INT-04.\n\nUnknown values fail closed.",
+      "oneOf": [
+        {
+          "description": "Update was successfully committed",
+          "enum": [
+            "COMMITTED"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "No proposal generated (value delta below threshold)",
+          "enum": [
+            "NO_PROPOSAL_NO_DELTA"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Rejected: cortex input quality below threshold",
+          "enum": [
+            "REJECTED_INPUT_QUALITY"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Rejected: insufficient energy to fund update",
+          "enum": [
+            "REJECTED_SCARCITY"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Rejected: hash verification or arithmetic error",
+          "enum": [
+            "REJECTED_INTEGRITY"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "PolicyDecision": {
+      "description": "Policy decision - closed enum.",
+      "oneOf": [
+        {
+          "description": "Action is allowed",
+          "enum": [
+            "ALLOW"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Action is denied",
+          "enum": [
+            "DENY"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Learning is frozen",
+          "enum": [
+            "FREEZE_LEARNING"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Degraded mode (quality below threshold)",
+          "enum": [
+            "DEGRADED_MODE"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Requires external review",
+          "enum": [
+            "REQUIRE_REVIEW"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "PolicyEnvelope": {
+      "additionalProperties": false,
+      "description": "Policy envelope - governance decision with audit trail.",
+      "properties": {
+        "decision": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/PolicyDecision"
+            }
+          ],
+          "description": "Final decision"
+        },
+        "policy_hash": {
+          "description": "SHA-256 hash of policy configuration (hex-encoded)",
+          "type": "string"
+        },
+        "reason_codes": {
+          "description": "Reason codes for decision (ordered)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision",
+        "policy_hash",
+        "reason_codes"
+      ],
+      "type": "object"
+    },
+    "ReasoningEnvelope": {
+      "additionalProperties": false,
+      "description": "Reasoning envelope - cortex output summary.\n\n# Fields All signals in [0.0, 1.0].",
+      "properties": {
+        "conflict_signal": {
+          "description": "Conflict detection signal [0.0, 1.0]",
+          "format": "double",
+          "type": "number"
+        },
+        "control_signal": {
+          "description": "Control signal [0.0, 1.0]",
+          "format": "double",
+          "type": "number"
+        },
+        "quality": {
+          "description": "Reasoning quality [0.0, 1.0] - payment ratio",
+          "format": "double",
+          "type": "number"
+        },
+        "value_signal": {
+          "description": "Value signal from cortex [0.0, 1.0]",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "conflict_signal",
+        "control_signal",
+        "quality",
+        "value_signal"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
+  "properties": {
+    "checksum": {
+      "description": "SHA-256 checksum of packet (excluding this field)",
+      "type": "string"
+    },
+    "economics_hash": {
+      "description": "Economics config hash",
+      "type": "string"
+    },
+    "energy": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/EnergyEnvelope"
+        }
+      ],
+      "description": "Energy snapshot"
+    },
+    "evaluated_rules": {
+      "description": "Evaluated rule IDs (ordered)",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "iter_build_hash": {
+      "description": "Iter build hash (compile-time)",
+      "type": "string"
+    },
+    "learning": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/LearningEnvelope"
+        }
+      ],
+      "description": "Learning audit"
+    },
+    "permit_hash": {
+      "description": "Active permit hash (if any)",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/PolicyEnvelope"
+        }
+      ],
+      "description": "Policy snapshot"
+    },
+    "reasoning": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ReasoningEnvelope"
+        }
+      ],
+      "description": "Reasoning signature"
+    },
+    "substrate_build_hash": {
+      "description": "SCG build hash (from contract)",
+      "type": "string"
+    },
+    "tick": {
+      "description": "Decision tick",
+      "format": "uint64",
+      "minimum": 0.0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "checksum",
+    "economics_hash",
+    "energy",
+    "evaluated_rules",
+    "iter_build_hash",
+    "learning",
+    "policy",
+    "reasoning",
+    "substrate_build_hash",
+    "tick"
+  ],
+  "title": "DecisionPacket",
+  "type": "object"
+}

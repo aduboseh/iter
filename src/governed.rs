@@ -101,11 +101,12 @@ impl GovernedRuntime {
     fn evaluate_state(
         &self,
     ) -> Result<(crate::policy::PolicyResult, SystemState), GovernanceRuntimeError> {
-        let base_state = self.graph.system_state().map_err(|e| {
-            GovernanceRuntimeError::EvaluationFailed {
-                reason: e.to_string(),
-            }
-        })?;
+        let base_state =
+            self.graph
+                .system_state()
+                .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
+                    reason: e.to_string(),
+                })?;
 
         let policy_result = self.evaluator.evaluate(
             &base_state.reasoning,
@@ -113,12 +114,11 @@ impl GovernedRuntime {
             &base_state.energy,
         );
 
-        let policy_envelope = self
-            .evaluator
-            .build_envelope(&policy_result)
-            .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
+        let policy_envelope = self.evaluator.build_envelope(&policy_result).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         let governed_state = SystemState::new(
             base_state.tick,
@@ -271,12 +271,17 @@ mod tests {
     #[test]
     fn governed_evaluate_returns_packet() {
         let mut rt = make_governed();
-        let outcome = rt.evaluate(&test_proposal()).expect("evaluate must succeed");
+        let outcome = rt
+            .evaluate(&test_proposal())
+            .expect("evaluate must succeed");
 
         assert_eq!(outcome.mode, GovernanceMode::Governed);
         assert!(outcome.authoritative_pdp);
         assert!(outcome.replay_sufficient);
-        assert!(outcome.packet.is_some(), "governed evaluate must emit packet");
+        assert!(
+            outcome.packet.is_some(),
+            "governed evaluate must emit packet"
+        );
         assert_eq!(outcome.schema_version, "decision_packet:v1");
     }
 
@@ -287,7 +292,10 @@ mod tests {
 
         assert_eq!(outcome.mode, GovernanceMode::Governed);
         assert!(outcome.authoritative_pdp);
-        assert!(!outcome.replay_sufficient, "preview is not replay-sufficient");
+        assert!(
+            !outcome.replay_sufficient,
+            "preview is not replay-sufficient"
+        );
         assert!(outcome.packet.is_none(), "preview must not emit packet");
     }
 
@@ -309,7 +317,10 @@ mod tests {
         assert!(rt.audit_log().is_empty());
 
         let _ = rt.preview(&test_proposal()).expect("preview");
-        assert!(rt.audit_log().is_empty(), "preview must not mutate audit log");
+        assert!(
+            rt.audit_log().is_empty(),
+            "preview must not mutate audit log"
+        );
     }
 
     #[test]

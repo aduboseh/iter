@@ -29,6 +29,7 @@ use crate::contracts::{
 /// - Policy snapshot (hash, evaluated rules, decision, reason codes)
 /// - Permits/budgets if used
 /// - Checksum over the packet
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionPacket {
     /// Iter build hash (compile-time)
@@ -93,8 +94,7 @@ impl DecisionPacket {
     fn compute_checksum(&self) -> String {
         let mut input = self.clone();
         input.checksum = String::new();
-        let canonical =
-            serde_json_canonicalizer::to_string(&input).unwrap_or_default();
+        let canonical = serde_json_canonicalizer::to_string(&input).unwrap_or_default();
         let mut hasher = Sha256::new();
         hasher.update(canonical.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -132,7 +132,6 @@ impl DecisionPacket {
         &self.policy.reason_codes
     }
 }
-
 
 /// Audit errors.
 #[derive(Debug, Clone, thiserror::Error)]

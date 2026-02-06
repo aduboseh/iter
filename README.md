@@ -30,6 +30,26 @@ The protocol and SDK surface are **stable for 12 months** (through January 2027)
 See [RELEASE.md](RELEASE.md) for the compatibility policy.
 
 ---
+## External Spec (v1)
+
+Machine-readable JSON Schemas live under `schemas/v1`. They freeze the payloads for:
+
+- DecisionPacket responses
+- DecisionPreview responses
+- `decision.check` requests
+- `audit.search` filters/results
+
+See [docs/iter-external-spec-v1.md](docs/iter-external-spec-v1.md) for integration guidance.
+
+Regenerate schemas only when intentionally changing the contract:
+
+```bash
+cargo run --features schema-gen --example generate_schemas
+```
+
+Any structural change that does not come with a regenerated schema will fail the schema integrity tests.
+
+---
 
 ## Designed For
 

@@ -66,8 +66,7 @@ fn golden_vector_1_allow_committed() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum,
-        "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe",
+        packet.checksum, "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe",
         "GOLDEN_VECTOR_1 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -119,8 +118,7 @@ fn golden_vector_2_freeze_scarcity() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum,
-        "478342ff53d3a8b5c0e365f7348a88fb323107b5ad76d44f5cdedba24bc85eca",
+        packet.checksum, "478342ff53d3a8b5c0e365f7348a88fb323107b5ad76d44f5cdedba24bc85eca",
         "GOLDEN_VECTOR_2 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -171,8 +169,7 @@ fn golden_vector_3_degraded_mode() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum,
-        "06c8c50c10ebdaece5faa46d7fd4a31a5fc9f983f3e2e9b84f9acff3b332e33d",
+        packet.checksum, "06c8c50c10ebdaece5faa46d7fd4a31a5fc9f983f3e2e9b84f9acff3b332e33d",
         "GOLDEN_VECTOR_3 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -220,8 +217,7 @@ fn golden_vector_4_boundary_values() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum,
-        "3aa4e02e0c337496be175572b15c04dc19a785a382880d46091364465309bcbb",
+        packet.checksum, "3aa4e02e0c337496be175572b15c04dc19a785a382880d46091364465309bcbb",
         "GOLDEN_VECTOR_4 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -273,8 +269,7 @@ fn golden_vector_5_large_values() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum,
-        "2ec1473fda2fbb78abaa0eb16b5edcd12353bd132a6f0b6b572269a0c69a93ea",
+        packet.checksum, "2ec1473fda2fbb78abaa0eb16b5edcd12353bd132a6f0b6b572269a0c69a93ea",
         "GOLDEN_VECTOR_5 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -366,8 +361,8 @@ fn golden_vector_6_governed_replay_cycle() {
         .expect("must have policy_version");
     let schema_version = &outcome.schema_version;
 
-    let replayed = replay_decision(packet, policy_version, schema_version)
-        .expect("replay must succeed");
+    let replayed =
+        replay_decision(packet, policy_version, schema_version).expect("replay must succeed");
 
     assert_eq!(replayed.verdict, outcome.verdict);
     assert_eq!(replayed.mode, GovernanceMode::Governed);
@@ -384,11 +379,7 @@ fn golden_vector_7_replay_rejects_version_mismatch() {
     let mut graph = StubRuntime::new();
     graph.create_node(0.8, 100.0);
 
-    let mut rt = GovernedRuntime::new(
-        graph,
-        PolicyConfig::default(),
-        EconomicsConfig::default(),
-    );
+    let mut rt = GovernedRuntime::new(graph, PolicyConfig::default(), EconomicsConfig::default());
 
     let proposal = GovernanceProposal {
         proposal_id: "mismatch-test".to_string(),
@@ -436,8 +427,8 @@ fn rfc8785_canonicalizer_regression() {
         }
     });
 
-    let canonical = serde_json_canonicalizer::to_string(&input)
-        .expect("canonicalization must succeed");
+    let canonical =
+        serde_json_canonicalizer::to_string(&input).expect("canonicalization must succeed");
 
     assert_eq!(
         canonical,
@@ -486,10 +477,7 @@ fn policy_hash_stability() {
         hash1_a, hash2,
         "Identical PolicyConfig values must produce identical hashes"
     );
-    assert!(
-        !hash1_a.is_empty(),
-        "PolicyConfig hash must not be empty"
-    );
+    assert!(!hash1_a.is_empty(), "PolicyConfig hash must not be empty");
 }
 
 /// Golden Vector 8: Governed verdict matches policy evaluator decision
@@ -499,11 +487,7 @@ fn golden_vector_8_governed_verdict_from_policy() {
     graph.create_node(0.9, 100.0);
     graph.create_node(0.8, 80.0);
 
-    let mut rt = GovernedRuntime::new(
-        graph,
-        PolicyConfig::default(),
-        EconomicsConfig::default(),
-    );
+    let mut rt = GovernedRuntime::new(graph, PolicyConfig::default(), EconomicsConfig::default());
 
     let proposal = GovernanceProposal {
         proposal_id: "verdict-test".to_string(),

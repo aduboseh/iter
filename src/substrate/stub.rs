@@ -21,8 +21,7 @@ use crate::economics::EconomicsConfig;
 use crate::policy::{PolicyConfig, PolicyEvaluator};
 use crate::runtime::{
     GovernanceMode, GovernanceOutcome, GovernanceRuntime as GovernanceRuntimeTrait,
-    GovernanceRuntimeError, GovernanceRuntimeMeta, GovernanceVerdict as RuntimeVerdict,
-    ReasonCode,
+    GovernanceRuntimeError, GovernanceRuntimeMeta, GovernanceVerdict as RuntimeVerdict, ReasonCode,
 };
 
 /// Counter for generating sequential IDs
@@ -384,9 +383,7 @@ impl StubRuntime {
             .filter(|entry| entry.operation == "governance.evaluate")
             .filter(|entry| {
                 if let Some(ref decision_filter) = filter.decision {
-                    entry
-                        .checksum
-                        .contains(&decision_filter.to_lowercase())
+                    entry.checksum.contains(&decision_filter.to_lowercase())
                         || decision_filter == "ALLOW"
                         || decision_filter == "BLOCK"
                         || decision_filter == "REVIEW"
@@ -989,6 +986,7 @@ pub struct EsvAudit {
 /// Verdict for governance evaluation.
 ///
 /// This is the authoritative decision boundary. Haltra proposes, Iter decides.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GovernanceVerdict {
@@ -1043,6 +1041,7 @@ impl std::fmt::Display for GovernanceError {
 impl std::error::Error for GovernanceError {}
 
 /// Determinism proof returned with governance evaluation.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeterminismProof {
     /// Whether energy drift is within bounds (≤1×10⁻¹⁰)
@@ -1056,6 +1055,7 @@ pub struct DeterminismProof {
 /// Receipt for governance evaluation (cryptographic audit trail).
 ///
 /// Self-contained for auditor verification — includes verdict and version.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceReceipt {
     /// Composite Integrity Hash for this decision
@@ -1076,6 +1076,7 @@ pub struct GovernanceReceipt {
 ///
 /// Iter does NOT interpret domain semantics. It evaluates deterministic
 /// admissibility only. Haltra owns domain ethics interpretation.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceProposal {
     /// Unique proposal identifier
@@ -1099,6 +1100,7 @@ pub struct GovernanceProposal {
 ///
 /// This is the authoritative response from Iter. Haltra must not claim
 /// determinism, ethical validity, or audit integrity independently.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceEvaluation {
     /// Authoritative verdict: ALLOW, BLOCK, or REVIEW
@@ -1113,6 +1115,7 @@ pub struct GovernanceEvaluation {
 ///
 /// DISTINCT from DecisionPacket: not stored in audit lineage,
 /// not replay-addressable, carries simulation: true.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionPreview {
     /// Schema version for preview artifacts
@@ -1138,6 +1141,7 @@ pub struct DecisionPreview {
 }
 
 /// Filter for audit.search queries.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AuditSearchFilter {
     /// Filter by principal identity.
@@ -1167,6 +1171,7 @@ pub struct AuditSearchFilter {
 }
 
 /// Single decision summary returned by audit.search.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionSummary {
     /// Unique identifier for this decision.
@@ -1184,6 +1189,7 @@ pub struct DecisionSummary {
 }
 
 /// Result set from audit.search.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditSearchResult {
     /// Matched decision summaries.

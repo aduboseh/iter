@@ -33,7 +33,10 @@ impl GovernanceMode {
         match s.to_lowercase().as_str() {
             "demo" => Ok(Self::Demo),
             "governed" => Ok(Self::Governed),
-            _ => Err(format!("unknown governance mode: '{}' (expected 'demo' or 'governed')", s)),
+            _ => Err(format!(
+                "unknown governance mode: '{}' (expected 'demo' or 'governed')",
+                s
+            )),
         }
     }
 }
@@ -175,11 +178,11 @@ pub fn replay_decision(
     expected_policy_version: &str,
     expected_schema_version: &str,
 ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
-    packet.verify_checksum().map_err(|e| {
-        GovernanceRuntimeError::EvaluationFailed {
+    packet
+        .verify_checksum()
+        .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
             reason: format!("checksum verification failed: {}", e),
-        }
-    })?;
+        })?;
 
     let actual_policy_hash = packet.policy.policy_hash.clone();
     let actual_policy_version = format!("sha256:{}", actual_policy_hash);

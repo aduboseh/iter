@@ -21,8 +21,7 @@ use iter_mcp_server::contracts::{
 };
 
 const GV1_CHECKSUM: &str = "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe";
-const GV1_POLICY_HASH: &str =
-    "b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2";
+const GV1_POLICY_HASH: &str = "b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2";
 
 fn iter_cli_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_iter-cli"))
@@ -42,12 +41,8 @@ fn build_gv1_packet() -> DecisionPacket {
         0,
     )
     .unwrap();
-    let policy = PolicyEnvelope::new(
-        GV1_POLICY_HASH.to_string(),
-        PolicyDecision::Allow,
-        vec![],
-    )
-    .unwrap();
+    let policy =
+        PolicyEnvelope::new(GV1_POLICY_HASH.to_string(), PolicyDecision::Allow, vec![]).unwrap();
 
     let state = SystemState::new(1000, energy, reasoning, learning, policy);
 
@@ -330,8 +325,5 @@ fn cli_policy_hash_stability_unchanged() {
 
     let packet = build_gv1_packet();
     assert_eq!(packet.checksum, GV1_CHECKSUM, "GV1 checksum must be stable");
-    assert!(
-        packet.verify_checksum().is_ok(),
-        "GV1 checksum must verify"
-    );
+    assert!(packet.verify_checksum().is_ok(), "GV1 checksum must verify");
 }

@@ -98,14 +98,17 @@ fn run_stdio_server(json_only: bool, profile: ServerProfile) {
 
                         if id.is_none() || id.as_ref().map(|v| v.is_null()).unwrap_or(false) {
                             let _ = handle_stub_request(
-                                &mut runtime, method, &req, profile, &tools_json,
+                                &mut runtime,
+                                method,
+                                &req,
+                                profile,
+                                &tools_json,
                             );
                             continue;
                         }
 
-                        let resp = handle_stub_request(
-                            &mut runtime, method, &req, profile, &tools_json,
-                        );
+                        let resp =
+                            handle_stub_request(&mut runtime, method, &req, profile, &tools_json);
                         let response_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": id,
@@ -355,10 +358,7 @@ fn build_tools_list(profile: ServerProfile) -> Vec<serde_json::Value> {
 ///
 /// Returns Err with message on violation. Caller must exit.
 #[cfg(feature = "public_stub")]
-fn validate_surface(
-    profile: ServerProfile,
-    tools: &[serde_json::Value],
-) -> Result<(), String> {
+fn validate_surface(profile: ServerProfile, tools: &[serde_json::Value]) -> Result<(), String> {
     if profile == ServerProfile::Governance {
         for tool in tools {
             let name = tool["name"].as_str().unwrap_or("");
@@ -382,10 +382,7 @@ fn validate_surface(
             "governance.health",
             "governor.health",
         ];
-        let names: Vec<&str> = tools
-            .iter()
-            .filter_map(|t| t["name"].as_str())
-            .collect();
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
         for tool_name in &required {
             if !names.contains(tool_name) {
                 return Err(format!(
@@ -499,9 +496,8 @@ fn handle_stub_tool(
 
     // Reject kernel/graph tools in governance profile.
     if profile == ServerProfile::Governance {
-        let is_kernel = tool.starts_with("kernel.")
-            || tool.starts_with("node.")
-            || tool.starts_with("edge.");
+        let is_kernel =
+            tool.starts_with("kernel.") || tool.starts_with("node.") || tool.starts_with("edge.");
         if is_kernel {
             return json!({
                 "error": {

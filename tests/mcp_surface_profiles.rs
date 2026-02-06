@@ -74,7 +74,11 @@ impl McpTestClient {
             .and_then(|t| t.as_array())
             .expect("tools/list must return tools array")
             .iter()
-            .filter_map(|t| t.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+            .filter_map(|t| {
+                t.get("name")
+                    .and_then(|n| n.as_str())
+                    .map(|s| s.to_string())
+            })
             .collect()
     }
 
@@ -94,9 +98,8 @@ fn governance_profile_contains_no_kernel_tools() {
     let names = client.get_tool_names();
 
     for name in &names {
-        let is_kernel = name.starts_with("kernel.")
-            || name.starts_with("node.")
-            || name.starts_with("edge.");
+        let is_kernel =
+            name.starts_with("kernel.") || name.starts_with("node.") || name.starts_with("edge.");
         assert!(
             !is_kernel,
             "Governance profile MUST NOT contain kernel/graph tool '{}'. Found: {:?}",
@@ -126,7 +129,8 @@ fn governance_profile_contains_all_canonical_tools() {
         assert!(
             names.iter().any(|n| n == tool),
             "Governance profile must contain canonical tool '{}'. Found: {:?}",
-            tool, names
+            tool,
+            names
         );
     }
 
@@ -138,13 +142,20 @@ fn kernel_debug_profile_contains_kernel_tools() {
     let mut client = McpTestClient::spawn_with_profile(Some("kernel-debug"));
     let names = client.get_tool_names();
 
-    let required_kernel = ["node.create", "node.query", "node.mutate", "edge.bind", "edge.propagate"];
+    let required_kernel = [
+        "node.create",
+        "node.query",
+        "node.mutate",
+        "edge.bind",
+        "edge.propagate",
+    ];
 
     for tool in &required_kernel {
         assert!(
             names.iter().any(|n| n == tool),
             "Kernel-debug profile must contain kernel tool '{}'. Found: {:?}",
-            tool, names
+            tool,
+            names
         );
     }
 
@@ -162,7 +173,8 @@ fn kernel_debug_profile_also_contains_governance_tools() {
         assert!(
             names.iter().any(|n| n == tool),
             "Kernel-debug profile must also contain governance tool '{}'. Found: {:?}",
-            tool, names
+            tool,
+            names
         );
     }
 
