@@ -10,7 +10,6 @@ from dataclasses import asdict
 from typing import Any, Dict, Optional
 
 from .exceptions import (
-    VersionMismatchError,
     ConnectionError,
     RequestError,
     BackpressureError,
