@@ -70,7 +70,8 @@ impl McpClient {
         self.reader
             .read_line(&mut line)
             .expect("Failed to read response");
-        serde_json::from_str(&line).unwrap_or(json!({"error": {"code": -1, "message": "parse failed"}}))
+        serde_json::from_str(&line)
+            .unwrap_or(json!({"error": {"code": -1, "message": "parse failed"}}))
     }
 
     fn close(mut self) {
