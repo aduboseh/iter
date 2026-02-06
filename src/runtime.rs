@@ -148,13 +148,22 @@ pub struct GovernanceOutcome {
 pub enum GovernanceRuntimeError {
     /// Proposal validation failed.
     #[error("proposal validation failed: {reason}")]
-    ProposalInvalid { reason: String },
+    ProposalInvalid {
+        /// Human-readable description of the validation failure.
+        reason: String,
+    },
     /// Internal evaluation error.
     #[error("evaluation error: {reason}")]
-    EvaluationFailed { reason: String },
+    EvaluationFailed {
+        /// Human-readable description of the evaluation failure.
+        reason: String,
+    },
     /// Mode-specific error.
     #[error("mode error: {reason}")]
-    ModeError { reason: String },
+    ModeError {
+        /// Human-readable description of the mode error.
+        reason: String,
+    },
 }
 
 /// Replay a DecisionPacket and verify it is still valid.
