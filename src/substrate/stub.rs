@@ -19,6 +19,11 @@ use crate::audit::DecisionPacket;
 use crate::contracts::{EnergyEnvelope, LearningEnvelope, ReasoningEnvelope, SystemState};
 use crate::economics::EconomicsConfig;
 use crate::policy::{PolicyConfig, PolicyEvaluator};
+use crate::runtime::{
+    GovernanceMode, GovernanceOutcome, GovernanceRuntime as GovernanceRuntimeTrait,
+    GovernanceRuntimeError, GovernanceRuntimeMeta, GovernanceVerdict as RuntimeVerdict,
+    ReasonCode,
+};
 
 /// Counter for generating sequential IDs
 static NODE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -109,6 +114,10 @@ pub struct LineageEntry {
     /// Optional propagation artifact attached for edge.propagate operations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub propagation_artifact: Option<PropagationArtifact>,
+    /// RFC 3339 timestamp recorded at entry creation.
+    /// Stored at creation time for deterministic search results.
+    #[serde(default)]
+    pub created_at: String,
 }
 
 impl Default for StubRuntime {
@@ -385,17 +394,13 @@ impl StubRuntime {
                     true
                 }
             })
-            .map(|entry| {
-                let timestamp =
-                    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
-                DecisionSummary {
-                    decision_id: format!("decision-{}", entry.sequence),
-                    principal: "governance".to_string(),
-                    action: "evaluate".to_string(),
-                    resource: "proposal".to_string(),
-                    decision: "ALLOW".to_string(),
-                    timestamp,
-                }
+            .map(|entry| DecisionSummary {
+                decision_id: format!("decision-{}", entry.sequence),
+                principal: "governance".to_string(),
+                action: "evaluate".to_string(),
+                resource: "proposal".to_string(),
+                decision: "ALLOW".to_string(),
+                timestamp: entry.created_at.clone(),
             })
             .collect();
 
@@ -618,11 +623,15 @@ impl StubRuntime {
     ) {
         let sequence = self.lineage.len() as u64;
         let checksum = compute_stable_hash(&format!("{}:{}:{}", sequence, operation, data));
+        let created_at = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+            .to_string();
         self.lineage.push(LineageEntry {
             sequence,
             operation: operation.to_string(),
             checksum,
             propagation_artifact,
+            created_at,
         });
     }
 
@@ -820,6 +829,108 @@ impl StubRuntime {
 
         Ok(packet)
     }
+}
+
+// ============================================================================
+// GovernanceRuntime trait implementation (demo mode)
+// ============================================================================
+
+impl GovernanceRuntimeTrait for StubRuntime {
+    fn evaluate(
+        &mut self,
+        proposal: &GovernanceProposal,
+    ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
+        let eval = self.evaluate_governance(proposal).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
+                reason: e.to_string(),
+            }
+        })?;
+
+        let status = self.governor_status();
+        let verdict = map_stub_verdict(eval.verdict);
+        let reason_codes = demo_reason_codes(&eval.determinism, status.healthy);
+
+        Ok(GovernanceOutcome {
+            verdict,
+            reason_codes,
+            mode: GovernanceMode::Demo,
+            policy_id: None,
+            policy_version: None,
+            schema_version: "1.0".to_string(),
+            packet: None,
+            trace_available: false,
+            authoritative_pdp: false,
+            replay_sufficient: false,
+        })
+    }
+
+    fn preview(
+        &self,
+        proposal: &GovernanceProposal,
+    ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
+        let preview = self.preview_governance(proposal).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
+                reason: e.to_string(),
+            }
+        })?;
+
+        let status = self.governor_status();
+        let verdict = map_stub_verdict(preview.verdict);
+        let reason_codes = demo_reason_codes(&preview.determinism, status.healthy);
+
+        Ok(GovernanceOutcome {
+            verdict,
+            reason_codes,
+            mode: GovernanceMode::Demo,
+            policy_id: None,
+            policy_version: None,
+            schema_version: "1.0".to_string(),
+            packet: None,
+            trace_available: false,
+            authoritative_pdp: false,
+            replay_sufficient: false,
+        })
+    }
+
+    fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
+        // Inherent method resolution takes priority over trait methods.
+        self.search_decisions(filter)
+    }
+
+    fn mode(&self) -> GovernanceMode {
+        GovernanceMode::Demo
+    }
+
+    fn meta(&self) -> GovernanceRuntimeMeta {
+        GovernanceRuntimeMeta::demo()
+    }
+}
+
+/// Map stub-local GovernanceVerdict to runtime GovernanceVerdict.
+fn map_stub_verdict(v: GovernanceVerdict) -> RuntimeVerdict {
+    match v {
+        GovernanceVerdict::Allow => RuntimeVerdict::Allow,
+        GovernanceVerdict::Block => RuntimeVerdict::Block,
+        GovernanceVerdict::Review => RuntimeVerdict::Review,
+    }
+}
+
+/// Build demo-namespace reason codes from determinism proof and health status.
+fn demo_reason_codes(determinism: &DeterminismProof, healthy: bool) -> Vec<ReasonCode> {
+    let mut codes = Vec::new();
+    if !healthy {
+        codes.push(ReasonCode::demo("thresholds.unhealthy"));
+    }
+    if !determinism.drift_ok {
+        codes.push(ReasonCode::demo("thresholds.drift_violation"));
+    }
+    if determinism.coherence < 0.7 {
+        codes.push(ReasonCode::demo("thresholds.low_coherence"));
+    }
+    if codes.is_empty() {
+        codes.push(ReasonCode::demo("thresholds.pass"));
+    }
+    codes
 }
 
 /// Result of replaying a single lineage entry.

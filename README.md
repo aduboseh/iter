@@ -12,11 +12,14 @@
 
 ## What is Iter?
 
-Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) that acts as an **authoritative governance and audit control plane** for decision systems.
+Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) for deterministic governance evaluation.
 
-Iter evaluates governance conditions, enforces policy and economic constraints, and emits **replay-sufficient DecisionPackets** that prove exactly why a decision occurred.
+Iter operates in two modes:
 
-**MCP is the transport. Governance, causality, and replay are the product.**
+- **Demo mode** (default): Threshold-based governance using stub graph state. Non-authoritative — `authoritative_pdp=false`, `replay_sufficient=false`, no `DecisionPacket` at the MCP edge. Suitable for protocol validation and integration testing.
+- **Governed mode**: PolicyEvaluator-based governance with typed contract envelopes. Authoritative PDP — `authoritative_pdp=true`, `replay_sufficient=true`, emits `DecisionPacket` with RFC 8785 JCS checksums.
+
+**MCP is the transport. Governance mode determines what claims are valid.**
 
 ---
 
@@ -60,25 +63,36 @@ Iter governs and proves decisions produced by upstream systems.
 
 ## Governance Artifacts
 
-### DecisionPacket
+### GovernanceOutcome
 
-The primary output of Iter is a **DecisionPacket**.
+All MCP decision endpoints (`decision.check`, `decision.preview`, `audit.search`) return a `GovernanceOutcome` containing:
+- `verdict` (ALLOW / BLOCK / REVIEW)
+- `mode` (demo / governed)
+- `authoritative_pdp` (true only in governed mode)
+- `replay_sufficient` (true only for governed evaluate)
+- `reason_codes` (namespaced: `demo.thresholds.*` or `policy.*`)
+- `packet` (DecisionPacket, governed evaluate only)
 
-A DecisionPacket is a **replay-sufficient, immutable record** that contains everything required to reconstruct a governance outcome without re-running learning or inference.
+### DecisionPacket (governed mode only)
+
+In governed mode, `decision.check` emits a `DecisionPacket` — a replay-sufficient, immutable record containing everything required to reconstruct the governance outcome.
 
 Each packet includes:
-- System state snapshot (energy, reasoning, learning, policy)
+- System state snapshot (energy, reasoning, learning, policy envelopes)
 - Capsule identity and version hashes
 - Policy decisions and explicit reason codes
 - Learning permissions and economic constraints
-- Canonical JSON serialization with SHA-256 checksum
+- RFC 8785 JCS canonical JSON with SHA-256 checksum
+
+**Demo mode does not emit DecisionPackets.** Demo verdicts are non-authoritative threshold checks.
 
 #### Determinism Guarantee
 
 DecisionPackets are **deterministic by construction**:
 - Identical inputs and configuration produce **byte-identical packets**
-- Checksums verify integrity across time and systems
-- Replay does not require model weights, training data, or inference infrastructure
+- Checksums use RFC 8785 JCS canonicalization
+- Replay verifies policy_version and schema_version (fail-closed on mismatch)
+- **Platform determinism:** Golden vectors enforced on: **Linux (x86_64, stable Rust)**. Cross-platform determinism (Windows, macOS) will be validated in CI before claiming.
 
 ---
 
@@ -105,11 +119,15 @@ The MCP surface is intentionally small. All tools are deterministic, side-effect
 
 | Tool | Description |
 |------|-------------|
-| `governance.status` | Query governance health |
-| `governor.status` | Query drift and coherence status |
-| `lineage.replay` | Replay checksum history |
+| `decision.check` | Governance evaluation (canonical) |
+| `decision.preview` | Non-authoritative simulation |
+| `audit.search` | Search governance decision history |
+| `audit.export` | Export audit bundle (canonical) |
+| `audit.replay` | Deterministic replay of decision history (canonical) |
+| `governor.health` | Drift and coherence metrics (canonical) |
+| `governance.health` | Governance subsystem health (canonical) |
 
-Governance tools emit **DecisionPackets** when applicable.
+Legacy aliases (`governance.evaluate`, `governor.status`, `governance.status`, `esv.audit`, `lineage.replay`) are supported but deprecated.
 
 ---
 

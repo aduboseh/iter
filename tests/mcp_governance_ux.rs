@@ -1,11 +1,12 @@
-//! MCP Governance UX Tests — Phase 2
+//! MCP Governance UX Tests — Phase 2 (GovernanceOutcome contract)
 //!
 //! Proves correctness of decision.preview and audit.search tools.
 //!
 //! INVARIANTS:
 //! - decision.preview MUST NOT mutate lineage
-//! - decision.preview MUST return simulation: true and derived_from: "decision.check@1"
+//! - decision.preview MUST return GovernanceOutcome with mode, authoritative_pdp, replay_sufficient
 //! - decision.preview MUST be deterministic across repeat calls
+//! - demo mode: authoritative_pdp=false, replay_sufficient=false, packet=null
 //! - audit.search MUST return deterministic ordering
 //! - audit.search MUST respect default limit (100) and max limit (1000)
 //! - audit.search on empty lineage returns zero results
@@ -133,32 +134,41 @@ fn tools_list_contains_phase2_tools() {
 }
 
 #[test]
-fn decision_preview_returns_simulation_artifact() {
+fn decision_preview_returns_governance_outcome() {
     let mut client = McpTestClient::spawn();
     let preview = client.extract_tool_text("decision.preview", proposal_args());
 
-    assert_eq!(
-        preview.get("simulation").and_then(|v| v.as_bool()),
-        Some(true),
-        "decision.preview must return simulation: true"
-    );
-    assert_eq!(
-        preview.get("preview_version").and_then(|v| v.as_str()),
-        Some("1.0"),
-        "decision.preview must return preview_version: \"1.0\""
-    );
-    assert_eq!(
-        preview.get("derived_from").and_then(|v| v.as_str()),
-        Some("decision.check@1"),
-        "decision.preview must return derived_from: \"decision.check@1\""
-    );
     assert!(
         preview.get("verdict").is_some(),
         "decision.preview must return a verdict"
     );
+    assert_eq!(
+        preview.get("mode").and_then(|v| v.as_str()),
+        Some("demo"),
+        "decision.preview must return mode"
+    );
+    assert_eq!(
+        preview.get("authoritative_pdp").and_then(|v| v.as_bool()),
+        Some(false),
+        "demo mode must set authoritative_pdp=false"
+    );
+    assert_eq!(
+        preview.get("replay_sufficient").and_then(|v| v.as_bool()),
+        Some(false),
+        "demo mode must set replay_sufficient=false"
+    );
     assert!(
-        preview.get("checksum_preview").is_some(),
-        "decision.preview must return checksum_preview"
+        preview.get("reason_codes").is_some(),
+        "decision.preview must return reason_codes"
+    );
+    assert_eq!(
+        preview.get("schema_version").and_then(|v| v.as_str()),
+        Some("1.0"),
+        "decision.preview must return schema_version"
+    );
+    assert!(
+        preview.get("packet").is_none() || preview.get("packet").unwrap().is_null(),
+        "demo mode must not emit packet"
     );
 
     client.close();
@@ -177,14 +187,19 @@ fn decision_preview_deterministic_across_repeat_calls() {
         "decision.preview verdict must be deterministic"
     );
     assert_eq!(
-        p1.get("checksum_preview"),
-        p2.get("checksum_preview"),
-        "decision.preview checksum must be deterministic"
+        p1.get("reason_codes"),
+        p2.get("reason_codes"),
+        "decision.preview reason_codes must be deterministic"
     );
     assert_eq!(
-        p1.get("determinism"),
-        p2.get("determinism"),
-        "decision.preview determinism proof must be stable"
+        p1.get("mode"),
+        p2.get("mode"),
+        "decision.preview mode must be deterministic"
+    );
+    assert_eq!(
+        p1.get("authoritative_pdp"),
+        p2.get("authoritative_pdp"),
+        "decision.preview authoritative_pdp must be deterministic"
     );
 
     client.close();
