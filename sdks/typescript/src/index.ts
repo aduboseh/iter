@@ -335,7 +335,75 @@ export class IterClient {
     return this.parseToolResult<NodeState>(response);
   }
 
-  /** Get governor status */
+  /**
+   * Get governor health (canonical).
+   * Replaces governorStatus().
+   */
+  async governorHealth(): Promise<GovernorStatus> {
+    const response = await this.send("tools/call", {
+      name: "governor.health",
+      arguments: {},
+    });
+
+    return this.parseToolResult<GovernorStatus>(response);
+  }
+
+  /**
+   * Get governance subsystem health (canonical).
+   */
+  async governanceHealth(): Promise<GovernorStatus> {
+    const response = await this.send("tools/call", {
+      name: "governance.health",
+      arguments: {},
+    });
+
+    return this.parseToolResult<GovernorStatus>(response);
+  }
+
+  /**
+   * Evaluate governance proposal (canonical PDP decision gate).
+   */
+  async decisionCheck(args: {
+    proposal_id: string;
+    state_snapshot_hash: string;
+    requested_action: string;
+    constraints?: Record<string, unknown>;
+  }): Promise<unknown> {
+    const response = await this.send("tools/call", {
+      name: "decision.check",
+      arguments: args,
+    });
+
+    return this.parseToolResult<unknown>(response);
+  }
+
+  /**
+   * Export audit bundle (canonical).
+   */
+  async auditExport(nodeId: string): Promise<unknown> {
+    const response = await this.send("tools/call", {
+      name: "audit.export",
+      arguments: { node_id: nodeId },
+    });
+
+    return this.parseToolResult<unknown>(response);
+  }
+
+  /**
+   * Replay decision history (canonical).
+   */
+  async auditReplay(): Promise<unknown> {
+    const response = await this.send("tools/call", {
+      name: "audit.replay",
+      arguments: {},
+    });
+
+    return this.parseToolResult<unknown>(response);
+  }
+
+  /**
+   * @deprecated Use governorHealth() instead. Will be removed in v3.0.
+   */
   async governorStatus(): Promise<GovernorStatus> {
     const response = await this.send("tools/call", {
       name: "governor.status",

@@ -60,25 +60,27 @@ All public MCP tools follow these canonical families:
 
 ## Legacy-to-Canonical Mapping (Alias Plan)
 
-**Phase 1** introduces aliases without semantic changes. Legacy IDs remain functional but are marked deprecated.
+**Phase 1 aliases are ACTIVE as of 2026-02-06.** Legacy IDs remain functional but are marked deprecated.
 
-| Legacy ID | Canonical ID | Alias Introduced | Retire By |
-|-----------|--------------|------------------|-----------|
-| `governance.evaluate` | `decision.check` | Phase 1 | v3.0 |
-| `governance.status` | `governance.health` | Phase 1 | v3.0 |
-| `governor.status` | `governor.health` | Phase 1 | v3.0 |
-| `esv.audit` | `audit.export` | Phase 1 | v3.0 |
-| `lineage.replay` | `audit.replay` | Phase 1 | v3.0 |
-| `node.create` | `kernel.node.create` | Phase 1 | v3.0 |
-| `node.query` | `kernel.node.query` | Phase 1 | v3.0 |
-| `node.mutate` | `kernel.node.mutate` | Phase 1 | v3.0 (remove in production mode) |
-| `edge.bind` | `kernel.edge.bind` | Phase 1 | v3.0 |
-| `edge.propagate` | `kernel.edge.propagate` | Phase 1 | v3.0 |
+| Legacy ID | Canonical ID | Status | Retire By |
+|-----------|--------------|--------|-----------|
+| `governance.evaluate` | `decision.check` | **ACTIVE** (Phase 1) | v3.0 |
+| `governance.status` | `governance.health` | **ACTIVE** (Phase 1) | v3.0 |
+| `governor.status` | `governor.health` | **ACTIVE** (Phase 1) | v3.0 |
+| `esv.audit` | `audit.export` | **ACTIVE** (Phase 1) | v3.0 |
+| `lineage.replay` | `audit.replay` | **ACTIVE** (Phase 1) | v3.0 |
+| `node.create` | `kernel.node.create` | Planned (Phase 3) | v3.0 |
+| `node.query` | `kernel.node.query` | Planned (Phase 3) | v3.0 |
+| `node.mutate` | `kernel.node.mutate` | Planned (Phase 3) | v3.0 (remove in production mode) |
+| `edge.bind` | `kernel.edge.bind` | Planned (Phase 3) | v3.0 |
+| `edge.propagate` | `kernel.edge.propagate` | Planned (Phase 3) | v3.0 |
 
 **Alias Semantics:**
 - Aliases are pointers only; canonical IDs own semantics.
 - Both legacy and canonical IDs invoke identical behavior during transition period.
-- Deprecation warnings are emitted when legacy IDs are used.
+- Deprecation warnings are emitted when legacy IDs are used via SDKs.
+- `deprecated: true` metadata applies to all legacy IDs with active aliases.
+- `retire_by_version: v3.0` for all deprecated IDs.
 
 ---
 
@@ -254,3 +256,20 @@ audit.search(time_range=[T1, T2], principal="alice")
 This outline defines the target Iter MCP Contract v1. Implementation occurs in Phases 1–4. Phase 0 establishes the frozen baseline against which all future changes are measured.
 
 **No behavior changes are permitted under Phase 0.**
+
+---
+
+## Phase 1 Status (Applied 2026-02-06)
+
+Canonical aliases registered in MCP server and SDKs:
+
+- `decision.check` ↔ `governance.evaluate` — same handler, same schema
+- `audit.export` ↔ `esv.audit` — same handler, same schema
+- `audit.replay` ↔ `lineage.replay` — same handler, same schema
+- `governance.health` ↔ `governance.status` — same handler, same schema
+- `governor.health` ↔ `governor.status` — same handler, same schema
+
+All alias pairs share identical handlers and schemas. No behavior changes introduced.
+Legacy IDs remain active but marked deprecated (`retire_by_version: v3.0`).
+SDKs (TypeScript, Rust, Python) expose canonical methods as primary API surface.
+Phase 0 JSON inventory and checksum are unchanged.
