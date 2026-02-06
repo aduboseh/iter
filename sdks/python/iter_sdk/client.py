@@ -6,11 +6,11 @@ Follows the SDK lifecycle contract: sdks/sdk-contract.md
 
 import asyncio
 import json
+import warnings
 from dataclasses import asdict
 from typing import Any, Dict, Optional
 
 from .exceptions import (
-    VersionMismatchError,
     ConnectionError,
     RequestError,
     BackpressureError,
@@ -159,8 +159,70 @@ class IterClient:
         })
         return self._parse_tool_result(response)
 
+    async def governor_health(self) -> GovernorStatus:
+        """Get governor coherence and drift metrics (canonical)."""
+        response = await self.send("tools/call", {
+            "name": "governor.health",
+            "arguments": {},
+        })
+        return self._parse_tool_result(response)
+
+    async def governance_health(self) -> GovernorStatus:
+        """Get governance subsystem health summary (canonical)."""
+        response = await self.send("tools/call", {
+            "name": "governance.health",
+            "arguments": {},
+        })
+        return self._parse_tool_result(response)
+
+    async def decision_check(
+        self,
+        proposal_id: str,
+        state_snapshot_hash: str,
+        requested_action: str,
+        constraints: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Evaluate governance proposal (canonical PDP decision gate)."""
+        args: Dict[str, Any] = {
+            "proposal_id": proposal_id,
+            "state_snapshot_hash": state_snapshot_hash,
+            "requested_action": requested_action,
+        }
+        if constraints is not None:
+            args["constraints"] = constraints
+        response = await self.send("tools/call", {
+            "name": "decision.check",
+            "arguments": args,
+        })
+        return self._parse_tool_result(response)
+
+    async def audit_export(self, node_id: int) -> Any:
+        """Export audit bundle for compliance/archival (canonical)."""
+        response = await self.send("tools/call", {
+            "name": "audit.export",
+            "arguments": {"node_id": str(node_id)},
+        })
+        return self._parse_tool_result(response)
+
+    async def audit_replay(self) -> Any:
+        """Replay decision history (canonical)."""
+        response = await self.send("tools/call", {
+            "name": "audit.replay",
+            "arguments": {},
+        })
+        return self._parse_tool_result(response)
+
     async def governor_status(self) -> GovernorStatus:
-        """Get governor status."""
+        """Get governor status.
+
+        .. deprecated:: 1.0.0
+            Use :meth:`governor_health` instead. Will be removed in v3.0.
+        """
+        warnings.warn(
+            "governor_status() is deprecated, use governor_health()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         response = await self.send("tools/call", {
             "name": "governor.status",
             "arguments": {},
