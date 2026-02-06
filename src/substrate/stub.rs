@@ -1140,20 +1140,28 @@ pub struct DecisionPreview {
 /// Filter for audit.search queries.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AuditSearchFilter {
+    /// Filter by principal identity.
     #[serde(default)]
     pub principal: Option<String>,
+    /// Filter by action type.
     #[serde(default)]
     pub action: Option<String>,
+    /// Filter by target resource.
     #[serde(default)]
     pub resource: Option<String>,
+    /// Filter by decision verdict.
     #[serde(default)]
     pub decision: Option<String>,
+    /// Filter by policy identifier.
     #[serde(default)]
     pub policy_id: Option<String>,
+    /// Start of time range (RFC 3339).
     #[serde(default)]
     pub from: Option<String>,
+    /// End of time range (RFC 3339).
     #[serde(default)]
     pub to: Option<String>,
+    /// Maximum number of results to return.
     #[serde(default)]
     pub limit: Option<u64>,
 }
@@ -1161,19 +1169,28 @@ pub struct AuditSearchFilter {
 /// Single decision summary returned by audit.search.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionSummary {
+    /// Unique identifier for this decision.
     pub decision_id: String,
+    /// Principal that initiated the decision.
     pub principal: String,
+    /// Action that was evaluated.
     pub action: String,
+    /// Resource the action targeted.
     pub resource: String,
+    /// Resulting verdict string.
     pub decision: String,
+    /// RFC 3339 timestamp of the decision.
     pub timestamp: String,
 }
 
 /// Result set from audit.search.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditSearchResult {
+    /// Matched decision summaries.
     pub results: Vec<DecisionSummary>,
+    /// Number of results returned.
     pub count: usize,
+    /// Sort order description.
     pub ordering: String,
 }
 
