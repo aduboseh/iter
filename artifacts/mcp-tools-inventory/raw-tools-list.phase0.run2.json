@@ -1,0 +1,179 @@
+   Compiling iter_mcp_server v1.0.2 (C:\Users\adubo\iter)
+warning: iter_mcp_server@1.0.2: Building in PUBLIC STUB mode
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.96s
+     Running `target\debug\examples\phase0_capture_tools.exe`
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "tools": [
+      {
+        "description": "Create a node",
+        "inputSchema": {
+          "properties": {
+            "belief": {
+              "description": "Initial belief value",
+              "type": "number"
+            },
+            "energy": {
+              "description": "Initial energy value",
+              "type": "number"
+            }
+          },
+          "required": [
+            "belief",
+            "energy"
+          ],
+          "type": "object"
+        },
+        "name": "node.create"
+      },
+      {
+        "description": "Query a node",
+        "inputSchema": {
+          "properties": {
+            "node_id": {
+              "description": "Node ID (numeric string)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id"
+          ],
+          "type": "object"
+        },
+        "name": "node.query"
+      },
+      {
+        "description": "Mutate node belief",
+        "inputSchema": {
+          "properties": {
+            "delta": {
+              "description": "Belief delta",
+              "type": "number"
+            },
+            "node_id": {
+              "description": "Node ID (numeric string)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id",
+            "delta"
+          ],
+          "type": "object"
+        },
+        "name": "node.mutate"
+      },
+      {
+        "description": "Bind an edge",
+        "inputSchema": {
+          "properties": {
+            "dst": {
+              "description": "Destination node ID (numeric string)",
+              "type": "string"
+            },
+            "src": {
+              "description": "Source node ID (numeric string)",
+              "type": "string"
+            },
+            "weight": {
+              "description": "Edge weight",
+              "type": "number"
+            }
+          },
+          "required": [
+            "src",
+            "dst",
+            "weight"
+          ],
+          "type": "object"
+        },
+        "name": "edge.bind"
+      },
+      {
+        "description": "Run propagation step",
+        "inputSchema": {
+          "properties": {
+            "edge_id": {
+              "description": "Edge ID (accepted for compatibility, not used)",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "edge.propagate"
+      },
+      {
+        "description": "Query governor status",
+        "inputSchema": {
+          "properties": {},
+          "type": "object"
+        },
+        "name": "governor.status"
+      },
+      {
+        "description": "Query governance health",
+        "inputSchema": {
+          "properties": {},
+          "type": "object"
+        },
+        "name": "governance.status"
+      },
+      {
+        "description": "Audit node ESV",
+        "inputSchema": {
+          "properties": {
+            "node_id": {
+              "description": "Node ID (numeric string)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id"
+          ],
+          "type": "object"
+        },
+        "name": "esv.audit"
+      },
+      {
+        "description": "Replay lineage",
+        "inputSchema": {
+          "properties": {},
+          "type": "object"
+        },
+        "name": "lineage.replay"
+      },
+      {
+        "description": "Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+        "inputSchema": {
+          "properties": {
+            "constraints": {
+              "description": "Constraints to evaluate (opaque to Iter)",
+              "type": "object"
+            },
+            "proposal_id": {
+              "description": "Unique proposal identifier",
+              "type": "string"
+            },
+            "requested_action": {
+              "description": "Requested action (opaque to Iter)",
+              "type": "string"
+            },
+            "state_snapshot_hash": {
+              "description": "SHA-256 hash of the state snapshot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "proposal_id",
+            "state_snapshot_hash",
+            "requested_action"
+          ],
+          "type": "object"
+        },
+        "name": "governance.evaluate"
+      }
+    ]
+  }
+}
