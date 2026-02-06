@@ -39,6 +39,15 @@ impl McpTestClient {
         }
 
         let mut server = cmd.spawn().expect("Failed to spawn iter-server");
+        let bin_path = env!("CARGO_BIN_EXE_iter-server");
+
+        let mut server = Command::new(bin_path)
+            .arg("--json-only")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("Failed to spawn iter-server");
 
         let stdin = server.stdin.take().expect("stdin");
         let stdout = server.stdout.take().expect("stdout");

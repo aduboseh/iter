@@ -445,37 +445,6 @@ export class IterClient {
   }
 
   /**
-   * Non-authoritative governance simulation (canonical, Phase 2).
-   * Returns DecisionPreview artifact (simulation: true, not stored in lineage).
-   */
-  async decisionPreview(args: {
-    proposal_id: string;
-    state_snapshot_hash: string;
-    requested_action: string;
-    constraints?: Record<string, unknown>;
-  }): Promise<DecisionPreview> {
-    const response = await this.send("tools/call", {
-      name: "decision.preview",
-      arguments: args,
-    });
-
-    return this.parseToolResult<DecisionPreview>(response);
-  }
-
-  /**
-   * Search governance decision history with filters (canonical, Phase 2).
-   * Returns deterministic results ordered by (timestamp_utc, decision_id) ASC.
-   */
-  async auditSearch(filter?: AuditSearchFilter): Promise<AuditSearchResult> {
-    const response = await this.send("tools/call", {
-      name: "audit.search",
-      arguments: filter ?? {},
-    });
-
-    return this.parseToolResult<AuditSearchResult>(response);
-  }
-
-  /**
    * @deprecated Use governorHealth() instead. Will be removed in v3.0.
    */
   async governorStatus(): Promise<GovernorStatus> {

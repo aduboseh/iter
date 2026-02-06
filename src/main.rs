@@ -432,7 +432,146 @@ fn handle_stub_request(
         }),
         "notifications/initialized" => json!({}),
         "tools/list" | "tools.list" => json!({
-            "tools": tools_list
+            "tools": [
+                {
+                    "name": "node.create",
+                    "description": "Create a node",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "belief": { "type": "number", "description": "Initial belief value" },
+                            "energy": { "type": "number", "description": "Initial energy value" }
+                        },
+                        "required": ["belief", "energy"]
+                    }
+                },
+                {
+                    "name": "node.query",
+                    "description": "Query a node",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                        },
+                        "required": ["node_id"]
+                    }
+                },
+                {
+                    "name": "node.mutate",
+                    "description": "Mutate node belief",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" },
+                            "delta": { "type": "number", "description": "Belief delta" }
+                        },
+                        "required": ["node_id", "delta"]
+                    }
+                },
+                {
+                    "name": "edge.bind",
+                    "description": "Bind an edge",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "src": { "type": "string", "description": "Source node ID (numeric string)" },
+                            "dst": { "type": "string", "description": "Destination node ID (numeric string)" },
+                            "weight": { "type": "number", "description": "Edge weight" }
+                        },
+                        "required": ["src", "dst", "weight"]
+                    }
+                },
+                {
+                    "name": "edge.propagate",
+                    "description": "Run propagation step",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "edge_id": { "type": "string", "description": "Edge ID (accepted for compatibility, not used)" }
+                        }
+                    }
+                },
+                {
+                    "name": "governor.status",
+                    "description": "[DEPRECATED: use governor.health] Query governor status",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governance.status",
+                    "description": "[DEPRECATED: use governance.health] Query governance health",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governor.health",
+                    "description": "Governor coherence and drift metrics (canonical)",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governance.health",
+                    "description": "Governance subsystem health summary (canonical)",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "esv.audit",
+                    "description": "[DEPRECATED: use audit.export] Audit node ESV",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                        },
+                        "required": ["node_id"]
+                    }
+                },
+                {
+                    "name": "audit.export",
+                    "description": "Export audit bundle for compliance/archival (canonical)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                        },
+                        "required": ["node_id"]
+                    }
+                },
+                {
+                    "name": "lineage.replay",
+                    "description": "[DEPRECATED: use audit.replay] Replay lineage",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "audit.replay",
+                    "description": "Deterministic replay of decision history (canonical)",
+                    "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "governance.evaluate",
+                    "description": "[DEPRECATED: use decision.check] Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                        },
+                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+                    }
+                },
+                {
+                    "name": "decision.check",
+                    "description": "Authoritative PDP decision gate (canonical)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                        },
+                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+                    }
+                }
+            ]
         }),
         "tools/call" => {
             let empty_params = json!({});
@@ -578,10 +717,47 @@ fn handle_stub_tool(
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
         "governance.evaluate" | "decision.check" => {
-            let proposal = parse_governance_proposal(args);
-            match GovernanceRuntimeTrait::evaluate(runtime, &proposal) {
-                Ok(outcome) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
+            // PHASE 0+: Iter-Haltra Bridge with JCS verification
+            // This is the authoritative governance entry point.
+            // Haltra proposes, Iter decides.
+            let proposal_id = args
+                .get("proposal_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let state_snapshot_hash = args
+                .get("state_snapshot_hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let constraints = args.get("constraints").cloned().unwrap_or(json!({}));
+            let requested_action = args
+                .get("requested_action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            // Patch A: JCS canonical bytes and hash
+            let proposal_c14n = args
+                .get("proposal_c14n")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let proposal_hash = args
+                .get("proposal_hash")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            let proposal = iter_mcp_server::substrate::stub::GovernanceProposal {
+                proposal_id,
+                state_snapshot_hash,
+                constraints,
+                requested_action,
+                proposal_c14n,
+                proposal_hash,
+            };
+
+            match runtime.evaluate_governance(&proposal) {
+                Ok(evaluation) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&evaluation).unwrap()}]})
                 }
                 Err(e) => {
                     json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
