@@ -357,3 +357,50 @@ Existing tool behavior is byte-identical. This phase changes only which tools ar
 - Governance: no kernel tools, all canonical tools present, kernel calls rejected.
 - Kernel-debug: kernel tools present, governance tools also present.
 - Default: identical to governance.
+
+## Phase 4 Status — Consumption-Grade Replay & Audit CLI (Applied 2026-02-06)
+
+All CLI commands operate strictly on governed-mode artifacts and do not introduce new governance decisions.
+
+### `iter-cli replay`
+
+Operator command to replay a DecisionPacket under specified policy/schema versions.
+
+- Wraps `replay_decision()` — the same function and code path used by CI golden vector tests.
+- Inputs: `--decision-file`, `--policy-version` (sha256:<hash>), `--schema-version` (decision_packet:v1).
+- Output: structured JSON to stdout (`outcome: VERIFIED` or `outcome: MISMATCH`).
+- Fail-closed: checksum mismatch, policy version mismatch, or schema version mismatch → exit 2.
+
+### `iter-cli audit export`
+
+Operator command to validate and export a DecisionPacket file.
+
+- Reads DecisionPacket JSON, verifies checksum integrity, writes canonical copy to `--output`.
+- This command performs no state mutation and does not create new audit entries.
+- Fail-closed: integrity failure → exit 2.
+
+### Exit Codes (Both Commands)
+
+- 0: Success (VERIFIED / EXPORTED)
+- 1: Input error (file missing, malformed JSON, missing required flags)
+- 2: Replay/contract mismatch or integrity failure
+- 3: Internal error
+
+### Semantic Guarantees
+
+- Zero semantic change: CLI calls existing replay and audit functions. No alteration to DecisionPacket shape, contents, or checksum algorithm.
+- `PolicyConfig::compute_hash` continues to use `serde_json::to_string` with struct field order. Cross-language canonicalization (JCS) is deferred; any change will bump versions and regenerate golden vectors.
+- DecisionPacket checksums use JCS canonicalization via `serde_json_canonicalizer`.
+
+### Test Coverage
+
+- `tests/cli_replay_audit.rs`: 7 integration tests.
+- Replay: golden vector verified, fail-closed on tampered packet, fail-closed on policy version mismatch, fail-closed on missing file.
+- Export: round-trip (export → replay), integrity rejection on tampered packet.
+- Policy hash stability across CLI boundary.
+
+### Golden Fixture
+
+- `tests/data/golden_decision_v1.json`: materialized Golden Vector 1 DecisionPacket.
+- Checksum: `acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe`.
+- Operator documentation: `docs/iter-operator-tools.md`.

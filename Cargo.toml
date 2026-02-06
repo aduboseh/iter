@@ -23,9 +23,17 @@ path = "src/main.rs"
 name = "iter-verify"
 path = "src/bin/iter_verify.rs"
 
+[[bin]]
+name = "iter-cli"
+path = "src/bin/iter_cli.rs"
+
 [[example]]
 name = "governance_demo"
 path = "demos/governance_demo.rs"
+
+[[example]]
+name = "generate_golden_fixture"
+path = "demos/generate_golden_fixture.rs"
 
 [lib]
 name = "iter_mcp_server"
