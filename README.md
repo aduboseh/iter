@@ -104,6 +104,9 @@ Each packet includes:
 - Learning permissions and economic constraints
 - RFC 8785 JCS canonical JSON with SHA-256 checksum
 
+DecisionPreview is a non-authoritative structure and is never replay-sufficient.
+Only DecisionPacket participates in checksum, replay, and audit guarantees.
+
 **Demo mode does not emit DecisionPackets.** Demo verdicts are non-authoritative threshold checks.
 
 #### Determinism Guarantee
@@ -116,36 +119,48 @@ DecisionPackets are **deterministic by construction**:
 
 ---
 
-## MCP Tools
+## MCP Tools (by Profile)
 
 The MCP surface is intentionally small. All tools are deterministic, side-effect constrained, and auditable.
 
-### State Operations
+### Governance Profile (Production)
 
+The following tools are available when Iter is run with `--profile=governance`.
+
+All authoritative governance, replay, and audit guarantees apply **only** to this profile.
+
+#### Governance & Audit
 | Tool | Description |
 |------|-------------|
-| `node.create` | Create a node with initial values |
-| `node.query` | Query node state by ID |
-| `node.mutate` | Mutate node belief by delta (debug only) |
+| decision.check | Governance evaluation (canonical) |
+| decision.preview | Non-authoritative simulation |
+| audit.search | Search governance decision history |
+| audit.export | Export DecisionPacket (canonical) |
+| audit.replay | Deterministic replay of a DecisionPacket (canonical, read-only) |
+| governor.health | Drift and coherence metrics |
+| governance.health | Governance subsystem health |
 
-### Propagation
+Note: Replay is a pure function over a DecisionPacket, policy_version, and schema_version.
+No server-side state mutation or historical re-execution occurs.
 
+### Kernel-Debug Profile (Non-Production)
+
+The following tools are available **only** when Iter is run with `--profile=kernel-debug`.
+
+These tools are **not authoritative**, **not replay-sufficient**, and **must never be used in production**.
+
+#### State Operations (Debug Only)
 | Tool | Description |
 |------|-------------|
-| `edge.bind` | Bind an edge between nodes |
-| `edge.propagate` | Run a deterministic propagation step |
+| node.create | Create a node with initial values |
+| node.query | Query node state by ID |
+| node.mutate | Mutate node belief by delta (debug only) |
 
-### Governance & Audit
-
+#### Propagation (Debug Only)
 | Tool | Description |
 |------|-------------|
-| `decision.check` | Governance evaluation (canonical) |
-| `decision.preview` | Non-authoritative simulation |
-| `audit.search` | Search governance decision history |
-| `audit.export` | Export audit bundle (canonical) |
-| `audit.replay` | Deterministic replay of decision history (canonical) |
-| `governor.health` | Drift and coherence metrics (canonical) |
-| `governance.health` | Governance subsystem health (canonical) |
+| edge.bind | Bind an edge between nodes |
+| edge.propagate | Run a deterministic propagation step |
 
 Legacy aliases (`governance.evaluate`, `governor.status`, `governance.status`, `esv.audit`, `lineage.replay`) are supported but deprecated.
 
@@ -238,6 +253,7 @@ Invariant
 
 SDKs do not embed policy, learning logic, or execution semantics.
 All governance decisions occur inside Iter Server.
+SDKs may not bypass schema validation, replay contracts, or governance mode restrictions.
 
 Stability
 
