@@ -1,8 +1,8 @@
 # Iter MCP Contract v1 — Outline
 
-**APEX DIRECTIVE:** ITER-MCP-TOOL-SURFACE v1 — Phase 0 (updated Phase 1)  
-**Status:** Phase 1 aliases ACTIVE  
-**Date:** 2026-02-05 (Phase 0) / 2026-02-06 (Phase 1)
+**APEX DIRECTIVE:** ITER-MCP-TOOL-SURFACE v1 — Phase 0  
+**Status:** OUTLINE ONLY (no implementation changes)  
+**Date:** 2026-02-05
 
 ---
 
