@@ -303,3 +303,57 @@ New governance UX tools registered in MCP server and SDKs:
 - `tests/mcp_governance_ux.rs`: 10 integration tests covering Phase 2 invariants.
 - Preview: artifact shape, determinism, non-mutation, verdict parity with decision.check.
 - Search: empty results, post-evaluate results, deterministic ordering, limit enforcement.
+
+## Phase 3 Status — Kernel Isolation & Profiles (Applied 2026-02-06)
+
+### Server Profiles
+
+Iter runs in one of two explicit profiles, selected via CLI:
+- `governance` (default) — production PDP surface.
+- `kernel-debug` — internal-only kernel/graph surface for debugging.
+
+Profile selection:
+```
+iter-server --profile=governance    # Production (default)
+iter-server --profile=kernel-debug  # Internal debug only
+iter-server                         # Same as --profile=governance
+```
+
+Unrecognized `--profile` values cause immediate exit (ERROR_INVALID_PROFILE).
+
+### Authority Scope
+
+The governance profile is the only profile under which authoritative PDP, replay, and audit claims apply. No other profile carries production authority.
+
+### Governance Profile Invariants (Enforced at Startup)
+
+1. No `kernel.*`, `node.*`, or `edge.*` tools may be registered.
+   - Startup aborts (exit 1) if this invariant is violated.
+2. All canonical governance tools must be present:
+   - `decision.check`, `decision.preview`
+   - `audit.export`, `audit.replay`, `audit.search`
+   - `governance.health`, `governor.health`
+   - Startup aborts if any canonical tool is missing.
+3. `tools/call` rejects kernel/graph tool invocations with error code 3001.
+
+### Kernel-Debug Profile
+
+Kernel-debug is a non-production profile and may expose diagnostic interfaces. It MUST NOT be used for authoritative governance decisions.
+
+- Exposes kernel tools: `node.create`, `node.query`, `node.mutate`, `edge.bind`, `edge.propagate`.
+- Also includes all governance tools (superset for debugging).
+- Never used by external tooling, production agents, or published configs.
+
+### Surface Partitioning (No Semantic Changes)
+
+Existing tool behavior is byte-identical. This phase changes only which tools are visible and callable per profile. No changes to:
+- DecisionPacket / DecisionPreview formats.
+- `decision.*` or `audit.*` logic.
+- Policy hashing or checksums.
+- Legacy alias behavior.
+
+### Test Coverage
+- `tests/mcp_surface_profiles.rs`: 6 integration tests validating profile surfaces.
+- Governance: no kernel tools, all canonical tools present, kernel calls rejected.
+- Kernel-debug: kernel tools present, governance tools also present.
+- Default: identical to governance.

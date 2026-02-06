@@ -1,9 +1,34 @@
 use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 
+/// Server profile controlling which MCP tools are exposed.
+///
+/// - `Governance`: Production PDP surface. No kernel/graph tools.
+/// - `KernelDebug`: Internal-only. Exposes kernel/graph tools for debugging.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ServerProfile {
+    Governance,
+    KernelDebug,
+}
+
+/// Parse --profile flag from CLI args. Default: Governance.
+/// Exits with code 1 on unrecognized profile.
+fn detect_profile(args: &[String]) -> ServerProfile {
+    let profile_arg = args.iter().find(|arg| arg.starts_with("--profile="));
+    match profile_arg.map(|s| s.as_str()) {
+        Some("--profile=kernel-debug") => ServerProfile::KernelDebug,
+        Some("--profile=governance") | None => ServerProfile::Governance,
+        Some(other) => {
+            eprintln!("FATAL: ERROR_INVALID_PROFILE: {}", other);
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let json_only = args.iter().any(|a| a == "--json-only");
+    let profile = detect_profile(&args);
 
     if !json_only {
         match std::env::current_exe() {
@@ -15,9 +40,10 @@ fn main() {
             Err(e) => eprintln!("ITER CWD = <error: {}>", e),
         }
         print_mode_banner();
+        eprintln!("iter-server profile: {:?}", profile);
     }
 
-    run_stdio_server(json_only);
+    run_stdio_server(json_only, profile);
 }
 
 fn print_mode_banner() {
@@ -29,11 +55,20 @@ fn print_mode_banner() {
     eprintln!();
 }
 
-fn run_stdio_server(json_only: bool) {
+fn run_stdio_server(json_only: bool, profile: ServerProfile) {
     use iter_mcp_server::substrate::stub::StubRuntime;
     use std::io::BufWriter;
 
     let mut runtime = StubRuntime::new();
+
+    // Build and validate tool surface before entering server loop (fail-fast).
+    let tools_list = build_tools_list(profile);
+    if let Err(msg) = validate_surface(profile, &tools_list) {
+        eprintln!("FATAL: {}", msg);
+        std::process::exit(1);
+    }
+    let tools_json = serde_json::to_value(&tools_list).unwrap_or(json!([]));
+
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
     let mut reader = BufReader::new(stdin.lock());
@@ -56,21 +91,21 @@ fn run_stdio_server(json_only: bool) {
                     continue;
                 }
 
-                // Simple stub handler - parse JSON-RPC and respond
                 match serde_json::from_str::<serde_json::Value>(line) {
                     Ok(req) => {
                         let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
                         let id = req.get("id").cloned();
 
-                        // Notifications (no id) get no response per JSON-RPC 2.0 spec
                         if id.is_none() || id.as_ref().map(|v| v.is_null()).unwrap_or(false) {
-                            // Still call handler for side effects, but don't respond
-                            let _ = handle_stub_request(&mut runtime, method, &req);
+                            let _ = handle_stub_request(
+                                &mut runtime, method, &req, profile, &tools_json,
+                            );
                             continue;
                         }
 
-                        // Build response as owned bytes - no shared Value, no reuse
-                        let resp = handle_stub_request(&mut runtime, method, &req);
+                        let resp = handle_stub_request(
+                            &mut runtime, method, &req, profile, &tools_json,
+                        );
                         let response_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": id,
@@ -78,7 +113,6 @@ fn run_stdio_server(json_only: bool) {
                         }))
                         .unwrap_or_default();
 
-                        // Single atomic write + newline + flush (Haltra pattern)
                         let _ = writer.write_all(&response_bytes);
                         let _ = writer.write_all(b"\n");
                         let _ = writer.flush();
@@ -112,16 +146,268 @@ fn run_stdio_server(json_only: bool) {
     }
 }
 
+/// Governance tool definitions — decision.*, audit.*, governance.*, governor.*
+/// Includes canonical IDs and legacy aliases.
+#[cfg(feature = "public_stub")]
+fn governance_tool_defs() -> Vec<serde_json::Value> {
+    vec![
+        json!({
+            "name": "governor.status",
+            "description": "[DEPRECATED: use governor.health] Query governor status",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "governance.status",
+            "description": "[DEPRECATED: use governance.health] Query governance health",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "governor.health",
+            "description": "Governor coherence and drift metrics (canonical)",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "governance.health",
+            "description": "Governance subsystem health summary (canonical)",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "esv.audit",
+            "description": "[DEPRECATED: use audit.export] Audit node ESV",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                },
+                "required": ["node_id"]
+            }
+        }),
+        json!({
+            "name": "audit.export",
+            "description": "Export audit bundle for compliance/archival (canonical)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                },
+                "required": ["node_id"]
+            }
+        }),
+        json!({
+            "name": "lineage.replay",
+            "description": "[DEPRECATED: use audit.replay] Replay lineage",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "audit.replay",
+            "description": "Deterministic replay of decision history (canonical)",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "governance.evaluate",
+            "description": "[DEPRECATED: use decision.check] Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                    "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                    "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                    "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                },
+                "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+            }
+        }),
+        json!({
+            "name": "decision.check",
+            "description": "Authoritative PDP decision gate (canonical)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                    "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                    "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                    "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                },
+                "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+            }
+        }),
+        json!({
+            "name": "decision.preview",
+            "description": "Non-authoritative governance simulation (canonical, Phase 2)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
+                    "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
+                    "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
+                    "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
+                },
+                "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
+            }
+        }),
+        json!({
+            "name": "audit.search",
+            "description": "Search governance decision history with filters (canonical, Phase 2)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "principal": { "type": "string", "description": "Filter by principal" },
+                    "action": { "type": "string", "description": "Filter by action" },
+                    "resource": { "type": "string", "description": "Filter by resource" },
+                    "decision": { "type": "string", "description": "Filter by decision verdict" },
+                    "policy_id": { "type": "string", "description": "Filter by policy ID" },
+                    "from": { "type": "string", "description": "Start timestamp (RFC3339)" },
+                    "to": { "type": "string", "description": "End timestamp (RFC3339)" },
+                    "limit": { "type": "integer", "description": "Max results (default 100, max 1000)" }
+                }
+            }
+        }),
+    ]
+}
+
+/// Kernel/graph tool definitions — node.*, edge.*
+/// Only available in kernel-debug profile.
+#[cfg(feature = "public_stub")]
+fn kernel_tool_defs() -> Vec<serde_json::Value> {
+    vec![
+        json!({
+            "name": "node.create",
+            "description": "Create a node",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "belief": { "type": "number", "description": "Initial belief value" },
+                    "energy": { "type": "number", "description": "Initial energy value" }
+                },
+                "required": ["belief", "energy"]
+            }
+        }),
+        json!({
+            "name": "node.query",
+            "description": "Query a node",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                },
+                "required": ["node_id"]
+            }
+        }),
+        json!({
+            "name": "node.mutate",
+            "description": "Mutate node belief",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "node_id": { "type": "string", "description": "Node ID (numeric string)" },
+                    "delta": { "type": "number", "description": "Belief delta" }
+                },
+                "required": ["node_id", "delta"]
+            }
+        }),
+        json!({
+            "name": "edge.bind",
+            "description": "Bind an edge",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "src": { "type": "string", "description": "Source node ID (numeric string)" },
+                    "dst": { "type": "string", "description": "Destination node ID (numeric string)" },
+                    "weight": { "type": "number", "description": "Edge weight" }
+                },
+                "required": ["src", "dst", "weight"]
+            }
+        }),
+        json!({
+            "name": "edge.propagate",
+            "description": "Run propagation step",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "edge_id": { "type": "string", "description": "Edge ID (accepted for compatibility, not used)" }
+                }
+            }
+        }),
+    ]
+}
+
+/// Build the tools list for the given profile.
+///
+/// - Governance: governance tools only.
+/// - KernelDebug: kernel tools + governance tools (superset for debugging).
+#[cfg(feature = "public_stub")]
+fn build_tools_list(profile: ServerProfile) -> Vec<serde_json::Value> {
+    match profile {
+        ServerProfile::Governance => governance_tool_defs(),
+        ServerProfile::KernelDebug => {
+            let mut tools = kernel_tool_defs();
+            tools.extend(governance_tool_defs());
+            tools
+        }
+    }
+}
+
+/// Validate tool surface invariants at startup.
+///
+/// In governance profile:
+/// - No kernel/graph tools (node.*, edge.*, kernel.*) may be registered.
+/// - All canonical governance tools must be present.
+///
+/// Returns Err with message on violation. Caller must exit.
+#[cfg(feature = "public_stub")]
+fn validate_surface(
+    profile: ServerProfile,
+    tools: &[serde_json::Value],
+) -> Result<(), String> {
+    if profile == ServerProfile::Governance {
+        for tool in tools {
+            let name = tool["name"].as_str().unwrap_or("");
+            let is_kernel = name.starts_with("kernel.")
+                || name.starts_with("node.")
+                || name.starts_with("edge.");
+            if is_kernel {
+                return Err(format!(
+                    "Kernel/debug tool '{}' registered in governance profile",
+                    name
+                ));
+            }
+        }
+
+        let required = [
+            "decision.check",
+            "decision.preview",
+            "audit.export",
+            "audit.replay",
+            "audit.search",
+            "governance.health",
+            "governor.health",
+        ];
+        let names: Vec<&str> = tools
+            .iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+        for tool_name in &required {
+            if !names.contains(tool_name) {
+                return Err(format!(
+                    "ERROR_MISSING_CANONICAL_TOOL: '{}' not found in governance profile",
+                    tool_name
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(feature = "public_stub")]
 fn handle_stub_request(
     runtime: &mut iter_mcp_server::substrate::stub::StubRuntime,
     method: &str,
     req: &serde_json::Value,
+    profile: ServerProfile,
+    tools_list: &serde_json::Value,
 ) -> serde_json::Value {
     match method {
         "initialize" => {
-            // Some clients currently advertise protocolVersion "2025-03-26".
-            // Echo the client's requested protocol version for maximum compatibility.
             let client_protocol = req
                 .get("params")
                 .and_then(|p| p.get("protocolVersion"))
@@ -149,177 +435,7 @@ fn handle_stub_request(
         }),
         "notifications/initialized" => json!({}),
         "tools/list" | "tools.list" => json!({
-            "tools": [
-                {
-                    "name": "node.create",
-                    "description": "Create a node",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "belief": { "type": "number", "description": "Initial belief value" },
-                            "energy": { "type": "number", "description": "Initial energy value" }
-                        },
-                        "required": ["belief", "energy"]
-                    }
-                },
-                {
-                    "name": "node.query",
-                    "description": "Query a node",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
-                        },
-                        "required": ["node_id"]
-                    }
-                },
-                {
-                    "name": "node.mutate",
-                    "description": "Mutate node belief",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "node_id": { "type": "string", "description": "Node ID (numeric string)" },
-                            "delta": { "type": "number", "description": "Belief delta" }
-                        },
-                        "required": ["node_id", "delta"]
-                    }
-                },
-                {
-                    "name": "edge.bind",
-                    "description": "Bind an edge",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "src": { "type": "string", "description": "Source node ID (numeric string)" },
-                            "dst": { "type": "string", "description": "Destination node ID (numeric string)" },
-                            "weight": { "type": "number", "description": "Edge weight" }
-                        },
-                        "required": ["src", "dst", "weight"]
-                    }
-                },
-                {
-                    "name": "edge.propagate",
-                    "description": "Run propagation step",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "edge_id": { "type": "string", "description": "Edge ID (accepted for compatibility, not used)" }
-                        }
-                    }
-                },
-                {
-                    "name": "governor.status",
-                    "description": "[DEPRECATED: use governor.health] Query governor status",
-                    "inputSchema": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "governance.status",
-                    "description": "[DEPRECATED: use governance.health] Query governance health",
-                    "inputSchema": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "governor.health",
-                    "description": "Governor coherence and drift metrics (canonical)",
-                    "inputSchema": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "governance.health",
-                    "description": "Governance subsystem health summary (canonical)",
-                    "inputSchema": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "esv.audit",
-                    "description": "[DEPRECATED: use audit.export] Audit node ESV",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
-                        },
-                        "required": ["node_id"]
-                    }
-                },
-                {
-                    "name": "audit.export",
-                    "description": "Export audit bundle for compliance/archival (canonical)",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "node_id": { "type": "string", "description": "Node ID (numeric string)" }
-                        },
-                        "required": ["node_id"]
-                    }
-                },
-                {
-                    "name": "lineage.replay",
-                    "description": "[DEPRECATED: use audit.replay] Replay lineage",
-                    "inputSchema": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "audit.replay",
-                    "description": "Deterministic replay of decision history (canonical)",
-                    "inputSchema": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "governance.evaluate",
-                    "description": "[DEPRECATED: use decision.check] Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
-                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
-                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
-                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
-                        },
-                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
-                    }
-                },
-                {
-                    "name": "decision.check",
-                    "description": "Authoritative PDP decision gate (canonical)",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
-                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
-                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
-                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
-                        },
-                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
-                    }
-                },
-                {
-                    "name": "decision.preview",
-                    "description": "Non-authoritative governance simulation (canonical, Phase 2)",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "proposal_id": { "type": "string", "description": "Unique proposal identifier" },
-                            "state_snapshot_hash": { "type": "string", "description": "SHA-256 hash of the state snapshot" },
-                            "constraints": { "type": "object", "description": "Constraints to evaluate (opaque to Iter)" },
-                            "requested_action": { "type": "string", "description": "Requested action (opaque to Iter)" }
-                        },
-                        "required": ["proposal_id", "state_snapshot_hash", "requested_action"]
-                    }
-                },
-                {
-                    "name": "audit.search",
-                    "description": "Search governance decision history with filters (canonical, Phase 2)",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "principal": { "type": "string", "description": "Filter by principal" },
-                            "action": { "type": "string", "description": "Filter by action" },
-                            "resource": { "type": "string", "description": "Filter by resource" },
-                            "decision": { "type": "string", "description": "Filter by decision verdict" },
-                            "policy_id": { "type": "string", "description": "Filter by policy ID" },
-                            "from": { "type": "string", "description": "Start timestamp (RFC3339)" },
-                            "to": { "type": "string", "description": "End timestamp (RFC3339)" },
-                            "limit": { "type": "integer", "description": "Max results (default 100, max 1000)" }
-                        }
-                    }
-                }
-            ]
+            "tools": tools_list
         }),
         "tools/call" => {
             let empty_params = json!({});
@@ -327,7 +443,7 @@ fn handle_stub_request(
             let tool_name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
             let empty_args = json!({});
             let args = params.get("arguments").unwrap_or(&empty_args);
-            handle_stub_tool(runtime, tool_name, args)
+            handle_stub_tool(runtime, tool_name, args, profile)
         }
         _ => json!({"error": "Unknown method"}),
     }
@@ -377,8 +493,24 @@ fn handle_stub_tool(
     runtime: &mut iter_mcp_server::substrate::stub::StubRuntime,
     tool: &str,
     args: &serde_json::Value,
+    profile: ServerProfile,
 ) -> serde_json::Value {
     use iter_mcp_server::runtime::GovernanceRuntime as GovernanceRuntimeTrait;
+
+    // Reject kernel/graph tools in governance profile.
+    if profile == ServerProfile::Governance {
+        let is_kernel = tool.starts_with("kernel.")
+            || tool.starts_with("node.")
+            || tool.starts_with("edge.");
+        if is_kernel {
+            return json!({
+                "error": {
+                    "code": 3001,
+                    "message": format!("Tool '{}' not available in governance profile", tool)
+                }
+            });
+        }
+    }
 
     match tool {
         "node.create" => {

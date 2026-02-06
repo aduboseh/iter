@@ -22,15 +22,23 @@ struct McpTestClient {
 
 impl McpTestClient {
     fn spawn() -> Self {
+        Self::spawn_with_profile(None)
+    }
+
+    fn spawn_with_profile(profile: Option<&str>) -> Self {
         let bin_path = env!("CARGO_BIN_EXE_iter-server");
 
-        let mut server = Command::new(bin_path)
-            .arg("--json-only")
+        let mut cmd = Command::new(bin_path);
+        cmd.arg("--json-only")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("Failed to spawn iter-server");
+            .stderr(Stdio::null());
+
+        if let Some(p) = profile {
+            cmd.arg(format!("--profile={}", p));
+        }
+
+        let mut server = cmd.spawn().expect("Failed to spawn iter-server");
 
         let stdin = server.stdin.take().expect("stdin");
         let stdout = server.stdout.take().expect("stdout");
@@ -216,7 +224,7 @@ fn alias_audit_export_eq_esv_audit() {
     };
 
     let mut r_legacy = {
-        let mut c = McpTestClient::spawn();
+        let mut c = McpTestClient::spawn_with_profile(Some("kernel-debug"));
         setup(&mut c);
         let r = c.call_tool("esv.audit", json!({"node_id": "0"}));
         c.close();
@@ -224,7 +232,7 @@ fn alias_audit_export_eq_esv_audit() {
     };
 
     let mut r_canonical = {
-        let mut c = McpTestClient::spawn();
+        let mut c = McpTestClient::spawn_with_profile(Some("kernel-debug"));
         setup(&mut c);
         let r = c.call_tool("audit.export", json!({"node_id": "0"}));
         c.close();
