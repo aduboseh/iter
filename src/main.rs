@@ -378,6 +378,8 @@ fn handle_stub_tool(
     tool: &str,
     args: &serde_json::Value,
 ) -> serde_json::Value {
+    use iter_mcp_server::runtime::GovernanceRuntime as GovernanceRuntimeTrait;
+
     match tool {
         "node.create" => {
             let belief = args.get("belief").and_then(|b| b.as_f64()).unwrap_or(0.5);
@@ -449,9 +451,9 @@ fn handle_stub_tool(
         }
         "governance.evaluate" | "decision.check" => {
             let proposal = parse_governance_proposal(args);
-            match runtime.evaluate_governance(&proposal) {
-                Ok(evaluation) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&evaluation).unwrap()}]})
+            match GovernanceRuntimeTrait::evaluate(runtime, &proposal) {
+                Ok(outcome) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
                 }
                 Err(e) => {
                     json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
@@ -460,9 +462,9 @@ fn handle_stub_tool(
         }
         "decision.preview" => {
             let proposal = parse_governance_proposal(args);
-            match runtime.preview_governance(&proposal) {
-                Ok(preview) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&preview).unwrap()}]})
+            match GovernanceRuntimeTrait::preview(runtime, &proposal) {
+                Ok(outcome) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
                 }
                 Err(e) => {
                     json!({"error": {"code": 5001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
@@ -472,7 +474,7 @@ fn handle_stub_tool(
         "audit.search" => {
             let filter: iter_mcp_server::substrate::stub::AuditSearchFilter =
                 serde_json::from_value(args.clone()).unwrap_or_default();
-            let result = runtime.search_decisions(&filter);
+            let result = GovernanceRuntimeTrait::search_decisions(runtime, &filter);
             json!({"content": [{"type": "text", "text": serde_json::to_string(&result).unwrap()}]})
         }
         _ => json!({"error": {"code": 3000, "message": "Unknown tool"}}),

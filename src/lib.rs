@@ -50,6 +50,19 @@ pub mod economics;
 pub mod policy;
 
 // ============================================================================
+// Governance Runtime (APEX DIRECTIVE v2)
+// ============================================================================
+
+/// GovernanceRuntime trait and outcome types.
+/// Single authoritative dispatch path for all decision endpoints.
+#[cfg(feature = "public_stub")]
+pub mod runtime;
+
+/// GovernedRuntime — authoritative PDP governance with DecisionPacket emission.
+#[cfg(feature = "public_stub")]
+pub mod governed;
+
+// ============================================================================
 // Public Stub Module (demonstration mode)
 // ============================================================================
 
