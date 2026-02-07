@@ -201,7 +201,7 @@ impl GovernanceRuntime for GovernedRuntime {
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
-        let limit = filter.limit.unwrap_or(100).min(1000).max(1) as usize;
+        let limit = filter.limit.unwrap_or(100).clamp(1, 1000) as usize;
 
         let results: Vec<DecisionSummary> = self
             .audit_log
