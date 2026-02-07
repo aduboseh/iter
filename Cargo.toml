@@ -29,6 +29,11 @@ path = "src/bin/iter_verify.rs"
 name = "iter-cli"
 path = "src/bin/iter_cli.rs"
 
+[[bin]]
+name = "generate-schemas"
+path = "src/bin/generate_schemas.rs"
+required-features = ["schema-gen"]
+
 [[example]]
 name = "governance_demo"
 path = "demos/governance_demo.rs"

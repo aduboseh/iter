@@ -44,7 +44,7 @@ See [docs/iter-external-spec-v1.md](docs/iter-external-spec-v1.md) for integrati
 Regenerate schemas only when intentionally changing the contract:
 
 ```bash
-cargo run --features schema-gen --example generate_schemas
+cargo run --features schema-gen --bin generate-schemas
 ```
 
 Any structural change that does not come with a regenerated schema will fail the schema integrity tests.

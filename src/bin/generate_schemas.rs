@@ -2,12 +2,14 @@
 //!
 //! Usage:
 //! ```bash
-//! cargo run --features schema-gen --example generate_schemas
+//! cargo run --features schema-gen --bin generate-schemas
 //! ```
 
 #[cfg(not(feature = "schema-gen"))]
 fn main() {
-    eprintln!("schema-gen feature required: cargo run --features schema-gen --example generate_schemas");
+    eprintln!(
+        "schema-gen feature required: cargo run --features schema-gen --bin generate-schemas"
+    );
     std::process::exit(1);
 }
 

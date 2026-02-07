@@ -43,7 +43,7 @@ Any change to the structs that would affect the schemas must regenerate artifact
 1. Ensure changes are intentional and backwards compatible (or bump the schema version).
 2. Run:
    ```
-   cargo run --features schema-gen --example generate_schemas
+   cargo run --features schema-gen --bin generate-schemas
    ```
 3. Review the updated files in `schemas/v1`.
 4. Commit the regenerated artifacts alongside the code change.
