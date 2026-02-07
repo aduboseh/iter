@@ -1,0 +1,124 @@
+{
+  "$id": "https://iter.dev/schemas/v1/decision_preview.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "DeterminismProof": {
+      "additionalProperties": false,
+      "description": "Determinism proof returned with governance evaluation.",
+      "properties": {
+        "coherence": {
+          "description": "Coherence index [0.0, 1.0]",
+          "format": "double",
+          "type": "number"
+        },
+        "drift_ok": {
+          "description": "Whether energy drift is within bounds (≤1×10⁻¹⁰)",
+          "type": "boolean"
+        },
+        "energy_drift": {
+          "description": "Current energy drift value",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "coherence",
+        "drift_ok",
+        "energy_drift"
+      ],
+      "type": "object"
+    },
+    "GovernanceVerdict": {
+      "description": "Verdict for governance evaluation.\n\nThis is the authoritative decision boundary. Haltra proposes, Iter decides.",
+      "oneOf": [
+        {
+          "description": "Action is admissible under current governance constraints",
+          "enum": [
+            "ALLOW"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Action is blocked due to governance violation",
+          "enum": [
+            "BLOCK"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Action requires human review (coherence below threshold)",
+          "enum": [
+            "REVIEW"
+          ],
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "description": "Non-authoritative simulation result from decision.preview.\n\nDISTINCT from DecisionPacket: not stored in audit lineage, not replay-addressable, carries simulation: true.",
+  "properties": {
+    "checksum_preview": {
+      "description": "Checksum of request + verdict (not stored in lineage)",
+      "type": "string"
+    },
+    "constraints": {
+      "description": "Applicable constraints (opaque)"
+    },
+    "derived_from": {
+      "description": "Canonical tool ID this simulation derives from",
+      "type": "string"
+    },
+    "determinism": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/DeterminismProof"
+        }
+      ],
+      "description": "Determinism proof metrics"
+    },
+    "obligations": {
+      "description": "Advisory obligations (not enforced)"
+    },
+    "policy_trace": {
+      "description": "Policy rules evaluated",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "preview_version": {
+      "description": "Schema version for preview artifacts",
+      "type": "string"
+    },
+    "request": {
+      "description": "Original request payload"
+    },
+    "simulation": {
+      "description": "Always true — marks this as non-authoritative",
+      "type": "boolean"
+    },
+    "verdict": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GovernanceVerdict"
+        }
+      ],
+      "description": "Projected verdict (same logic as decision.check)"
+    }
+  },
+  "required": [
+    "checksum_preview",
+    "constraints",
+    "derived_from",
+    "determinism",
+    "obligations",
+    "policy_trace",
+    "preview_version",
+    "request",
+    "simulation",
+    "verdict"
+  ],
+  "title": "DecisionPreview",
+  "type": "object"
+}

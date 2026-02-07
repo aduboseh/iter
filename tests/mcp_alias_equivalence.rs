@@ -22,6 +22,23 @@ struct McpTestClient {
 
 impl McpTestClient {
     fn spawn() -> Self {
+        Self::spawn_with_profile(None)
+    }
+
+    fn spawn_with_profile(profile: Option<&str>) -> Self {
+        let bin_path = env!("CARGO_BIN_EXE_iter-server");
+
+        let mut cmd = Command::new(bin_path);
+        cmd.arg("--json-only")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+
+        if let Some(p) = profile {
+            cmd.arg(format!("--profile={}", p));
+        }
+
+        let mut server = cmd.spawn().expect("Failed to spawn iter-server");
         let bin_path = env!("CARGO_BIN_EXE_iter-server");
 
         let mut server = Command::new(bin_path)
@@ -86,15 +103,34 @@ fn canonical_json(v: &Value) -> String {
     serde_json::to_string(v).expect("canonical serialization")
 }
 
+/// Strip the JSON-RPC `id` field from a response.
+///
+/// Per JSON-RPC 2.0, `id` is a per-request correlation field echoed by the server.
+/// It is NOT part of method semantics. Alias equivalence is about payload identity,
+/// not transport-level correlation. Two sequential requests in the same client
+/// will have different auto-incremented ids, so comparing them is meaningless.
+fn strip_jsonrpc_id(v: &mut Value) {
+    if let Some(obj) = v.as_object_mut() {
+        obj.remove("id");
+    }
+}
+
 /// Assert two tool responses are equivalent under canonical JSON serialization.
+///
+/// Strips the JSON-RPC `id` field before comparison, since alias equivalence
+/// is defined as identical envelope structure + identical payload semantics,
+/// not identical per-request correlation ids.
 fn assert_alias_equivalent(
     client: &mut McpTestClient,
     canonical_id: &str,
     legacy_id: &str,
     arguments: Value,
 ) {
-    let r_legacy = client.call_tool(legacy_id, arguments.clone());
-    let r_canonical = client.call_tool(canonical_id, arguments);
+    let mut r_legacy = client.call_tool(legacy_id, arguments.clone());
+    let mut r_canonical = client.call_tool(canonical_id, arguments);
+
+    strip_jsonrpc_id(&mut r_legacy);
+    strip_jsonrpc_id(&mut r_canonical);
 
     let c_legacy = canonical_json(&r_legacy);
     let c_canonical = canonical_json(&r_canonical);
@@ -196,21 +232,24 @@ fn alias_audit_export_eq_esv_audit() {
         let _ = c.call_tool("node.create", json!({"belief": 0.5, "energy": 100.0}));
     };
 
-    let r_legacy = {
-        let mut c = McpTestClient::spawn();
+    let mut r_legacy = {
+        let mut c = McpTestClient::spawn_with_profile(Some("kernel-debug"));
         setup(&mut c);
         let r = c.call_tool("esv.audit", json!({"node_id": "0"}));
         c.close();
         r
     };
 
-    let r_canonical = {
-        let mut c = McpTestClient::spawn();
+    let mut r_canonical = {
+        let mut c = McpTestClient::spawn_with_profile(Some("kernel-debug"));
         setup(&mut c);
         let r = c.call_tool("audit.export", json!({"node_id": "0"}));
         c.close();
         r
     };
+
+    strip_jsonrpc_id(&mut r_legacy);
+    strip_jsonrpc_id(&mut r_canonical);
 
     let c_legacy = canonical_json(&r_legacy);
     let c_canonical = canonical_json(&r_canonical);
@@ -233,19 +272,22 @@ fn alias_decision_check_eq_governance_evaluate() {
         "requested_action": "deploy_capsule"
     });
 
-    let r_legacy = {
+    let mut r_legacy = {
         let mut c = McpTestClient::spawn();
         let r = c.call_tool("governance.evaluate", args.clone());
         c.close();
         r
     };
 
-    let r_canonical = {
+    let mut r_canonical = {
         let mut c = McpTestClient::spawn();
         let r = c.call_tool("decision.check", args);
         c.close();
         r
     };
+
+    strip_jsonrpc_id(&mut r_legacy);
+    strip_jsonrpc_id(&mut r_canonical);
 
     let c_legacy = canonical_json(&r_legacy);
     let c_canonical = canonical_json(&r_canonical);

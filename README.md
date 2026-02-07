@@ -12,11 +12,14 @@
 
 ## What is Iter?
 
-Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) that acts as an **authoritative governance and audit control plane** for decision systems.
+Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) for deterministic governance evaluation.
 
-Iter evaluates governance conditions, enforces policy and economic constraints, and emits **replay-sufficient DecisionPackets** that prove exactly why a decision occurred.
+Iter operates in two modes:
 
-**MCP is the transport. Governance, causality, and replay are the product.**
+- **Demo mode** (default): Threshold-based governance using stub graph state. Non-authoritative — `authoritative_pdp=false`, `replay_sufficient=false`, no `DecisionPacket` at the MCP edge. Suitable for protocol validation and integration testing.
+- **Governed mode**: PolicyEvaluator-based governance with typed contract envelopes. Authoritative PDP — `authoritative_pdp=true`, `replay_sufficient=true`, emits `DecisionPacket` with RFC 8785 JCS checksums.
+
+**MCP is the transport. Governance mode determines what claims are valid.**
 
 ---
 
@@ -25,6 +28,26 @@ Iter evaluates governance conditions, enforces policy and economic constraints, 
 The protocol and SDK surface are **stable for 12 months** (through January 2027), barring security issues.
 
 See [RELEASE.md](RELEASE.md) for the compatibility policy.
+
+---
+## External Spec (v1)
+
+Machine-readable JSON Schemas live under `schemas/v1`. They freeze the payloads for:
+
+- DecisionPacket responses
+- DecisionPreview responses
+- `decision.check` requests
+- `audit.search` filters/results
+
+See [docs/iter-external-spec-v1.md](docs/iter-external-spec-v1.md) for integration guidance.
+
+Regenerate schemas only when intentionally changing the contract:
+
+```bash
+cargo run --features schema-gen --example generate_schemas
+```
+
+Any structural change that does not come with a regenerated schema will fail the schema integrity tests.
 
 ---
 
@@ -60,56 +83,86 @@ Iter governs and proves decisions produced by upstream systems.
 
 ## Governance Artifacts
 
-### DecisionPacket
+### GovernanceOutcome
 
-The primary output of Iter is a **DecisionPacket**.
+All MCP decision endpoints (`decision.check`, `decision.preview`, `audit.search`) return a `GovernanceOutcome` containing:
+- `verdict` (ALLOW / BLOCK / REVIEW)
+- `mode` (demo / governed)
+- `authoritative_pdp` (true only in governed mode)
+- `replay_sufficient` (true only for governed evaluate)
+- `reason_codes` (namespaced: `demo.thresholds.*` or `policy.*`)
+- `packet` (DecisionPacket, governed evaluate only)
 
-A DecisionPacket is a **replay-sufficient, immutable record** that contains everything required to reconstruct a governance outcome without re-running learning or inference.
+### DecisionPacket (governed mode only)
+
+In governed mode, `decision.check` emits a `DecisionPacket` — a replay-sufficient, immutable record containing everything required to reconstruct the governance outcome.
 
 Each packet includes:
-- System state snapshot (energy, reasoning, learning, policy)
+- System state snapshot (energy, reasoning, learning, policy envelopes)
 - Capsule identity and version hashes
 - Policy decisions and explicit reason codes
 - Learning permissions and economic constraints
-- Canonical JSON serialization with SHA-256 checksum
+- RFC 8785 JCS canonical JSON with SHA-256 checksum
+
+DecisionPreview is a non-authoritative structure and is never replay-sufficient.
+Only DecisionPacket participates in checksum, replay, and audit guarantees.
+
+**Demo mode does not emit DecisionPackets.** Demo verdicts are non-authoritative threshold checks.
 
 #### Determinism Guarantee
 
 DecisionPackets are **deterministic by construction**:
 - Identical inputs and configuration produce **byte-identical packets**
-- Checksums verify integrity across time and systems
-- Replay does not require model weights, training data, or inference infrastructure
+- Checksums use RFC 8785 JCS canonicalization
+- Replay verifies policy_version and schema_version (fail-closed on mismatch)
+- **Platform determinism:** Golden vectors enforced on: **Linux (x86_64, stable Rust)**. Cross-platform determinism (Windows, macOS) will be validated in CI before claiming.
 
 ---
 
-## MCP Tools
+## MCP Tools (by Profile)
 
 The MCP surface is intentionally small. All tools are deterministic, side-effect constrained, and auditable.
 
-### State Operations
+### Governance Profile (Production)
 
+The following tools are available when Iter is run with `--profile=governance`.
+
+All authoritative governance, replay, and audit guarantees apply **only** to this profile.
+
+#### Governance & Audit
 | Tool | Description |
 |------|-------------|
-| `node.create` | Create a node with initial values |
-| `node.query` | Query node state by ID |
-| `node.mutate` | Mutate node belief by delta (debug only) |
+| decision.check | Governance evaluation (canonical) |
+| decision.preview | Non-authoritative simulation |
+| audit.search | Search governance decision history |
+| audit.export | Export DecisionPacket (canonical) |
+| audit.replay | Deterministic replay of a DecisionPacket (canonical, read-only) |
+| governor.health | Drift and coherence metrics |
+| governance.health | Governance subsystem health |
 
-### Propagation
+Note: Replay is a pure function over a DecisionPacket, policy_version, and schema_version.
+No server-side state mutation or historical re-execution occurs.
 
+### Kernel-Debug Profile (Non-Production)
+
+The following tools are available **only** when Iter is run with `--profile=kernel-debug`.
+
+These tools are **not authoritative**, **not replay-sufficient**, and **must never be used in production**.
+
+#### State Operations (Debug Only)
 | Tool | Description |
 |------|-------------|
-| `edge.bind` | Bind an edge between nodes |
-| `edge.propagate` | Run a deterministic propagation step |
+| node.create | Create a node with initial values |
+| node.query | Query node state by ID |
+| node.mutate | Mutate node belief by delta (debug only) |
 
-### Governance & Audit
-
+#### Propagation (Debug Only)
 | Tool | Description |
 |------|-------------|
-| `governance.status` | Query governance health |
-| `governor.status` | Query drift and coherence status |
-| `lineage.replay` | Replay checksum history |
+| edge.bind | Bind an edge between nodes |
+| edge.propagate | Run a deterministic propagation step |
 
-Governance tools emit **DecisionPackets** when applicable.
+Legacy aliases (`governance.evaluate`, `governor.status`, `governance.status`, `esv.audit`, `lineage.replay`) are supported but deprecated.
 
 ---
 
@@ -200,6 +253,7 @@ Invariant
 
 SDKs do not embed policy, learning logic, or execution semantics.
 All governance decisions occur inside Iter Server.
+SDKs may not bypass schema validation, replay contracts, or governance mode restrictions.
 
 Stability
 

@@ -172,6 +172,49 @@ export interface GovernorStatus {
   healthy: boolean;
 }
 
+export interface DecisionPreview {
+  preview_version: string;
+  simulation: boolean;
+  request: Record<string, unknown>;
+  verdict: string;
+  determinism: {
+    drift_ok: boolean;
+    energy_drift: number;
+    coherence: number;
+  };
+  constraints: Record<string, unknown>;
+  obligations: Record<string, unknown>;
+  policy_trace: string[];
+  checksum_preview: string;
+  derived_from: string;
+}
+
+export interface AuditSearchFilter {
+  principal?: string;
+  action?: string;
+  resource?: string;
+  decision?: string;
+  policy_id?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface DecisionSummary {
+  decision_id: string;
+  principal: string;
+  action: string;
+  resource: string;
+  decision: string;
+  timestamp: string;
+}
+
+export interface AuditSearchResult {
+  results: DecisionSummary[];
+  count: number;
+  ordering: string;
+}
+
 // ============================================================================
 // Client
 // ============================================================================

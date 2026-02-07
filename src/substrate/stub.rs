@@ -19,6 +19,10 @@ use crate::audit::DecisionPacket;
 use crate::contracts::{EnergyEnvelope, LearningEnvelope, ReasoningEnvelope, SystemState};
 use crate::economics::EconomicsConfig;
 use crate::policy::{PolicyConfig, PolicyEvaluator};
+use crate::runtime::{
+    GovernanceMode, GovernanceOutcome, GovernanceRuntime as GovernanceRuntimeTrait,
+    GovernanceRuntimeError, GovernanceRuntimeMeta, GovernanceVerdict as RuntimeVerdict, ReasonCode,
+};
 
 /// Counter for generating sequential IDs
 static NODE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -109,6 +113,10 @@ pub struct LineageEntry {
     /// Optional propagation artifact attached for edge.propagate operations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub propagation_artifact: Option<PropagationArtifact>,
+    /// RFC 3339 timestamp recorded at entry creation.
+    /// Stored at creation time for deterministic search results.
+    #[serde(default)]
+    pub created_at: String,
 }
 
 impl Default for StubRuntime {
@@ -307,6 +315,106 @@ impl StubRuntime {
     #[allow(dead_code)]
     pub fn lineage_entries(&self) -> &[LineageEntry] {
         &self.lineage
+    }
+
+    /// Preview a governance proposal without committing to lineage.
+    ///
+    /// Returns a DecisionPreview artifact (non-authoritative).
+    /// MUST NOT mutate lineage, graph, or any governed state.
+    pub fn preview_governance(
+        &self,
+        proposal: &GovernanceProposal,
+    ) -> Result<DecisionPreview, GovernanceError> {
+        let verified_proposal_hash = self.verify_proposal_hash(proposal)?;
+        let status = self.governor_status();
+
+        let verdict = if !status.healthy || !status.drift_ok {
+            GovernanceVerdict::Block
+        } else if status.coherence >= 0.7 {
+            GovernanceVerdict::Allow
+        } else {
+            GovernanceVerdict::Review
+        };
+
+        let determinism = DeterminismProof {
+            drift_ok: status.drift_ok,
+            energy_drift: status.energy_drift,
+            coherence: status.coherence,
+        };
+
+        let preview_payload = serde_json::json!({
+            "proposal_id": proposal.proposal_id,
+            "proposal_hash": verified_proposal_hash,
+            "state_snapshot_hash": proposal.state_snapshot_hash,
+            "verdict": verdict,
+        });
+        let checksum_preview =
+            compute_stable_hash(&serde_json::to_string(&preview_payload).unwrap_or_default());
+
+        Ok(DecisionPreview {
+            preview_version: "1.0".to_string(),
+            simulation: true,
+            request: serde_json::json!({
+                "proposal_id": proposal.proposal_id,
+                "state_snapshot_hash": proposal.state_snapshot_hash,
+                "requested_action": proposal.requested_action,
+            }),
+            verdict,
+            determinism,
+            constraints: serde_json::json!({}),
+            obligations: serde_json::json!({}),
+            policy_trace: vec![],
+            checksum_preview,
+            derived_from: "decision.check@1".to_string(),
+        })
+    }
+
+    /// Search lineage for governance decisions matching filters.
+    ///
+    /// Returns results in deterministic order: (sequence ASC) which maps to
+    /// (timestamp_utc, decision_id) ASC in production.
+    /// Default limit: 100. Max limit: 1000.
+    pub fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
+        let limit = filter.limit.unwrap_or(100).min(1000).max(1) as usize;
+
+        let mut results: Vec<DecisionSummary> = self
+            .lineage
+            .iter()
+            .filter(|entry| entry.operation == "governance.evaluate")
+            .filter(|entry| {
+                if let Some(ref decision_filter) = filter.decision {
+                    entry.checksum.contains(&decision_filter.to_lowercase())
+                        || decision_filter == "ALLOW"
+                        || decision_filter == "BLOCK"
+                        || decision_filter == "REVIEW"
+                } else {
+                    true
+                }
+            })
+            .map(|entry| DecisionSummary {
+                decision_id: format!("decision-{}", entry.sequence),
+                principal: "governance".to_string(),
+                action: "evaluate".to_string(),
+                resource: "proposal".to_string(),
+                decision: "ALLOW".to_string(),
+                timestamp: entry.created_at.clone(),
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            a.timestamp
+                .cmp(&b.timestamp)
+                .then_with(|| a.decision_id.cmp(&b.decision_id))
+        });
+
+        results.truncate(limit);
+        let count = results.len();
+
+        AuditSearchResult {
+            results,
+            count,
+            ordering: "(timestamp_utc,decision_id) ASC".to_string(),
+        }
     }
 
     /// Evaluate a governance proposal and return authoritative verdict.
@@ -512,11 +620,15 @@ impl StubRuntime {
     ) {
         let sequence = self.lineage.len() as u64;
         let checksum = compute_stable_hash(&format!("{}:{}:{}", sequence, operation, data));
+        let created_at = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+            .to_string();
         self.lineage.push(LineageEntry {
             sequence,
             operation: operation.to_string(),
             checksum,
             propagation_artifact,
+            created_at,
         });
     }
 
@@ -716,6 +828,108 @@ impl StubRuntime {
     }
 }
 
+// ============================================================================
+// GovernanceRuntime trait implementation (demo mode)
+// ============================================================================
+
+impl GovernanceRuntimeTrait for StubRuntime {
+    fn evaluate(
+        &mut self,
+        proposal: &GovernanceProposal,
+    ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
+        let eval = self.evaluate_governance(proposal).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
+                reason: e.to_string(),
+            }
+        })?;
+
+        let status = self.governor_status();
+        let verdict = map_stub_verdict(eval.verdict);
+        let reason_codes = demo_reason_codes(&eval.determinism, status.healthy);
+
+        Ok(GovernanceOutcome {
+            verdict,
+            reason_codes,
+            mode: GovernanceMode::Demo,
+            policy_id: None,
+            policy_version: None,
+            schema_version: "1.0".to_string(),
+            packet: None,
+            trace_available: false,
+            authoritative_pdp: false,
+            replay_sufficient: false,
+        })
+    }
+
+    fn preview(
+        &self,
+        proposal: &GovernanceProposal,
+    ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
+        let preview = self.preview_governance(proposal).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
+                reason: e.to_string(),
+            }
+        })?;
+
+        let status = self.governor_status();
+        let verdict = map_stub_verdict(preview.verdict);
+        let reason_codes = demo_reason_codes(&preview.determinism, status.healthy);
+
+        Ok(GovernanceOutcome {
+            verdict,
+            reason_codes,
+            mode: GovernanceMode::Demo,
+            policy_id: None,
+            policy_version: None,
+            schema_version: "1.0".to_string(),
+            packet: None,
+            trace_available: false,
+            authoritative_pdp: false,
+            replay_sufficient: false,
+        })
+    }
+
+    fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
+        // Inherent method resolution takes priority over trait methods.
+        self.search_decisions(filter)
+    }
+
+    fn mode(&self) -> GovernanceMode {
+        GovernanceMode::Demo
+    }
+
+    fn meta(&self) -> GovernanceRuntimeMeta {
+        GovernanceRuntimeMeta::demo()
+    }
+}
+
+/// Map stub-local GovernanceVerdict to runtime GovernanceVerdict.
+fn map_stub_verdict(v: GovernanceVerdict) -> RuntimeVerdict {
+    match v {
+        GovernanceVerdict::Allow => RuntimeVerdict::Allow,
+        GovernanceVerdict::Block => RuntimeVerdict::Block,
+        GovernanceVerdict::Review => RuntimeVerdict::Review,
+    }
+}
+
+/// Build demo-namespace reason codes from determinism proof and health status.
+fn demo_reason_codes(determinism: &DeterminismProof, healthy: bool) -> Vec<ReasonCode> {
+    let mut codes = Vec::new();
+    if !healthy {
+        codes.push(ReasonCode::demo("thresholds.unhealthy"));
+    }
+    if !determinism.drift_ok {
+        codes.push(ReasonCode::demo("thresholds.drift_violation"));
+    }
+    if determinism.coherence < 0.7 {
+        codes.push(ReasonCode::demo("thresholds.low_coherence"));
+    }
+    if codes.is_empty() {
+        codes.push(ReasonCode::demo("thresholds.pass"));
+    }
+    codes
+}
+
 /// Result of replaying a single lineage entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplayResult {
@@ -772,6 +986,7 @@ pub struct EsvAudit {
 /// Verdict for governance evaluation.
 ///
 /// This is the authoritative decision boundary. Haltra proposes, Iter decides.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GovernanceVerdict {
@@ -826,6 +1041,7 @@ impl std::fmt::Display for GovernanceError {
 impl std::error::Error for GovernanceError {}
 
 /// Determinism proof returned with governance evaluation.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeterminismProof {
     /// Whether energy drift is within bounds (≤1×10⁻¹⁰)
@@ -839,6 +1055,7 @@ pub struct DeterminismProof {
 /// Receipt for governance evaluation (cryptographic audit trail).
 ///
 /// Self-contained for auditor verification — includes verdict and version.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceReceipt {
     /// Composite Integrity Hash for this decision
@@ -859,6 +1076,7 @@ pub struct GovernanceReceipt {
 ///
 /// Iter does NOT interpret domain semantics. It evaluates deterministic
 /// admissibility only. Haltra owns domain ethics interpretation.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceProposal {
     /// Unique proposal identifier
@@ -882,6 +1100,7 @@ pub struct GovernanceProposal {
 ///
 /// This is the authoritative response from Iter. Haltra must not claim
 /// determinism, ethical validity, or audit integrity independently.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceEvaluation {
     /// Authoritative verdict: ALLOW, BLOCK, or REVIEW
@@ -890,6 +1109,95 @@ pub struct GovernanceEvaluation {
     pub determinism: DeterminismProof,
     /// Cryptographic receipt for audit trail
     pub receipt: GovernanceReceipt,
+}
+
+/// Non-authoritative simulation result from decision.preview.
+///
+/// DISTINCT from DecisionPacket: not stored in audit lineage,
+/// not replay-addressable, carries simulation: true.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecisionPreview {
+    /// Schema version for preview artifacts
+    pub preview_version: String,
+    /// Always true — marks this as non-authoritative
+    pub simulation: bool,
+    /// Original request payload
+    pub request: serde_json::Value,
+    /// Projected verdict (same logic as decision.check)
+    pub verdict: GovernanceVerdict,
+    /// Determinism proof metrics
+    pub determinism: DeterminismProof,
+    /// Applicable constraints (opaque)
+    pub constraints: serde_json::Value,
+    /// Advisory obligations (not enforced)
+    pub obligations: serde_json::Value,
+    /// Policy rules evaluated
+    pub policy_trace: Vec<String>,
+    /// Checksum of request + verdict (not stored in lineage)
+    pub checksum_preview: String,
+    /// Canonical tool ID this simulation derives from
+    pub derived_from: String,
+}
+
+/// Filter for audit.search queries.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AuditSearchFilter {
+    /// Filter by principal identity.
+    #[serde(default)]
+    pub principal: Option<String>,
+    /// Filter by action type.
+    #[serde(default)]
+    pub action: Option<String>,
+    /// Filter by target resource.
+    #[serde(default)]
+    pub resource: Option<String>,
+    /// Filter by decision verdict.
+    #[serde(default)]
+    pub decision: Option<String>,
+    /// Filter by policy identifier.
+    #[serde(default)]
+    pub policy_id: Option<String>,
+    /// Start of time range (RFC 3339).
+    #[serde(default)]
+    pub from: Option<String>,
+    /// End of time range (RFC 3339).
+    #[serde(default)]
+    pub to: Option<String>,
+    /// Maximum number of results to return.
+    #[serde(default)]
+    pub limit: Option<u64>,
+}
+
+/// Single decision summary returned by audit.search.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecisionSummary {
+    /// Unique identifier for this decision.
+    pub decision_id: String,
+    /// Principal that initiated the decision.
+    pub principal: String,
+    /// Action that was evaluated.
+    pub action: String,
+    /// Resource the action targeted.
+    pub resource: String,
+    /// Resulting verdict string.
+    pub decision: String,
+    /// RFC 3339 timestamp of the decision.
+    pub timestamp: String,
+}
+
+/// Result set from audit.search.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditSearchResult {
+    /// Matched decision summaries.
+    pub results: Vec<DecisionSummary>,
+    /// Number of results returned.
+    pub count: usize,
+    /// Sort order description.
+    pub ordering: String,
 }
 
 fn compute_stable_hash(input: &str) -> String {

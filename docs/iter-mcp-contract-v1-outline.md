@@ -28,14 +28,14 @@ All public MCP tools follow these canonical families:
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
 | `decision.check` | `governance.evaluate` | 1 (alias) | Authoritative PDP gate. Evaluates governance proposal and returns verdict (ALLOW/DENY). |
-| `decision.preview` | *(to be added)* | 2 | Non-authoritative simulation. Returns projected decision without committing. |
+|| `decision.preview` | **ACTIVE** | 2 | Non-authoritative simulation. Returns projected decision without committing. |
 | `decision.explain` | *(to be added)* | 3 | Structured explanation of decision rationale with policy trace. |
 
 ### Audit Tools (`audit.*`)
 
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
-| `audit.search` | *(to be added)* | 2 | Search decisions by criteria (time range, principal, action, outcome). |
+|| `audit.search` | **ACTIVE** | 2 | Search decisions by criteria (time range, principal, action, outcome). |
 | `audit.export` | `esv.audit` | 1 (alias) | Export audit bundle for compliance/archival. Currently node-scoped; may expand to full bundles. |
 | `audit.replay` | `lineage.replay` | 1 (alias) | Deterministic replay of decision history. Verifies checksums and reconstructs lineage. |
 
@@ -185,9 +185,10 @@ Exportable audit artifact for compliance/archival.
    - Identical query parameters → identical result set and order.
    - Applies to fixed underlying store (no concurrent writes).
 
-3. **Phase 0 Status**
-   - Currently documented as requirement; not yet enforced.
-   - Implementation in Phase 2.
+3. **Phase 2 Status**
+   - Ordering and determinism enforced for `audit.search`.
+   - Results ordered by `(timestamp_utc, decision_id) ASC`.
+   - Default limit: 100. Max limit: 1000.
 
 **Example:**
 ```
