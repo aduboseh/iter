@@ -181,8 +181,7 @@ cargo test --test governance_invariants
 cargo build --release --bin iter-server
 
 # Query tools list (STDIO transport)
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | \
-  cargo run --release --bin iter-server
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | cargo run --release --bin iter-server
 ```
 
 Note: Examples compile in public_stub mode and demonstrate governance behavior
