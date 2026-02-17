@@ -18,6 +18,7 @@ tmp/
 demo_output/
 demo_runs/
 *.ansi
+demos/governance_proof_log.json
 
 # Certification artifacts (generated)
 certification/v1.0/expected_results/lineage.json
