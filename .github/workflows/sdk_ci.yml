@@ -15,6 +15,9 @@ on:
       - 'sdks/**'
       - '.github/workflows/sdk_ci.yml'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   rust-sdk:
     name: Rust SDK
@@ -23,7 +26,7 @@ jobs:
       run:
         working-directory: sdks/rust
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -70,7 +73,7 @@ jobs:
       run:
         working-directory: sdks/typescript
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -106,7 +109,7 @@ jobs:
       run:
         working-directory: sdks/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -124,7 +127,7 @@ jobs:
     name: SDK Contract Gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Fail-closed: contract file must exist and versions must match SDKs.
       - name: Contract presence + version parity

@@ -27,6 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Checkout canonical SCG source
+        uses: actions/checkout@v6
+        with:
+          repository: aduboseh/SCG
+          ref: master
+          path: scg_ref
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Verify local governance mirror integrity
         run: |
           set -euo pipefail
@@ -66,8 +75,6 @@ jobs:
       - name: Verify canonical SCG governance parity
         run: |
           set -euo pipefail
-
-          git clone --depth 1 --branch master https://github.com/aduboseh/SCG.git scg_ref
 
           diff -u governance/SCG_Governance_v1.0.md scg_ref/governance/SCG_Governance_v1.0.md
           diff -u governance/governance.hash scg_ref/governance/governance.hash
