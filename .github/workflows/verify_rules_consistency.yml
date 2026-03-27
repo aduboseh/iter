@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   governance-guarantees:
     name: Verify Governance Signals
@@ -14,15 +17,30 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Verify public governance stub exists
+      - name: Verify governance mirror surface exists
         run: |
-          if [ ! -f governance/GOVERNANCE.md ]; then
-            echo "::error::Public governance stub missing"
-            exit 1
-          fi
-          echo "✅ Governance stub present"
+          required_files=(
+            "governance/GOVERNANCE.md"
+            "governance/SCG_Governance_v1.0.md"
+            "governance/governance.hash"
+            "governance/boundary_contract.json"
+          )
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Required governance file missing: $file"
+              exit 1
+            fi
+          done
+          echo "✅ Governance mirror surface present"
+
+      - name: Verify derived governance stub boundary
+        run: |
+          grep -q "This file is not authoritative." governance/GOVERNANCE.md
+          grep -q "SCG/governance/SCG_Governance_v1.0.md" governance/GOVERNANCE.md
+          grep -q "must fail CI" governance/GOVERNANCE.md
+          echo "✅ Derived governance stub boundary is explicit"
 
       - name: Verify no CRLF line endings
         run: |
@@ -39,4 +57,3 @@ jobs:
             exit 1
           fi
           echo "✅ Stability baseline v1.0.0 present"
-
