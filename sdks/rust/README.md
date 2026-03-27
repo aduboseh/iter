@@ -40,8 +40,21 @@ fn main() -> iter_sdk::Result<()> {
     let state = client.node_query(node.id)?;
     println!("Node state: {:?}", state);
     
+    // Preview a governance decision without mutating lineage
+    let preview = client.decision_preview(
+        "proposal-1",
+        "sha256:state",
+        "deploy_capsule",
+        None,
+    )?;
+    println!("Preview: {:?}", preview);
+
+    // Search governance history
+    let history = client.audit_search(Some(serde_json::json!({ "limit": 10 })))?;
+    println!("Audit results: {:?}", history);
+
     // Check governor status
-    let status = client.governor_status()?;
+    let status = client.governor_health()?;
     println!("Governor: {:?}", status);
     
     Ok(())

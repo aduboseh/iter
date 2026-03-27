@@ -39,8 +39,20 @@ async function main() {
   const state = await client.nodeQuery(node.id);
   console.log("Node state:", state);
 
+  // Preview a governance decision without mutating lineage
+  const preview = await client.decisionPreview({
+    proposal_id: "proposal-1",
+    state_snapshot_hash: "sha256:state",
+    requested_action: "deploy_capsule",
+  });
+  console.log("Preview verdict:", preview.verdict);
+
+  // Search governance history
+  const history = await client.auditSearch({ limit: 10 });
+  console.log("Audit results:", history.results.length);
+
   // Check governor status
-  const status = await client.governorStatus();
+  const status = await client.governorHealth();
   console.log("Governor:", status);
 
   // Clean up
