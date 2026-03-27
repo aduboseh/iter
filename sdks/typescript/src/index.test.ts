@@ -645,3 +645,81 @@ describe("CT4.1: Graceful Shutdown", () => {
   });
 });
 
+describe("Governance Helper Methods", () => {
+  test("decisionPreview calls decision.preview with canonical args", async () => {
+    const client = new (IterClient as any)(1);
+    const response = {
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              preview_version: "1.0",
+              simulation: true,
+              request: {},
+              verdict: "ALLOW",
+              determinism: { drift_ok: true, energy_drift: 0, coherence: 1 },
+              constraints: {},
+              obligations: {},
+              policy_trace: [],
+              checksum_preview: "abc",
+              derived_from: "decision.check@1",
+            }),
+          },
+        ],
+      },
+    };
+
+    client.send = jest.fn().mockResolvedValue(response);
+
+    const args = {
+      proposal_id: "proposal-1",
+      state_snapshot_hash: "hash-1",
+      requested_action: "deploy",
+      constraints: { tenant: "alpha" },
+    };
+
+    const result = await client.decisionPreview(args);
+
+    expect(client.send).toHaveBeenCalledWith("tools/call", {
+      name: "decision.preview",
+      arguments: args,
+    });
+    expect(result.verdict).toBe("ALLOW");
+    expect(result.simulation).toBe(true);
+  });
+
+  test("auditSearch calls audit.search with empty filter by default", async () => {
+    const client = new (IterClient as any)(1);
+    const response = {
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              results: [],
+              count: 0,
+              ordering: "timestamp_utc,decision_id ASC",
+            }),
+          },
+        ],
+      },
+    };
+
+    client.send = jest.fn().mockResolvedValue(response);
+
+    const result = await client.auditSearch();
+
+    expect(client.send).toHaveBeenCalledWith("tools/call", {
+      name: "audit.search",
+      arguments: {},
+    });
+    expect(result.count).toBe(0);
+    expect(result.results).toEqual([]);
+  });
+});
+

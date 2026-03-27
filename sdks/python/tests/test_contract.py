@@ -2,6 +2,7 @@
 
 import asyncio
 import pytest
+from unittest.mock import AsyncMock, Mock
 
 from iter_sdk import IterClient
 from iter_sdk.exceptions import ConnectionClosedError, BackpressureError, RequestTimeoutError
@@ -52,3 +53,48 @@ async def test_timeout_rejects_and_evicts():
         await client.send("test", {}, timeout_ms=1)
 
     assert client._response_queue == {}
+
+
+@pytest.mark.asyncio
+async def test_decision_preview_uses_canonical_tool_name_and_args():
+    client = IterClient(max_inflight=1)
+    client.send = AsyncMock(return_value=object())
+    client._parse_tool_result = Mock(return_value={"verdict": "ALLOW", "simulation": True})
+
+    result = await client.decision_preview(
+        proposal_id="proposal-1",
+        state_snapshot_hash="sha256:state",
+        requested_action="deploy_capsule",
+        constraints={"tenant": "alpha"},
+    )
+
+    client.send.assert_awaited_once_with("tools/call", {
+        "name": "decision.preview",
+        "arguments": {
+            "proposal_id": "proposal-1",
+            "state_snapshot_hash": "sha256:state",
+            "requested_action": "deploy_capsule",
+            "constraints": {"tenant": "alpha"},
+        },
+    })
+    client._parse_tool_result.assert_called_once()
+    assert result["verdict"] == "ALLOW"
+
+
+@pytest.mark.asyncio
+async def test_audit_search_uses_canonical_tool_name_and_filter_map():
+    client = IterClient(max_inflight=1)
+    client.send = AsyncMock(return_value=object())
+    client._parse_tool_result = Mock(return_value={"count": 0, "results": []})
+
+    result = await client.audit_search(principal="alice", limit=10)
+
+    client.send.assert_awaited_once_with("tools/call", {
+        "name": "audit.search",
+        "arguments": {
+            "principal": "alice",
+            "limit": 10,
+        },
+    })
+    client._parse_tool_result.assert_called_once()
+    assert result["count"] == 0

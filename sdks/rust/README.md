@@ -21,27 +21,43 @@ iter-sdk = "0.1"
 ```rust
 use iter_sdk::{IterClient, TraceContext};
 
-fn main() -> iter_sdk::Result<()> {
+#[tokio::main]
+async fn main() -> iter_sdk::Result<()> {
     // Connect to an Iter server
-    let mut client = IterClient::connect("iter-server")?;
+    let mut client = IterClient::connect("iter-server", 1).await?;
     
     // Set trace context for distributed tracing
     client.with_trace(TraceContext::new("my-trace-id"));
     
     // List available tools
-    let tools = client.tools_list()?;
+    let tools = client.tools_list().await?;
     println!("Available tools: {:?}", tools);
     
     // Create a node
-    let node = client.node_create(0.5, 1.0)?;
+    let node = client.node_create(0.5, 1.0).await?;
     println!("Created node: {:?}", node);
     
     // Query a node
-    let state = client.node_query(node.id)?;
+    let state = client.node_query(node.id).await?;
     println!("Node state: {:?}", state);
     
+    // Preview a governance decision without mutating lineage
+    let preview = client.decision_preview(
+        "proposal-1",
+        "sha256:state",
+        "deploy_capsule",
+        None,
+    ).await?;
+    println!("Preview: {:?}", preview);
+
+    // Search governance history
+    let history = client
+        .audit_search(Some(serde_json::json!({ "limit": 10 })))
+        .await?;
+    println!("Audit results: {:?}", history);
+
     // Check governor status
-    let status = client.governor_status()?;
+    let status = client.governor_health().await?;
     println!("Governor: {:?}", status);
     
     Ok(())

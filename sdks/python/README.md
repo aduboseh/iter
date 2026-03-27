@@ -53,8 +53,20 @@ async def main() -> None:
     state = await client.node_query(node.id)
     print("Node state:", state)
 
+    # Preview a governance decision without mutating lineage
+    preview = await client.decision_preview(
+        proposal_id="proposal-1",
+        state_snapshot_hash="sha256:state",
+        requested_action="deploy_capsule",
+    )
+    print("Preview verdict:", preview["verdict"])
+
+    # Search governance history
+    history = await client.audit_search(limit=10)
+    print("Audit results:", len(history["results"]))
+
     # Check governor status
-    status = await client.governor_status()
+    status = await client.governor_health()
     print("Governor status:", status)
 
     # Graceful shutdown
