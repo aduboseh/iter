@@ -1,0 +1,10 @@
+{
+  "role": "mcp_governance_extension",
+  "authoritative_source_repo": "SCG",
+  "authoritative_source": "SCG/governance/SCG_Governance_v1.0.md",
+  "governance_source": "governance/SCG_Governance_v1.0.md",
+  "hash_source": "governance/governance.hash",
+  "governance_mode": "mirror_only",
+  "mutation_policy": "forbidden",
+  "failure_mode": "fail_closed"
+}

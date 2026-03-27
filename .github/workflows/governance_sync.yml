@@ -1,0 +1,75 @@
+name: governance-sync
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "governance/**"
+      - ".github/workflows/governance_sync.yml"
+      - ".github/workflows/verify_rules_consistency.yml"
+      - "README.md"
+  push:
+    branches: [main]
+    paths:
+      - "governance/**"
+      - ".github/workflows/governance_sync.yml"
+      - ".github/workflows/verify_rules_consistency.yml"
+      - "README.md"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  verify:
+    name: Verify SCG Governance Mirror
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify local governance mirror integrity
+        run: |
+          set -euo pipefail
+
+          CANONICAL=$(tr -d '[:space:]' < governance/governance.hash | tr 'a-f' 'A-F')
+          ACTUAL=$(sha256sum governance/SCG_Governance_v1.0.md | awk '{print toupper($1)}')
+
+          echo "Mirror hash:   $CANONICAL"
+          echo "Manifest hash: $ACTUAL"
+
+          test "$CANONICAL" = "$ACTUAL"
+
+      - name: Validate Iter governance boundary contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected = {
+              "role": "mcp_governance_extension",
+              "authoritative_source_repo": "SCG",
+              "authoritative_source": "SCG/governance/SCG_Governance_v1.0.md",
+              "governance_source": "governance/SCG_Governance_v1.0.md",
+              "hash_source": "governance/governance.hash",
+              "governance_mode": "mirror_only",
+              "mutation_policy": "forbidden",
+              "failure_mode": "fail_closed",
+          }
+          actual = json.loads(Path("governance/boundary_contract.json").read_text())
+          if actual != expected:
+              raise SystemExit(
+                  f"boundary_contract.json mismatch\\nexpected={expected}\\nactual={actual}"
+              )
+          print("Boundary contract verified")
+          PY
+
+      - name: Verify canonical SCG governance parity
+        run: |
+          set -euo pipefail
+
+          git clone --depth 1 --branch master https://github.com/aduboseh/SCG.git scg_ref
+
+          diff -u governance/SCG_Governance_v1.0.md scg_ref/governance/SCG_Governance_v1.0.md
+          diff -u governance/governance.hash scg_ref/governance/governance.hash
+
+          echo "Iter governance mirror matches SCG canonical source"

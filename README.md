@@ -81,6 +81,19 @@ Iter governs and proves decisions produced by upstream systems.
 
 ---
 
+## Governance Source
+
+Iter does not define canonical governance. SCG does.
+
+- Authoritative governance source: `SCG/governance/SCG_Governance_v1.0.md`
+- Mirrored governance artifact in this repo: `governance/SCG_Governance_v1.0.md`
+- Mirrored checksum source in this repo: `governance/governance.hash`
+- Derived explanatory stub: `governance/GOVERNANCE.md`
+
+If the mirrored governance artifact drifts from SCG, CI fails closed.
+
+---
+
 ## Governance Artifacts
 
 ### GovernanceOutcome

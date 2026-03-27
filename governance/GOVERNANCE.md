@@ -1,16 +1,17 @@
-# Iter Governance Manifest (Public)
+# GOVERNANCE (DERIVED)
 
-This repository implements a governed execution model backed by an
-integrity-locked internal governance manifest.
+This file is not authoritative.
 
-Public guarantees include:
-- Deterministic execution
-- Auditable lineage and replay
-- Governed state transitions
-- Explicit invariant enforcement
+Canonical governance source:
+- authoritative repo: `SCG`
+- authoritative manifest: `SCG/governance/SCG_Governance_v1.0.md`
 
-Detailed governance rules, enforcement doctrine, and internal operating
-procedures are maintained in a private governance repository owned by
-Only SG Solutions.
+This repository mirrors the canonical SCG governance manifest at:
+- `governance/SCG_Governance_v1.0.md`
+- `governance/governance.hash`
 
-Access is available under NDA for audit, compliance, or partnership review.
+Iter is a downstream MCP governance extension. It consumes and enforces the
+SCG governance boundary but does not define governance independently.
+
+Any divergence between this mirror and the canonical SCG governance artifact
+must fail CI.
