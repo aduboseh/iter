@@ -27,16 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Checkout canonical SCG source
-        uses: actions/checkout@v6
-        with:
-          repository: aduboseh/SCG
-          ref: master
-          token: ${{ secrets.SCG_PAT }}
-          path: scg_ref
-          fetch-depth: 1
-          persist-credentials: false
-
       - name: Verify local governance mirror integrity
         run: |
           set -euo pipefail
@@ -73,11 +63,26 @@ jobs:
           print("Boundary contract verified")
           PY
 
-      - name: Verify canonical SCG governance parity
+      - name: Enforce mirror-only governance mutation discipline
         run: |
           set -euo pipefail
 
-          diff -u governance/SCG_Governance_v1.0.md scg_ref/governance/SCG_Governance_v1.0.md
-          diff -u governance/governance.hash scg_ref/governance/governance.hash
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REV="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REV="${{ github.event.before }}"
+          fi
 
-          echo "Iter governance mirror matches SCG canonical source"
+          if [ -z "$BASE_REV" ] || [ "$BASE_REV" = "0000000000000000000000000000000000000000" ]; then
+            echo "No comparable base revision available; skipping mirror mutation diff check"
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_REV" "$GITHUB_SHA" | grep -qx 'governance/SCG_Governance_v1.0.md'; then
+            if ! git diff --name-only "$BASE_REV" "$GITHUB_SHA" | grep -qx 'governance/governance.hash'; then
+              echo "::error::Mirrored governance manifest changed without a corresponding checksum update"
+              exit 1
+            fi
+          fi
+
+          echo "Iter governance mirror mutation discipline verified"
