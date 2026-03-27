@@ -525,11 +525,7 @@ impl IterClient {
             )
             .await?;
 
-        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
-            code: -1,
-            message: "No result".into(),
-        })?;
-        Ok(result)
+        extract_raw_result(response)
     }
 
     pub async fn audit_export(&mut self, node_id: u64) -> Result<serde_json::Value> {
@@ -544,11 +540,7 @@ impl IterClient {
             )
             .await?;
 
-        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
-            code: -1,
-            message: "No result".into(),
-        })?;
-        Ok(result)
+        extract_raw_result(response)
     }
 
     pub async fn audit_replay(&mut self) -> Result<serde_json::Value> {
@@ -563,11 +555,7 @@ impl IterClient {
             )
             .await?;
 
-        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
-            code: -1,
-            message: "No result".into(),
-        })?;
-        Ok(result)
+        extract_raw_result(response)
     }
 
     pub async fn decision_preview(
@@ -596,11 +584,7 @@ impl IterClient {
             )
             .await?;
 
-        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
-            code: -1,
-            message: "No result".into(),
-        })?;
-        Ok(result)
+        extract_raw_result(response)
     }
 
     pub async fn audit_search(
@@ -619,11 +603,7 @@ impl IterClient {
             )
             .await?;
 
-        let result = response.result.ok_or_else(|| SdkError::RequestFailed {
-            code: -1,
-            message: "No result".into(),
-        })?;
-        Ok(result)
+        extract_raw_result(response)
     }
 
     #[deprecated(note = "Use governor_health() instead. Will be removed in v3.0.")]
@@ -816,6 +796,20 @@ fn parse_tool_result<T: serde::de::DeserializeOwned>(response: RpcResponse) -> R
     serde_json::from_str(content).map_err(SdkError::Json)
 }
 
+fn extract_raw_result(response: RpcResponse) -> Result<serde_json::Value> {
+    if let Some(err) = response.error {
+        return Err(SdkError::RequestFailed {
+            code: err.code,
+            message: err.message,
+        });
+    }
+
+    response.result.ok_or_else(|| SdkError::RequestFailed {
+        code: -1,
+        message: "No result".into(),
+    })
+}
+
 // ==============================
 // Version Checking
 // ==============================
@@ -857,5 +851,27 @@ mod tests {
     fn governance_helper_methods_are_exposed() {
         let _ = IterClient::decision_preview;
         let _ = IterClient::audit_search;
+    }
+
+    #[test]
+    fn raw_result_preserves_server_error() {
+        let response = RpcResponse {
+            jsonrpc: "2.0".into(),
+            result: None,
+            error: Some(RpcError {
+                code: 5001,
+                message: "simulation unavailable".into(),
+            }),
+            id: serde_json::json!(1),
+        };
+
+        let err = extract_raw_result(response).unwrap_err();
+        match err {
+            SdkError::RequestFailed { code, message } => {
+                assert_eq!(code, 5001);
+                assert_eq!(message, "simulation unavailable");
+            }
+            other => panic!("unexpected error: {other}"),
+        }
     }
 }
