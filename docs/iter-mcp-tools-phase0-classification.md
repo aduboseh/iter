@@ -97,7 +97,7 @@ All required fields are documented in schemas.
 
 1. **`governance.evaluate` is the only PUBLIC_GOVERNANCE tool**
    - This is the canonical PDP gate
-   - Description explicitly marks it as "PHASE 0: Iter-Haltra Bridge"
+   - Description now scopes behavior by runtime mode instead of the older "PHASE 0: Iter-Haltra Bridge" label
    - Target canonical name: `decision.check`
 
 2. **`node.mutate` is marked as governed operation**

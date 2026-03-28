@@ -164,6 +164,77 @@ fn governed_local_packet_and_trace_are_deterministic_across_fresh_servers() {
 }
 
 #[test]
+fn governed_local_governance_evaluate_alias_matches_decision_check() {
+    let run_tool = |tool_name: &str| {
+        let mut client = McpTestClient::spawn(Some("governed-local"));
+        let outcome = client.extract_tool_json(tool_name, proposal_args());
+        client.close();
+        outcome
+    };
+
+    let legacy = run_tool("governance.evaluate");
+    let canonical = run_tool("decision.check");
+
+    assert_eq!(legacy, canonical);
+}
+
+#[test]
+fn governed_local_preview_is_authoritative_but_not_replay_sufficient() {
+    let mut client = McpTestClient::spawn(Some("governed-local"));
+    let outcome = client.extract_tool_json("decision.preview", proposal_args());
+
+    assert_eq!(
+        outcome.get("mode").and_then(|v| v.as_str()),
+        Some("governed")
+    );
+    assert_eq!(
+        outcome.get("authoritative_pdp").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+    assert_eq!(
+        outcome.get("replay_sufficient").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert!(
+        outcome.get("packet").is_none() || outcome.get("packet").unwrap().is_null(),
+        "preview must not emit a packet"
+    );
+
+    client.close();
+}
+
+#[test]
+fn governed_local_audit_search_uses_policy_decision() {
+    let mut client = McpTestClient::spawn(Some("governed-local"));
+    let outcome = client.extract_tool_json("decision.check", proposal_args());
+    let expected_decision = outcome
+        .get("verdict")
+        .and_then(|v| v.as_str())
+        .expect("verdict")
+        .to_string();
+
+    let result = client.extract_tool_json("audit.search", json!({"decision": expected_decision}));
+    let count = result.get("count").and_then(|v| v.as_u64()).expect("count");
+    assert!(
+        count >= 1,
+        "audit.search must return governed decision records"
+    );
+
+    let first = result
+        .get("results")
+        .and_then(|v| v.as_array())
+        .and_then(|v| v.first())
+        .expect("at least one result");
+
+    assert_eq!(
+        first.get("decision").and_then(|v| v.as_str()),
+        Some("ALLOW")
+    );
+
+    client.close();
+}
+
+#[test]
 fn invalid_runtime_mode_fails_closed() {
     let bin_path = env!("CARGO_BIN_EXE_iter-server");
     let output = Command::new(bin_path)

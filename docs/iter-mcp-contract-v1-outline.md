@@ -114,6 +114,10 @@ Immutable governance decision artifact.
 }
 ```
 
+**Optional Fields (runtime-dependent):**
+- `governance_hash` — canonical mirrored governance hash when the active runtime binds governance identity into the packet
+- `execution_trace` — ordered evaluation trace when the active runtime exposes deterministic trace data
+
 **PEP Statement:**
 > Iter does not enforce obligations. Obligations are advisory only; enforcement is the responsibility of the Policy Enforcement Point (PEP) caller.
 
@@ -215,7 +219,8 @@ audit.search(time_range=[T1, T2], principal="alice")
 - DecisionPacket MUST have:
   - Matching checksum
   - Valid version
-  - Timestamp within acceptable drift window
+  - Governance hash when emitted by a governed runtime
+  - Ordered execution trace when emitted by a governed runtime
 
 ### Invariant 4: Checksum Stability
 - `decision.check` invoked with identical inputs MUST produce identical checksums.

@@ -133,7 +133,7 @@ impl DecisionPacket {
     }
 
     /// Attach deterministic governance metadata and refresh the packet checksum.
-    pub fn bind_governance_context(
+    pub(crate) fn bind_governance_context(
         &mut self,
         governance_hash: String,
         execution_trace: Vec<String>,
@@ -194,6 +194,8 @@ pub struct AuditEvent {
     pub tick: u64,
     /// Decision ID (packet checksum)
     pub decision_id: String,
+    /// Policy decision outcome.
+    pub decision: String,
     /// Capsule hash (if learning involved)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capsule_hash: Option<String>,
@@ -219,6 +221,13 @@ impl AuditEvent {
             sequence,
             tick: packet.tick,
             decision_id: packet.checksum.clone(),
+            decision: match packet.policy.decision {
+                PolicyDecision::Allow => "ALLOW".to_string(),
+                PolicyDecision::Deny => "DENY".to_string(),
+                PolicyDecision::FreezeLearning => "FREEZE_LEARNING".to_string(),
+                PolicyDecision::DegradedMode => "DEGRADED_MODE".to_string(),
+                PolicyDecision::RequireReview => "REQUIRE_REVIEW".to_string(),
+            },
             capsule_hash: if packet.learning.capsule_id.is_empty() {
                 None
             } else {
@@ -238,6 +247,7 @@ impl AuditEvent {
             "sequence": self.sequence,
             "tick": self.tick,
             "decision_id": self.decision_id,
+            "decision": self.decision,
             "capsule_hash": self.capsule_hash,
             "learning_status": self.learning_status,
             "reason_codes": self.reason_codes,

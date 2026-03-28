@@ -82,7 +82,7 @@ fn print_mode_banner(runtime_mode: RuntimeMode) {
             eprintln!("│ Responses are deterministic placeholders                   │");
             eprintln!("└────────────────────────────────────────────────────────────┘");
             eprintln!(
-                "WARNING: Server running in stub mode. SCG execution path not active. See WO-ITER-RUNTIME-001."
+                "WARNING: Server running in stub mode. SCG execution path not active. See WO-ITER-RUNTIME-001B."
             );
         }
         RuntimeMode::GovernedLocal => {

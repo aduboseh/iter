@@ -238,7 +238,7 @@ impl GovernanceRuntime for GovernedRuntime {
             .iter()
             .filter(|event| {
                 if let Some(ref decision_filter) = filter.decision {
-                    let status_upper = event.learning_status.to_uppercase();
+                    let status_upper = event.decision.to_uppercase();
                     let filter_upper = decision_filter.to_uppercase();
                     status_upper.contains(&filter_upper)
                 } else {
@@ -251,7 +251,7 @@ impl GovernanceRuntime for GovernedRuntime {
                 principal: "policy".to_string(),
                 action: "evaluate".to_string(),
                 resource: "proposal".to_string(),
-                decision: event.learning_status.clone(),
+                decision: event.decision.clone(),
                 timestamp: event.created_at.clone(),
             })
             .collect();

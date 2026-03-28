@@ -254,7 +254,7 @@
       "description": "Energy snapshot"
     },
     "execution_trace": {
-      "description": "Ordered evaluation trace. Empty when no trace is attached.",
+      "description": "Ordered evaluation trace. Omitted when no trace is attached.",
       "items": {
         "type": "string"
       },

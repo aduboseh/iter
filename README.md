@@ -106,7 +106,7 @@ The governed runtime implementation is centered on a `GovernanceOutcome` contain
 - `reason_codes` (namespaced: `demo.thresholds.*` or `policy.*`)
 - `packet` (DecisionPacket, governed evaluate only)
 
-Current public server status: `decision.preview` follows the active runtime mode. Default demo mode remains non-authoritative; `--runtime-mode=governed-local` exposes governed packet emission over the local stub substrate.
+Current public server status: `decision.preview` follows the active runtime mode. Default demo mode remains non-authoritative; `--runtime-mode=governed-local` performs authoritative policy preview without emitting a packet.
 
 ### DecisionPacket (governed mode only)
 
@@ -120,7 +120,7 @@ Each packet includes:
 - Learning permissions and economic constraints
 - RFC 8785 JCS canonical JSON with SHA-256 checksum
 
-DecisionPreview is a non-authoritative structure and is never replay-sufficient.
+DecisionPreview is non-authoritative in demo mode. In governed-local mode it reflects authoritative policy evaluation, but it is still not replay-sufficient because no packet is emitted.
 Only DecisionPacket participates in checksum, replay, and audit guarantees.
 
 **Demo mode does not emit DecisionPackets.** Demo verdicts are non-authoritative threshold checks.
@@ -146,6 +146,7 @@ The following tools are available when Iter is run with `--profile=governance`.
 Current public server note: `--profile=governance` constrains tool exposure. Runtime behavior then depends on `--runtime-mode`: default demo stub mode or `governed-local` packet-emitting mode. Full SCG-backed execution remains pending WO-ITER-RUNTIME-001B.
 
 #### Governance & Audit
+
 | Tool | Description |
 |------|-------------|
 | decision.check | Governance decision gate. Default demo mode is non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate |
@@ -155,6 +156,7 @@ Current public server note: `--profile=governance` constrains tool exposure. Run
 | audit.replay | Deterministic replay of a DecisionPacket (canonical, read-only) |
 | governor.health | Drift and coherence metrics |
 | governance.health | Governance subsystem health |
+
 
 Note: Replay is a pure function over a DecisionPacket, policy_version, and schema_version.
 No server-side state mutation or historical re-execution occurs.
