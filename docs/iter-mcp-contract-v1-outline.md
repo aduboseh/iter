@@ -27,7 +27,7 @@ All public MCP tools follow these canonical families:
 
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
-| `decision.check` | `governance.evaluate` | 1 (alias) | Authoritative PDP gate. Evaluates governance proposal and returns verdict (ALLOW/DENY). |
+| `decision.check` | `governance.evaluate` | 1 (alias) | Governance decision gate. Default runtime is demo/non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. |
 || `decision.preview` | **ACTIVE** | 2 | Non-authoritative simulation. Returns projected decision without committing. |
 | `decision.explain` | *(to be added)* | 3 | Structured explanation of decision rationale with policy trace. |
 

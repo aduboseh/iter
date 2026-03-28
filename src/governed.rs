@@ -23,6 +23,8 @@ use crate::substrate::stub::{
     AuditSearchFilter, AuditSearchResult, DecisionSummary, GovernanceProposal, StubRuntime,
 };
 
+const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
+
 /// Governed-mode runtime wrapping graph state + PolicyEvaluator + AuditLog.
 ///
 /// PolicyEvaluator is the sole verdict source. All evaluate() calls produce
@@ -32,6 +34,7 @@ pub struct GovernedRuntime {
     evaluator: PolicyEvaluator,
     audit_log: AuditLog,
     economics_config: EconomicsConfig,
+    governance_hash: String,
 }
 
 impl GovernedRuntime {
@@ -46,6 +49,7 @@ impl GovernedRuntime {
             evaluator: PolicyEvaluator::new(policy_config),
             audit_log: AuditLog::new(),
             economics_config,
+            governance_hash: GOVERNANCE_HASH.trim().to_string(),
         }
     }
 
@@ -94,6 +98,29 @@ impl GovernedRuntime {
         format!("sha256:{}", self.evaluator.config().compute_hash())
     }
 
+    fn execution_trace(policy_result: &crate::policy::PolicyResult) -> Vec<String> {
+        let mut trace = Vec::with_capacity(policy_result.evaluated_rules.len() + 3);
+        trace.push("governance.hash.bound".to_string());
+        trace.push("policy.evaluate.start".to_string());
+        trace.extend(
+            policy_result
+                .evaluated_rules
+                .iter()
+                .map(|rule| format!("policy.rule.{}", rule.to_ascii_lowercase())),
+        );
+        trace.push(format!(
+            "policy.decision.{}",
+            match policy_result.decision {
+                PolicyDecision::Allow => "allow",
+                PolicyDecision::Deny => "deny",
+                PolicyDecision::DegradedMode => "degraded_mode",
+                PolicyDecision::FreezeLearning => "freeze_learning",
+                PolicyDecision::RequireReview => "require_review",
+            }
+        ));
+        trace
+    }
+
     /// Evaluate policy against graph state. Returns PolicyResult + governed SystemState.
     ///
     /// Extracts envelopes from graph, re-evaluates with governed PolicyEvaluator,
@@ -138,8 +165,9 @@ impl GovernanceRuntime for GovernedRuntime {
         _proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
         let (policy_result, governed_state) = self.evaluate_state()?;
+        let execution_trace = Self::execution_trace(&policy_result);
 
-        let packet = DecisionPacket::new(
+        let mut packet = DecisionPacket::new(
             env!("CARGO_PKG_VERSION").to_string(),
             "stub".to_string(),
             &governed_state,
@@ -154,6 +182,7 @@ impl GovernanceRuntime for GovernedRuntime {
         .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
             reason: e.to_string(),
         })?;
+        packet.bind_governance_context(self.governance_hash.clone(), execution_trace);
 
         self.audit_log.append(&packet);
         self.graph.advance_tick();
@@ -392,5 +421,37 @@ mod tests {
         assert_eq!(meta.mode, GovernanceMode::Governed);
         assert!(meta.authoritative_pdp);
         assert!(meta.replay_sufficient);
+    }
+
+    #[test]
+    fn governed_packet_binds_governance_hash() {
+        let mut rt = make_governed();
+        let outcome = rt.evaluate(&test_proposal()).expect("evaluate");
+        let packet = outcome.packet.expect("packet");
+
+        assert_eq!(packet.governance_hash(), Some(GOVERNANCE_HASH.trim()));
+    }
+
+    #[test]
+    fn governed_execution_trace_is_deterministic() {
+        let mut rt1 = make_governed();
+        let mut rt2 = make_governed();
+
+        let packet1 = rt1
+            .evaluate(&test_proposal())
+            .expect("evaluate")
+            .packet
+            .expect("packet");
+        let packet2 = rt2
+            .evaluate(&test_proposal())
+            .expect("evaluate")
+            .packet
+            .expect("packet");
+
+        assert_eq!(packet1.execution_trace(), packet2.execution_trace());
+        assert!(
+            !packet1.execution_trace().is_empty(),
+            "governed packets must carry an execution trace"
+        );
     }
 }

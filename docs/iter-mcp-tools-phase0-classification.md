@@ -10,7 +10,7 @@
 
 | Tool Name | Category | Target Role (Future) | Notes (Current Behavior) |
 |-----------|----------|---------------------|--------------------------|
-| `governance.evaluate` | PUBLIC_GOVERNANCE | `decision.check` | PDP gate; returns authoritative verdict on governance proposals. Accepts `proposal_id`, `state_snapshot_hash`, `requested_action`, optional `constraints`. Marked "PHASE 0: Iter-Haltra Bridge" in description. |
+| `governance.evaluate` | PUBLIC_GOVERNANCE | `decision.check` | Governance decision gate; default runtime is demo/non-authoritative, while `--runtime-mode=governed-local` emits governed packets over the local stub substrate. Accepts `proposal_id`, `state_snapshot_hash`, `requested_action`, optional `constraints`. |
 | `governance.status` | OPS/STATUS | `governance.health` | Returns governance health summary. No required parameters. |
 | `governor.status` | OPS/STATUS | `governor.health` | Returns governor coherence/drift metrics. No required parameters. |
 | `esv.audit` | AUDIT/REPLAY | `audit.export` | Audit node ESV (Energy-State-Value). Requires `node_id` (string). Returns compliance status for a specific node. |
