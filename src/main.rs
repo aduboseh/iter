@@ -11,6 +11,17 @@ enum ServerProfile {
     KernelDebug,
 }
 
+/// Runtime mode controlling which in-crate engine backs MCP governance calls.
+///
+/// - `Demo`: Default public stub behavior.
+/// - `GovernedLocal`: Governed runtime over the local stub substrate. Emits
+///   DecisionPackets, but is not yet SCG-backed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RuntimeMode {
+    Demo,
+    GovernedLocal,
+}
+
 /// Parse --profile flag from CLI args. Default: Governance.
 /// Exits with code 1 on unrecognized profile.
 fn detect_profile(args: &[String]) -> ServerProfile {
@@ -25,10 +36,25 @@ fn detect_profile(args: &[String]) -> ServerProfile {
     }
 }
 
+/// Parse --runtime-mode flag from CLI args. Default: demo.
+/// Exits with code 1 on unrecognized runtime mode.
+fn detect_runtime_mode(args: &[String]) -> RuntimeMode {
+    let runtime_arg = args.iter().find(|arg| arg.starts_with("--runtime-mode="));
+    match runtime_arg.map(|s| s.as_str()) {
+        Some("--runtime-mode=governed-local") => RuntimeMode::GovernedLocal,
+        Some("--runtime-mode=demo") | None => RuntimeMode::Demo,
+        Some(other) => {
+            eprintln!("FATAL: ERROR_INVALID_RUNTIME_MODE: {}", other);
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let json_only = args.iter().any(|a| a == "--json-only");
     let profile = detect_profile(&args);
+    let runtime_mode = detect_runtime_mode(&args);
 
     if !json_only {
         match std::env::current_exe() {
@@ -39,28 +65,43 @@ fn main() {
             Ok(p) => eprintln!("ITER CWD = {}", p.display()),
             Err(e) => eprintln!("ITER CWD = <error: {}>", e),
         }
-        print_mode_banner();
+        print_mode_banner(runtime_mode);
         eprintln!("iter-server profile: {:?}", profile);
+        eprintln!("iter-server runtime mode: {:?}", runtime_mode);
     }
 
-    run_stdio_server(json_only, profile);
+    run_stdio_server(json_only, profile, runtime_mode);
 }
 
-fn print_mode_banner() {
+fn print_mode_banner(runtime_mode: RuntimeMode) {
     eprintln!("┌────────────────────────────────────────────────────────────┐");
-    eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
-    eprintln!("│ Proprietary substrate DISABLED                             │");
-    eprintln!("│ Responses are deterministic placeholders                   │");
-    eprintln!("└────────────────────────────────────────────────────────────┘");
-    eprintln!("WARNING: Server running in stub mode. SCG execution path not active. See WO-ITER-RUNTIME-001.");
+    match runtime_mode {
+        RuntimeMode::Demo => {
+            eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
+            eprintln!("│ Proprietary substrate DISABLED                             │");
+            eprintln!("│ Responses are deterministic placeholders                   │");
+            eprintln!("└────────────────────────────────────────────────────────────┘");
+            eprintln!(
+                "WARNING: Server running in stub mode. SCG execution path not active. See WO-ITER-RUNTIME-001B."
+            );
+        }
+        RuntimeMode::GovernedLocal => {
+            eprintln!("│ ITER: GOVERNED LOCAL MODE                                  │");
+            eprintln!("│ Policy runtime ACTIVE over local stub substrate            │");
+            eprintln!("│ SCG execution path still inactive                          │");
+            eprintln!("└────────────────────────────────────────────────────────────┘");
+            eprintln!(
+                "WARNING: Governed local mode is packet-emitting and replay-capable, but not SCG-backed. See WO-ITER-RUNTIME-001B."
+            );
+        }
+    }
     eprintln!();
 }
 
-fn run_stdio_server(json_only: bool, profile: ServerProfile) {
-    use iter_mcp_server::substrate::stub::StubRuntime;
+fn run_stdio_server(json_only: bool, profile: ServerProfile, runtime_mode: RuntimeMode) {
     use std::io::BufWriter;
 
-    let mut runtime = StubRuntime::new();
+    let mut runtime = ServerRuntime::new(runtime_mode);
 
     // Build and validate tool surface before entering server loop (fail-fast).
     let tools_list = build_tools_list(profile);
@@ -77,7 +118,8 @@ fn run_stdio_server(json_only: bool, profile: ServerProfile) {
 
     if !json_only {
         eprintln!(
-            "Iter server running in STDIO mode (stub) — v{}",
+            "Iter server running in STDIO mode ({:?}) — v{}",
+            runtime.mode(),
             env!("CARGO_PKG_VERSION")
         );
     }
@@ -98,18 +140,12 @@ fn run_stdio_server(json_only: bool, profile: ServerProfile) {
                         let id = req.get("id").cloned();
 
                         if id.is_none() || id.as_ref().map(|v| v.is_null()).unwrap_or(false) {
-                            let _ = handle_stub_request(
-                                &mut runtime,
-                                method,
-                                &req,
-                                profile,
-                                &tools_json,
-                            );
+                            let _ =
+                                handle_request(&mut runtime, method, &req, profile, &tools_json);
                             continue;
                         }
 
-                        let resp =
-                            handle_stub_request(&mut runtime, method, &req, profile, &tools_json);
+                        let resp = handle_request(&mut runtime, method, &req, profile, &tools_json);
                         let response_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": id,
@@ -145,6 +181,91 @@ fn run_stdio_server(json_only: bool, profile: ServerProfile) {
                     eprintln!("Error reading from stdin: {}", e);
                 }
                 break;
+            }
+        }
+    }
+}
+
+enum ServerRuntime {
+    Demo(iter_mcp_server::substrate::stub::StubRuntime),
+    GovernedLocal(iter_mcp_server::governed::GovernedRuntime),
+}
+
+impl ServerRuntime {
+    fn new(mode: RuntimeMode) -> Self {
+        match mode {
+            RuntimeMode::Demo => Self::Demo(iter_mcp_server::substrate::stub::StubRuntime::new()),
+            RuntimeMode::GovernedLocal => {
+                Self::GovernedLocal(iter_mcp_server::governed::GovernedRuntime::new(
+                    iter_mcp_server::substrate::stub::StubRuntime::new(),
+                    iter_mcp_server::policy::PolicyConfig::default(),
+                    iter_mcp_server::economics::EconomicsConfig::default(),
+                ))
+            }
+        }
+    }
+
+    fn mode(&self) -> RuntimeMode {
+        match self {
+            Self::Demo(_) => RuntimeMode::Demo,
+            Self::GovernedLocal(_) => RuntimeMode::GovernedLocal,
+        }
+    }
+
+    fn graph(&self) -> &iter_mcp_server::substrate::stub::StubRuntime {
+        match self {
+            Self::Demo(runtime) => runtime,
+            Self::GovernedLocal(runtime) => runtime.graph(),
+        }
+    }
+
+    fn graph_mut(&mut self) -> &mut iter_mcp_server::substrate::stub::StubRuntime {
+        match self {
+            Self::Demo(runtime) => runtime,
+            Self::GovernedLocal(runtime) => runtime.graph_mut(),
+        }
+    }
+
+    fn evaluate(
+        &mut self,
+        proposal: &iter_mcp_server::substrate::stub::GovernanceProposal,
+    ) -> Result<
+        iter_mcp_server::runtime::GovernanceOutcome,
+        iter_mcp_server::runtime::GovernanceRuntimeError,
+    > {
+        use iter_mcp_server::runtime::GovernanceRuntime as GovernanceRuntimeTrait;
+
+        match self {
+            Self::Demo(runtime) => GovernanceRuntimeTrait::evaluate(runtime, proposal),
+            Self::GovernedLocal(runtime) => GovernanceRuntimeTrait::evaluate(runtime, proposal),
+        }
+    }
+
+    fn preview(
+        &self,
+        proposal: &iter_mcp_server::substrate::stub::GovernanceProposal,
+    ) -> Result<
+        iter_mcp_server::runtime::GovernanceOutcome,
+        iter_mcp_server::runtime::GovernanceRuntimeError,
+    > {
+        use iter_mcp_server::runtime::GovernanceRuntime as GovernanceRuntimeTrait;
+
+        match self {
+            Self::Demo(runtime) => GovernanceRuntimeTrait::preview(runtime, proposal),
+            Self::GovernedLocal(runtime) => GovernanceRuntimeTrait::preview(runtime, proposal),
+        }
+    }
+
+    fn search_decisions(
+        &self,
+        filter: &iter_mcp_server::substrate::stub::AuditSearchFilter,
+    ) -> iter_mcp_server::substrate::stub::AuditSearchResult {
+        use iter_mcp_server::runtime::GovernanceRuntime as GovernanceRuntimeTrait;
+
+        match self {
+            Self::Demo(runtime) => GovernanceRuntimeTrait::search_decisions(runtime, filter),
+            Self::GovernedLocal(runtime) => {
+                GovernanceRuntimeTrait::search_decisions(runtime, filter)
             }
         }
     }
@@ -209,7 +330,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "governance.evaluate",
-            "description": "[DEPRECATED: use decision.check] Stub-mode governance evaluation on the current public server; authoritative SCG-backed runtime pending WO-ITER-RUNTIME-001",
+            "description": "[DEPRECATED: use decision.check] Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. SCG-backed runtime remains pending WO-ITER-RUNTIME-001B",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -223,7 +344,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "decision.check",
-            "description": "Stub-mode governance decision gate on the current public server; authoritative SCG-backed runtime pending WO-ITER-RUNTIME-001",
+            "description": "Governance decision gate. Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. SCG-backed runtime remains pending WO-ITER-RUNTIME-001B",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -237,7 +358,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "decision.preview",
-            "description": "Non-authoritative governance simulation (canonical, Phase 2)",
+            "description": "Governance preview through the active runtime. Demo is non-authoritative; governed-local is read-only but packet-capable on evaluate",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -397,8 +518,8 @@ fn validate_surface(profile: ServerProfile, tools: &[serde_json::Value]) -> Resu
 }
 
 #[cfg(feature = "public_stub")]
-fn handle_stub_request(
-    runtime: &mut iter_mcp_server::substrate::stub::StubRuntime,
+fn handle_request(
+    runtime: &mut ServerRuntime,
     method: &str,
     req: &serde_json::Value,
     profile: ServerProfile,
@@ -441,7 +562,7 @@ fn handle_stub_request(
             let tool_name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
             let empty_args = json!({});
             let args = params.get("arguments").unwrap_or(&empty_args);
-            handle_stub_tool(runtime, tool_name, args, profile)
+            handle_tool(runtime, tool_name, args, profile)
         }
         _ => json!({"error": "Unknown method"}),
     }
@@ -487,14 +608,12 @@ fn parse_governance_proposal(
 }
 
 #[cfg(feature = "public_stub")]
-fn handle_stub_tool(
-    runtime: &mut iter_mcp_server::substrate::stub::StubRuntime,
+fn handle_tool(
+    runtime: &mut ServerRuntime,
     tool: &str,
     args: &serde_json::Value,
     profile: ServerProfile,
 ) -> serde_json::Value {
-    use iter_mcp_server::runtime::GovernanceRuntime as GovernanceRuntimeTrait;
-
     // Reject kernel/graph tools in governance profile.
     if profile == ServerProfile::Governance {
         let is_kernel =
@@ -513,13 +632,13 @@ fn handle_stub_tool(
         "node.create" => {
             let belief = args.get("belief").and_then(|b| b.as_f64()).unwrap_or(0.5);
             let energy = args.get("energy").and_then(|e| e.as_f64()).unwrap_or(100.0);
-            let node = runtime.create_node(belief, energy);
+            let node = runtime.graph_mut().create_node(belief, energy);
             json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
         }
         "node.query" => {
             let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
             let id: u64 = id_str.parse().unwrap_or(0);
-            match runtime.query_node(id) {
+            match runtime.graph().query_node(id) {
                 Some(node) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
                 }
@@ -530,7 +649,7 @@ fn handle_stub_tool(
             let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
             let id: u64 = id_str.parse().unwrap_or(0);
             let delta = args.get("delta").and_then(|d| d.as_f64()).unwrap_or(0.0);
-            match runtime.mutate_node(id, delta) {
+            match runtime.graph_mut().mutate_node(id, delta) {
                 Some(node) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
                 }
@@ -549,7 +668,7 @@ fn handle_stub_tool(
                 .and_then(|d| d.parse().ok())
                 .unwrap_or(0);
             let weight = args.get("weight").and_then(|w| w.as_f64()).unwrap_or(0.5);
-            match runtime.bind_edge(src, dst, weight) {
+            match runtime.graph_mut().bind_edge(src, dst, weight) {
                 Some(edge) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&edge).unwrap()}]})
                 }
@@ -557,17 +676,17 @@ fn handle_stub_tool(
             }
         }
         "edge.propagate" => {
-            let msg = runtime.propagate();
+            let msg = runtime.graph_mut().propagate();
             json!({"content": [{"type": "text", "text": msg}]})
         }
         "governor.status" | "governance.status" | "governor.health" | "governance.health" => {
-            let status = runtime.governor_status();
+            let status = runtime.graph().governor_status();
             json!({"content": [{"type": "text", "text": serde_json::to_string(&status).unwrap()}]})
         }
         "esv.audit" | "audit.export" => {
             let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
             let id: u64 = id_str.parse().unwrap_or(0);
-            match runtime.esv_audit(id) {
+            match runtime.graph().esv_audit(id) {
                 Some(audit) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&audit).unwrap()}]})
                 }
@@ -575,51 +694,15 @@ fn handle_stub_tool(
             }
         }
         "lineage.replay" | "audit.replay" => {
-            let lineage = runtime.lineage_replay();
+            let lineage = runtime.graph().lineage_replay();
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
         "governance.evaluate" | "decision.check" => {
-            // PHASE 0+: Iter-Haltra Bridge with JCS verification
-            // Current public server path remains stub-mode.
-            // Full authoritative SCG-backed evaluation is pending WO-ITER-RUNTIME-001.
-            let proposal_id = args
-                .get("proposal_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string();
-            let state_snapshot_hash = args
-                .get("state_snapshot_hash")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let constraints = args.get("constraints").cloned().unwrap_or(json!({}));
-            let requested_action = args
-                .get("requested_action")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string();
-            // Patch A: JCS canonical bytes and hash
-            let proposal_c14n = args
-                .get("proposal_c14n")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let proposal_hash = args
-                .get("proposal_hash")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            let proposal = parse_governance_proposal(args);
 
-            let proposal = iter_mcp_server::substrate::stub::GovernanceProposal {
-                proposal_id,
-                state_snapshot_hash,
-                constraints,
-                requested_action,
-                proposal_c14n,
-                proposal_hash,
-            };
-
-            match runtime.evaluate_governance(&proposal) {
-                Ok(evaluation) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&evaluation).unwrap()}]})
+            match runtime.evaluate(&proposal) {
+                Ok(outcome) => {
+                    json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
                 }
                 Err(e) => {
                     json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
@@ -628,7 +711,7 @@ fn handle_stub_tool(
         }
         "decision.preview" => {
             let proposal = parse_governance_proposal(args);
-            match GovernanceRuntimeTrait::preview(runtime, &proposal) {
+            match runtime.preview(&proposal) {
                 Ok(outcome) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
                 }
@@ -640,7 +723,7 @@ fn handle_stub_tool(
         "audit.search" => {
             let filter: iter_mcp_server::substrate::stub::AuditSearchFilter =
                 serde_json::from_value(args.clone()).unwrap_or_default();
-            let result = GovernanceRuntimeTrait::search_decisions(runtime, &filter);
+            let result = runtime.search_decisions(&filter);
             json!({"content": [{"type": "text", "text": serde_json::to_string(&result).unwrap()}]})
         }
         _ => json!({"error": {"code": 3000, "message": "Unknown tool"}}),

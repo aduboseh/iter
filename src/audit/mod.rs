@@ -26,6 +26,8 @@ use crate::contracts::{
 /// - Energy snapshot
 /// - Reasoning signature
 /// - Learning audit (status, hashes, scarcity streak)
+/// - Governance artifact binding
+/// - Ordered execution trace
 /// - Policy snapshot (hash, evaluated rules, decision, reason codes)
 /// - Permits/budgets if used
 /// - Checksum over the packet
@@ -51,6 +53,12 @@ pub struct DecisionPacket {
     pub permit_hash: Option<String>,
     /// Economics config hash
     pub economics_hash: String,
+    /// Canonical governance hash bound to this packet, if available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governance_hash: Option<String>,
+    /// Ordered evaluation trace. Empty when no trace has been attached.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_trace: Vec<String>,
     /// Evaluated rule IDs (ordered)
     pub evaluated_rules: Vec<String>,
     /// SHA-256 checksum of packet (excluding this field)
@@ -80,6 +88,8 @@ impl DecisionPacket {
             policy: state.policy.clone(),
             permit_hash,
             economics_hash,
+            governance_hash: None,
+            execution_trace: Vec::new(),
             evaluated_rules,
             checksum: String::new(),
         };
@@ -122,9 +132,30 @@ impl DecisionPacket {
         self.policy.decision
     }
 
+    /// Attach deterministic governance metadata and refresh the packet checksum.
+    pub(crate) fn bind_governance_context(
+        &mut self,
+        governance_hash: String,
+        execution_trace: Vec<String>,
+    ) {
+        self.governance_hash = Some(governance_hash);
+        self.execution_trace = execution_trace;
+        self.checksum = self.compute_checksum();
+    }
+
     /// Check if learning was committed.
     pub fn learning_committed(&self) -> bool {
         self.learning.status == crate::contracts::LearningStatus::Committed
+    }
+
+    /// Governance hash attached to this packet, if available.
+    pub fn governance_hash(&self) -> Option<&str> {
+        self.governance_hash.as_deref()
+    }
+
+    /// Ordered execution trace carried by this packet.
+    pub fn execution_trace(&self) -> &[String] {
+        &self.execution_trace
     }
 
     /// Get reason codes for decision.
@@ -163,6 +194,8 @@ pub struct AuditEvent {
     pub tick: u64,
     /// Decision ID (packet checksum)
     pub decision_id: String,
+    /// Policy decision outcome.
+    pub decision: String,
     /// Capsule hash (if learning involved)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capsule_hash: Option<String>,
@@ -188,6 +221,13 @@ impl AuditEvent {
             sequence,
             tick: packet.tick,
             decision_id: packet.checksum.clone(),
+            decision: match packet.policy.decision {
+                PolicyDecision::Allow => "ALLOW".to_string(),
+                PolicyDecision::Deny => "DENY".to_string(),
+                PolicyDecision::FreezeLearning => "FREEZE_LEARNING".to_string(),
+                PolicyDecision::DegradedMode => "DEGRADED_MODE".to_string(),
+                PolicyDecision::RequireReview => "REQUIRE_REVIEW".to_string(),
+            },
             capsule_hash: if packet.learning.capsule_id.is_empty() {
                 None
             } else {
@@ -207,6 +247,7 @@ impl AuditEvent {
             "sequence": self.sequence,
             "tick": self.tick,
             "decision_id": self.decision_id,
+            "decision": self.decision,
             "capsule_hash": self.capsule_hash,
             "learning_status": self.learning_status,
             "reason_codes": self.reason_codes,

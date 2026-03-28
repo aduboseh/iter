@@ -253,12 +253,23 @@
       ],
       "description": "Energy snapshot"
     },
+    "execution_trace": {
+      "description": "Ordered evaluation trace. Omitted when no trace is attached.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "evaluated_rules": {
       "description": "Evaluated rule IDs (ordered)",
       "items": {
         "type": "string"
       },
       "type": "array"
+    },
+    "governance_hash": {
+      "description": "Canonical governance hash bound to this packet, if available.",
+      "type": "string"
     },
     "iter_build_hash": {
       "description": "Iter build hash (compile-time)",

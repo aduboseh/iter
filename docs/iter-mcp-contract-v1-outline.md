@@ -27,7 +27,7 @@ All public MCP tools follow these canonical families:
 
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
-| `decision.check` | `governance.evaluate` | 1 (alias) | Authoritative PDP gate. Evaluates governance proposal and returns verdict (ALLOW/DENY). |
+| `decision.check` | `governance.evaluate` | 1 (alias) | Governance decision gate. Default runtime is demo/non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. |
 || `decision.preview` | **ACTIVE** | 2 | Non-authoritative simulation. Returns projected decision without committing. |
 | `decision.explain` | *(to be added)* | 3 | Structured explanation of decision rationale with policy trace. |
 
@@ -113,6 +113,10 @@ Immutable governance decision artifact.
   "timestamp": "<iso8601>"
 }
 ```
+
+**Optional Fields (runtime-dependent):**
+- `governance_hash` — canonical mirrored governance hash when the active runtime binds governance identity into the packet
+- `execution_trace` — ordered evaluation trace when the active runtime exposes deterministic trace data
 
 **PEP Statement:**
 > Iter does not enforce obligations. Obligations are advisory only; enforcement is the responsibility of the Policy Enforcement Point (PEP) caller.
@@ -215,7 +219,8 @@ audit.search(time_range=[T1, T2], principal="alice")
 - DecisionPacket MUST have:
   - Matching checksum
   - Valid version
-  - Timestamp within acceptable drift window
+  - Governance hash when emitted by a governed runtime
+  - Ordered execution trace when emitted by a governed runtime
 
 ### Invariant 4: Checksum Stability
 - `decision.check` invoked with identical inputs MUST produce identical checksums.
