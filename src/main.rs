@@ -16,10 +16,13 @@ enum ServerProfile {
 /// - `Demo`: Default public stub behavior.
 /// - `GovernedLocal`: Governed runtime over the local stub substrate. Emits
 ///   DecisionPackets, but is not yet SCG-backed.
+/// - `ScgBacked`: Reserved authoritative mode. Fails closed until a real SCG
+///   connector contract exists in the public repo.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RuntimeMode {
     Demo,
     GovernedLocal,
+    ScgBacked,
 }
 
 /// Parse --profile flag from CLI args. Default: Governance.
@@ -41,6 +44,7 @@ fn detect_profile(args: &[String]) -> ServerProfile {
 fn detect_runtime_mode(args: &[String]) -> RuntimeMode {
     let runtime_arg = args.iter().find(|arg| arg.starts_with("--runtime-mode="));
     match runtime_arg.map(|s| s.as_str()) {
+        Some("--runtime-mode=scg-backed") => RuntimeMode::ScgBacked,
         Some("--runtime-mode=governed-local") => RuntimeMode::GovernedLocal,
         Some("--runtime-mode=demo") | None => RuntimeMode::Demo,
         Some(other) => {
@@ -70,7 +74,10 @@ fn main() {
         eprintln!("iter-server runtime mode: {:?}", runtime_mode);
     }
 
-    run_stdio_server(json_only, profile, runtime_mode);
+    if let Err(err) = run_stdio_server(json_only, profile, runtime_mode) {
+        eprintln!("FATAL: {}", err);
+        std::process::exit(1);
+    }
 }
 
 fn print_mode_banner(runtime_mode: RuntimeMode) {
@@ -94,14 +101,24 @@ fn print_mode_banner(runtime_mode: RuntimeMode) {
                 "WARNING: Governed local mode is packet-emitting and replay-capable, but not SCG-backed. See WO-ITER-RUNTIME-001B."
             );
         }
+        RuntimeMode::ScgBacked => {
+            eprintln!("│ ITER: SCG-BACKED MODE REQUESTED                            │");
+            eprintln!("│ Public connector contract not available                    │");
+            eprintln!("│ Startup will fail closed                                   │");
+            eprintln!("└────────────────────────────────────────────────────────────┘");
+        }
     }
     eprintln!();
 }
 
-fn run_stdio_server(json_only: bool, profile: ServerProfile, runtime_mode: RuntimeMode) {
+fn run_stdio_server(
+    json_only: bool,
+    profile: ServerProfile,
+    runtime_mode: RuntimeMode,
+) -> Result<(), iter_mcp_server::runtime::GovernanceRuntimeError> {
     use std::io::BufWriter;
 
-    let mut runtime = ServerRuntime::new(runtime_mode);
+    let mut runtime = ServerRuntime::new(runtime_mode)?;
 
     // Build and validate tool surface before entering server loop (fail-fast).
     let tools_list = build_tools_list(profile);
@@ -184,6 +201,8 @@ fn run_stdio_server(json_only: bool, profile: ServerProfile, runtime_mode: Runti
             }
         }
     }
+
+    Ok(())
 }
 
 enum ServerRuntime {
@@ -192,15 +211,27 @@ enum ServerRuntime {
 }
 
 impl ServerRuntime {
-    fn new(mode: RuntimeMode) -> Self {
+    fn new(mode: RuntimeMode) -> Result<Self, iter_mcp_server::runtime::GovernanceRuntimeError> {
         match mode {
-            RuntimeMode::Demo => Self::Demo(iter_mcp_server::substrate::stub::StubRuntime::new()),
-            RuntimeMode::GovernedLocal => {
-                Self::GovernedLocal(iter_mcp_server::governed::GovernedRuntime::new(
+            RuntimeMode::Demo => Ok(Self::Demo(
+                iter_mcp_server::substrate::stub::StubRuntime::new(),
+            )),
+            RuntimeMode::GovernedLocal => Ok(Self::GovernedLocal(
+                iter_mcp_server::governed::GovernedRuntime::new(
                     iter_mcp_server::substrate::stub::StubRuntime::new(),
                     iter_mcp_server::policy::PolicyConfig::default(),
                     iter_mcp_server::economics::EconomicsConfig::default(),
-                ))
+                ),
+            )),
+            RuntimeMode::ScgBacked => {
+                eprintln!(
+                    "WARNING: ScgBacked mode not available — SCG connector not yet implemented."
+                );
+                Err(
+                    iter_mcp_server::runtime::GovernanceRuntimeError::ModeError {
+                        reason: "scg-backed connector not implemented".to_string(),
+                    },
+                )
             }
         }
     }
