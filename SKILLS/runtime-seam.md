@@ -82,3 +82,15 @@ Execution decision
   - 001B: real SCG-backed boot/runtime integration once the connector exists
 
 DOWNGRADE EXECUTED: 2026-03-27 — full wiring deferred, live-server claims reduced to match the current stub-mode boot path.
+
+001B DOWNGRADE: 2026-03-27
+Reason: no stable public SCG connector contract exists in the Iter repo, the public Cargo manifest carries no scg-* dependency, SCG exposes simulation/energy APIs but no governance packet or execution_trace response contract, and the private iter-internal facade is not a usable public seam.
+ScgBacked mode added as fail-closed stub.
+Real connector deferred pending: an inspectable SCG-backed governance interface with stable request/response signatures, governance identity binding, and SCG-originated deterministic execution_trace data.
+
+001B STATUS: 2026-03-27
+ScgRuntime connector: deferred — no stable public SCG interface or response contract
+ScgBacked mode: fail-closed stub
+Trace-level replay test: deferred — no SCG-originated execution_trace surface exists
+INV-RUNTIME-001 CI guard: pending
+Canonical hash bound at boot: no — connector deferred, so no SCG-backed boot path exists
