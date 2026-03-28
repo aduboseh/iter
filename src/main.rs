@@ -52,6 +52,7 @@ fn print_mode_banner() {
     eprintln!("│ Proprietary substrate DISABLED                             │");
     eprintln!("│ Responses are deterministic placeholders                   │");
     eprintln!("└────────────────────────────────────────────────────────────┘");
+    eprintln!("WARNING: Server running in stub mode. SCG execution path not active. See WO-ITER-RUNTIME-001.");
     eprintln!();
 }
 
@@ -208,7 +209,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "governance.evaluate",
-            "description": "[DEPRECATED: use decision.check] Evaluate governance proposal and return authoritative verdict (PHASE 0: Iter-Haltra Bridge)",
+            "description": "[DEPRECATED: use decision.check] Stub-mode governance evaluation on the current public server; authoritative SCG-backed runtime pending WO-ITER-RUNTIME-001",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -222,7 +223,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "decision.check",
-            "description": "Authoritative PDP decision gate (canonical)",
+            "description": "Stub-mode governance decision gate on the current public server; authoritative SCG-backed runtime pending WO-ITER-RUNTIME-001",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -579,8 +580,8 @@ fn handle_stub_tool(
         }
         "governance.evaluate" | "decision.check" => {
             // PHASE 0+: Iter-Haltra Bridge with JCS verification
-            // This is the authoritative governance entry point.
-            // Haltra proposes, Iter decides.
+            // Current public server path remains stub-mode.
+            // Full authoritative SCG-backed evaluation is pending WO-ITER-RUNTIME-001.
             let proposal_id = args
                 .get("proposal_id")
                 .and_then(|v| v.as_str())

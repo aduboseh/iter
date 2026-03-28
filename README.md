@@ -14,12 +14,12 @@
 
 Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) for deterministic governance evaluation.
 
-Iter operates in two modes:
+Iter currently exposes one live public server mode and one in-crate governed runtime implementation:
 
-- **Demo mode** (default): Threshold-based governance using stub graph state. Non-authoritative — `authoritative_pdp=false`, `replay_sufficient=false`, no `DecisionPacket` at the MCP edge. Suitable for protocol validation and integration testing.
-- **Governed mode**: PolicyEvaluator-based governance with typed contract envelopes. Authoritative PDP — `authoritative_pdp=true`, `replay_sufficient=true`, emits `DecisionPacket` with RFC 8785 JCS checksums.
+- **Public server mode** (current `iter-server` boot path): Threshold-based governance using stub graph state. Non-authoritative — `authoritative_pdp=false`, `replay_sufficient=false`, no `DecisionPacket` at the MCP edge. Suitable for protocol validation and integration testing.
+- **Governed runtime implementation** (library/test surface, not the current public server boot path): PolicyEvaluator-based governance with typed contract envelopes. Authoritative PDP — `authoritative_pdp=true`, `replay_sufficient=true`, emits `DecisionPacket` with RFC 8785 JCS checksums.
 
-**MCP is the transport. Governance mode determines what claims are valid.**
+**MCP is the transport. The current public server still runs in stub mode; full governed execution via the SCG substrate is pending WO-ITER-RUNTIME-001.**
 
 ---
 
@@ -98,7 +98,7 @@ If the mirrored governance artifact drifts from SCG, CI fails closed.
 
 ### GovernanceOutcome
 
-All MCP decision endpoints (`decision.check`, `decision.preview`, `audit.search`) return a `GovernanceOutcome` containing:
+The governed runtime implementation is centered on a `GovernanceOutcome` containing:
 - `verdict` (ALLOW / BLOCK / REVIEW)
 - `mode` (demo / governed)
 - `authoritative_pdp` (true only in governed mode)
@@ -106,9 +106,11 @@ All MCP decision endpoints (`decision.check`, `decision.preview`, `audit.search`
 - `reason_codes` (namespaced: `demo.thresholds.*` or `policy.*`)
 - `packet` (DecisionPacket, governed evaluate only)
 
+Current public server status: `decision.preview` exposes the documented governance metadata surface, but live `decision.check` on the public boot path remains stub-mode pending WO-ITER-RUNTIME-001.
+
 ### DecisionPacket (governed mode only)
 
-In governed mode, `decision.check` emits a `DecisionPacket` — a replay-sufficient, immutable record containing everything required to reconstruct the governance outcome.
+In the governed runtime implementation, `decision.check` emits a `DecisionPacket` — a replay-sufficient, immutable record containing everything required to reconstruct the governance outcome. This is not yet the behavior of the current public `iter-server` boot path.
 
 Each packet includes:
 - System state snapshot (energy, reasoning, learning, policy envelopes)
@@ -136,16 +138,16 @@ DecisionPackets are **deterministic by construction**:
 
 The MCP surface is intentionally small. All tools are deterministic, side-effect constrained, and auditable.
 
-### Governance Profile (Production)
+### Governance Profile (Server Surface)
 
 The following tools are available when Iter is run with `--profile=governance`.
 
-All authoritative governance, replay, and audit guarantees apply **only** to this profile.
+Current public server note: `--profile=governance` constrains tool exposure but still boots the stub runtime today. Full authoritative governed execution via SCG remains pending WO-ITER-RUNTIME-001.
 
 #### Governance & Audit
 | Tool | Description |
 |------|-------------|
-| decision.check | Governance evaluation (canonical) |
+| decision.check | Stub-mode governance evaluation on the current public server; authoritative runtime seam pending WO-ITER-RUNTIME-001 |
 | decision.preview | Non-authoritative simulation |
 | audit.search | Search governance decision history |
 | audit.export | Export DecisionPacket (canonical) |
