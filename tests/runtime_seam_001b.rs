@@ -1,7 +1,7 @@
 use std::process::{Command, Stdio};
 
 #[test]
-fn scg_backed_mode_fails_closed_without_connector() {
+fn scgbacked_mode_fails_closed_without_connector() {
     let bin_path = env!("CARGO_BIN_EXE_iter-server");
     let output = Command::new(bin_path)
         .arg("--json-only")
