@@ -1,6 +1,66 @@
-//! Build script to validate substrate availability in full mode.
+//! Build script to validate substrate availability and vendored contract integrity.
+
+use std::io::Read;
+
+fn sha256_file(path: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut file = std::fs::File::open(path)
+        .unwrap_or_else(|e| panic!("INTEGRITY: cannot open {}: {}", path, e));
+    let mut contents = Vec::new();
+    file.read_to_end(&mut contents)
+        .unwrap_or_else(|e| panic!("INTEGRITY: cannot read {}: {}", path, e));
+
+    let mut hasher = Sha256::new();
+    hasher.update(&contents);
+    hex::encode(hasher.finalize())
+}
 
 fn main() {
+    println!("cargo:rerun-if-changed=vendor/governance-bridge/src/contract.rs");
+    println!("cargo:rerun-if-changed=vendor/governance-bridge/src/trace.rs");
+    println!("cargo:rerun-if-changed=vendor/governance-bridge/src/errors.rs");
+    println!("cargo:rerun-if-changed=vendor/governance-bridge/src/lib.rs");
+
+    let expected: &[(&str, &str)] = &[
+        (
+            "vendor/governance-bridge/src/contract.rs",
+            "f80501527f9cff1abccf4226afca9cd949f8f44fbc774460c440a26d3ec28605",
+        ),
+        (
+            "vendor/governance-bridge/src/trace.rs",
+            "fb7c80bc8afe0f88f4dc2cfc95abea220879bbe5649c9cc44eeadf0c40f1846e",
+        ),
+        (
+            "vendor/governance-bridge/src/errors.rs",
+            "d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af",
+        ),
+        (
+            "vendor/governance-bridge/src/lib.rs",
+            "d508e6c4fa515761fa052e844ca51434dfd8971aaa3fab3a5d7c118787bbf8ac",
+        ),
+    ];
+
+    let mut failed = false;
+    for (path, expected_hash) in expected {
+        let actual = sha256_file(path);
+        if actual != *expected_hash {
+            println!(
+                "cargo:warning=GOVERNANCE INTEGRITY VIOLATION: {} hash mismatch",
+                path
+            );
+            println!("cargo:warning=  expected: {}", expected_hash);
+            println!("cargo:warning=  actual:   {}", actual);
+            failed = true;
+        }
+    }
+
+    if failed {
+        panic!(
+            "Vendor governance-bridge integrity check failed. The vendored contract does not match the canonical SCG source. To update intentionally: recompute hashes in build.rs and update vendor/governance-bridge/PROVENANCE.md with the new commit and hash."
+        );
+    }
+
     // Only check for substrate in full mode (not when public_stub is enabled)
     #[cfg(all(feature = "full_substrate", not(feature = "public_stub")))]
     {

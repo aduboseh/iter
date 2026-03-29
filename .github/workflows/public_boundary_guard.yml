@@ -94,6 +94,21 @@ jobs:
             exit 1
           fi
 
+      - name: INV-VENDOR-001 — reject floating git deps
+        run: |
+          if grep -E 'git\s*=\s*".*SCG' Cargo.toml; then
+            echo "INVARIANT VIOLATION INV-VENDOR-001: floating git dep to SCG found"
+            echo "Use vendored path dep under vendor/ instead"
+            exit 1
+          fi
+
+      - name: INV-VENDOR-002 — vendor provenance file must exist
+        run: |
+          if [ ! -f vendor/governance-bridge/PROVENANCE.md ]; then
+            echo "INVARIANT VIOLATION INV-VENDOR-002: PROVENANCE.md missing from vendor"
+            exit 1
+          fi
+
       # ================================================================
       # Build verification
       # ================================================================
