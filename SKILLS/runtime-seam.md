@@ -94,3 +94,16 @@ ScgBacked mode: fail-closed stub
 Trace-level replay test: deferred — no SCG-originated execution_trace surface exists
 INV-RUNTIME-001 CI guard: pending
 Canonical hash bound at boot: no — connector deferred, so no SCG-backed boot path exists
+
+001B-RETRY STATUS: 2026-03-29
+src/scg_connector.rs: created
+ScgRuntime::connect(): implemented
+Four fail-closed checks: all present
+governance_hash boot load: yes
+execution_trace from SCG: yes
+AuditEvent.decision field: yes
+replay_trace_is_identical test: passing
+contract_version check: present
+governance_hash mismatch check: present
+verify_replay_id check: present
+SCG↔Iter seam: CLOSED

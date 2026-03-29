@@ -16,8 +16,7 @@ enum ServerProfile {
 /// - `Demo`: Default public stub behavior.
 /// - `GovernedLocal`: Governed runtime over the local stub substrate. Emits
 ///   DecisionPackets, but is not yet SCG-backed.
-/// - `ScgBacked`: Reserved authoritative mode. Fails closed until a real SCG
-///   connector contract exists in the public repo.
+/// - `ScgBacked`: Authoritative mode backed by the live SCG governance endpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RuntimeMode {
     Demo,
@@ -102,9 +101,10 @@ fn print_mode_banner(runtime_mode: RuntimeMode) {
             );
         }
         RuntimeMode::ScgBacked => {
-            eprintln!("│ ITER: SCG-BACKED MODE REQUESTED                            │");
-            eprintln!("│ Public connector contract not available                    │");
-            eprintln!("│ Startup will fail closed                                   │");
+            eprintln!("│ ITER: SCG-BACKED GOVERNED RUNTIME                          │");
+            eprintln!("│ POST /governance/evaluate — fail-closed                    │");
+            eprintln!("│ governance_hash bound at boot                              │");
+            eprintln!("│ replay integrity verified on every response                │");
             eprintln!("└────────────────────────────────────────────────────────────┘");
         }
     }
@@ -208,6 +208,7 @@ fn run_stdio_server(
 enum ServerRuntime {
     Demo(iter_mcp_server::substrate::stub::StubRuntime),
     GovernedLocal(iter_mcp_server::governed::GovernedRuntime),
+    ScgBacked(iter_mcp_server::scg_connector::ScgRuntime),
 }
 
 impl ServerRuntime {
@@ -224,14 +225,37 @@ impl ServerRuntime {
                 ),
             )),
             RuntimeMode::ScgBacked => {
-                eprintln!(
-                    "WARNING: ScgBacked mode not available — SCG connector not yet implemented."
-                );
-                Err(
-                    iter_mcp_server::runtime::GovernanceRuntimeError::ModeError {
-                        reason: "scg-backed connector not implemented".to_string(),
-                    },
-                )
+                let endpoint = std::env::var("SCG_ENDPOINT").map_err(|_| {
+                    iter_mcp_server::runtime::GovernanceRuntimeError::ConfigMissing(
+                        "SCG_ENDPOINT".to_string(),
+                    )
+                })?;
+                let hash_path = std::env::var("SCG_GOVERNANCE_HASH_PATH")
+                    .unwrap_or_else(|_| "governance/governance.hash".to_string());
+                let boot_hash = std::fs::read_to_string(&hash_path)
+                    .map_err(|e| {
+                        iter_mcp_server::runtime::GovernanceRuntimeError::ConfigMissing(format!(
+                            "governance.hash not found at {}: {}",
+                            hash_path, e
+                        ))
+                    })?
+                    .trim()
+                    .to_string();
+
+                if boot_hash.is_empty() {
+                    return Err(
+                        iter_mcp_server::runtime::GovernanceRuntimeError::ConfigMissing(
+                            "governance.hash is empty".to_string(),
+                        ),
+                    );
+                }
+
+                Ok(Self::ScgBacked(
+                    iter_mcp_server::scg_connector::ScgRuntime::connect(
+                        endpoint,
+                        std::sync::Arc::new(boot_hash),
+                    )?,
+                ))
             }
         }
     }
@@ -240,6 +264,7 @@ impl ServerRuntime {
         match self {
             Self::Demo(_) => RuntimeMode::Demo,
             Self::GovernedLocal(_) => RuntimeMode::GovernedLocal,
+            Self::ScgBacked(_) => RuntimeMode::ScgBacked,
         }
     }
 
@@ -247,6 +272,7 @@ impl ServerRuntime {
         match self {
             Self::Demo(runtime) => runtime,
             Self::GovernedLocal(runtime) => runtime.graph(),
+            Self::ScgBacked(runtime) => runtime.graph(),
         }
     }
 
@@ -254,6 +280,7 @@ impl ServerRuntime {
         match self {
             Self::Demo(runtime) => runtime,
             Self::GovernedLocal(runtime) => runtime.graph_mut(),
+            Self::ScgBacked(runtime) => runtime.graph_mut(),
         }
     }
 
@@ -269,6 +296,7 @@ impl ServerRuntime {
         match self {
             Self::Demo(runtime) => GovernanceRuntimeTrait::evaluate(runtime, proposal),
             Self::GovernedLocal(runtime) => GovernanceRuntimeTrait::evaluate(runtime, proposal),
+            Self::ScgBacked(runtime) => GovernanceRuntimeTrait::evaluate(runtime, proposal),
         }
     }
 
@@ -284,6 +312,7 @@ impl ServerRuntime {
         match self {
             Self::Demo(runtime) => GovernanceRuntimeTrait::preview(runtime, proposal),
             Self::GovernedLocal(runtime) => GovernanceRuntimeTrait::preview(runtime, proposal),
+            Self::ScgBacked(runtime) => GovernanceRuntimeTrait::preview(runtime, proposal),
         }
     }
 
@@ -298,6 +327,7 @@ impl ServerRuntime {
             Self::GovernedLocal(runtime) => {
                 GovernanceRuntimeTrait::search_decisions(runtime, filter)
             }
+            Self::ScgBacked(runtime) => GovernanceRuntimeTrait::search_decisions(runtime, filter),
         }
     }
 }

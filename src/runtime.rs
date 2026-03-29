@@ -167,6 +167,21 @@ pub enum GovernanceRuntimeError {
         /// Human-readable description of the mode error.
         reason: String,
     },
+    /// SCG endpoint unavailable or returned a non-success transport status.
+    #[error("SCG unavailable: {0}")]
+    ScgUnavailable(String),
+    /// SCG contract version did not match the expected value.
+    #[error("contract version mismatch: {0}")]
+    ContractVersionMismatch(String),
+    /// SCG replay integrity verification failed.
+    #[error("replay integrity violation: {0}")]
+    ReplayIntegrityViolation(String),
+    /// SCG governance hash did not match the boot-loaded canonical hash.
+    #[error("governance hash mismatch: {0}")]
+    GovernanceHashMismatch(String),
+    /// Required runtime configuration was missing.
+    #[error("configuration missing: {0}")]
+    ConfigMissing(String),
 }
 
 /// Replay a DecisionPacket and verify it is still valid.

@@ -62,6 +62,10 @@ pub mod runtime;
 #[cfg(feature = "public_stub")]
 pub mod governed;
 
+/// ScgRuntime — authoritative connector to the live SCG governance endpoint.
+#[cfg(feature = "public_stub")]
+pub mod scg_connector;
+
 // ============================================================================
 // Public Stub Module (demonstration mode)
 // ============================================================================
