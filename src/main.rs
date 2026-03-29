@@ -251,10 +251,7 @@ impl ServerRuntime {
                 }
 
                 Ok(Self::ScgBacked(
-                    iter_mcp_server::scg_connector::ScgRuntime::connect(
-                        endpoint,
-                        std::sync::Arc::new(boot_hash),
-                    )?,
+                    iter_mcp_server::scg_connector::ScgRuntime::connect(endpoint, boot_hash)?,
                 ))
             }
         }

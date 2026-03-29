@@ -1,8 +1,8 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use scg_governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, CONTRACT_VERSION_STR,
@@ -100,6 +100,7 @@ struct MockHttpResponse {
 
 struct MockScgServer {
     endpoint: String,
+    expected_requests: usize,
     handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -107,12 +108,13 @@ impl MockScgServer {
     fn spawn(responses: Vec<MockHttpResponse>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock SCG");
         let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+        let expected_requests = responses.len();
 
         let handle = thread::spawn(move || {
             for response in responses {
                 let (mut stream, _) = listener.accept().expect("accept");
                 stream
-                    .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                    .set_read_timeout(Some(Duration::from_secs(2)))
                     .expect("read timeout");
 
                 let _ = read_http_request(&mut stream);
@@ -139,6 +141,7 @@ impl MockScgServer {
 
         Self {
             endpoint,
+            expected_requests,
             handle: Some(handle),
         }
     }
@@ -150,6 +153,16 @@ impl MockScgServer {
 
 impl Drop for MockScgServer {
     fn drop(&mut self) {
+        for _ in 0..self.expected_requests {
+            if let Ok(mut stream) =
+                std::net::TcpStream::connect(self.endpoint.trim_start_matches("http://"))
+            {
+                let _ = stream.write_all(
+                    b"POST /governance/evaluate HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                );
+                let _ = stream.flush();
+            }
+        }
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
         }
@@ -273,7 +286,7 @@ fn scg_outcome(
 }
 
 fn runtime_for(endpoint: &str, hash: &str) -> ScgRuntime {
-    ScgRuntime::connect(endpoint.to_string(), Arc::new(hash.to_string())).expect("connect runtime")
+    ScgRuntime::connect(endpoint.to_string(), hash.to_string()).expect("connect runtime")
 }
 
 #[test]
@@ -375,10 +388,7 @@ fn replay_trace_is_identical_not_just_output() {
 
 #[test]
 fn governance_hash_absent_fails_boot() {
-    let result = ScgRuntime::connect(
-        "http://127.0.0.1:18080".to_string(),
-        Arc::new(String::new()),
-    );
+    let result = ScgRuntime::connect("http://127.0.0.1:18080".to_string(), String::new());
     assert!(matches!(
         result,
         Err(GovernanceRuntimeError::ConfigMissing(_))
@@ -387,7 +397,7 @@ fn governance_hash_absent_fails_boot() {
 
 #[test]
 fn scg_endpoint_absent_fails_boot() {
-    let result = ScgRuntime::connect(String::new(), Arc::new(GOVERNANCE_HASH.trim().to_string()));
+    let result = ScgRuntime::connect(String::new(), GOVERNANCE_HASH.trim().to_string());
     assert!(matches!(
         result,
         Err(GovernanceRuntimeError::ConfigMissing(_))

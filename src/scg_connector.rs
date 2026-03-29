@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use reqwest::blocking::Client;
 use scg_governance_bridge::contract::{
@@ -28,29 +29,29 @@ pub struct ScgRuntime {
 
 impl ScgRuntime {
     /// Construct a fail-closed connector to the live SCG governance endpoint.
-    pub fn connect(
-        endpoint: String,
-        boot_hash: Arc<String>,
-    ) -> Result<Self, GovernanceRuntimeError> {
+    pub fn connect(endpoint: String, boot_hash: String) -> Result<Self, GovernanceRuntimeError> {
         let endpoint = endpoint.trim().trim_end_matches('/').to_string();
+        let boot_hash = boot_hash.trim().to_string();
         if endpoint.is_empty() {
             return Err(GovernanceRuntimeError::ConfigMissing(
                 "SCG_ENDPOINT".to_string(),
             ));
         }
-        if boot_hash.trim().is_empty() {
+        if boot_hash.is_empty() {
             return Err(GovernanceRuntimeError::ConfigMissing(
                 "governance_hash".to_string(),
             ));
         }
 
         let http_client = Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| GovernanceRuntimeError::ScgUnavailable(e.to_string()))?;
 
         Ok(Self {
             endpoint,
-            boot_governance_hash: Arc::new(boot_hash.trim().to_string()),
+            boot_governance_hash: Arc::new(boot_hash),
             http_client,
             graph: StubRuntime::new(),
             audit_log: AuditLog::new(),
@@ -260,6 +261,8 @@ impl ScgRuntime {
             policy,
         );
 
+        // decision_id is content-addressed: identical inputs produce identical IDs.
+        // That is the replay guarantee, not a collision bug.
         let mut packet = DecisionPacket::new(
             env!("CARGO_PKG_VERSION").to_string(),
             outcome.governance_hash.clone(),
@@ -327,6 +330,8 @@ impl GovernanceRuntime for ScgRuntime {
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
         let limit = filter.limit.unwrap_or(100).clamp(1, 1000) as usize;
 
+        // Supported filters: decision, limit.
+        // Other AuditSearchFilter fields are deferred to WO-ITER-SURFACE-001.
         let results: Vec<DecisionSummary> = self
             .audit_log
             .events()
