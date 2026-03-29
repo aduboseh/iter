@@ -208,7 +208,7 @@ fn run_stdio_server(
 enum ServerRuntime {
     Demo(iter_mcp_server::substrate::stub::StubRuntime),
     GovernedLocal(iter_mcp_server::governed::GovernedRuntime),
-    ScgBacked(iter_mcp_server::scg_connector::ScgRuntime),
+    ScgBacked(iter_mcp_server::governance_connector::ScgRuntime),
 }
 
 impl ServerRuntime {
@@ -251,7 +251,9 @@ impl ServerRuntime {
                 }
 
                 Ok(Self::ScgBacked(
-                    iter_mcp_server::scg_connector::ScgRuntime::connect(endpoint, boot_hash)?,
+                    iter_mcp_server::governance_connector::ScgRuntime::connect(
+                        endpoint, boot_hash,
+                    )?,
                 ))
             }
         }

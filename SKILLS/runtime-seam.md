@@ -96,7 +96,7 @@ INV-RUNTIME-001 CI guard: pending
 Canonical hash bound at boot: no — connector deferred, so no SCG-backed boot path exists
 
 001B-RETRY STATUS: 2026-03-29
-src/scg_connector.rs: created
+src/governance_connector.rs: created
 ScgRuntime::connect(): implemented
 Four fail-closed checks: all present
 governance_hash boot load: yes

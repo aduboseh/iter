@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::blocking::Client;
-use scg_governance_bridge::contract::{
+use governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, GovernanceRequest,
     CONTRACT_VERSION_STR,
 };
+use reqwest::blocking::Client;
 
 use crate::audit::{AuditLog, DecisionPacket};
 use crate::contracts::{PolicyDecision, PolicyEnvelope, SystemState};
@@ -121,7 +121,7 @@ impl ScgRuntime {
         }
     }
 
-    fn fetch_scg_outcome(
+    fn fetch_outcome(
         &self,
         proposal: &GovernanceProposal,
     ) -> Result<ScgGovernanceOutcome, GovernanceRuntimeError> {
@@ -217,18 +217,18 @@ impl ScgRuntime {
 
     fn runtime_reason_codes(decision: ScgDecision) -> Vec<ReasonCode> {
         let suffix = match decision {
-            ScgDecision::Allow => "scg_allow",
-            ScgDecision::Deny => "scg_deny",
-            ScgDecision::Escalate => "scg_escalate",
+            ScgDecision::Allow => "governance_allow",
+            ScgDecision::Deny => "governance_deny",
+            ScgDecision::Escalate => "governance_escalate",
         };
         vec![ReasonCode::policy(suffix)]
     }
 
     fn packet_reason_codes(decision: ScgDecision) -> Vec<String> {
         let reason = match decision {
-            ScgDecision::Allow => "policy.scg_allow",
-            ScgDecision::Deny => "policy.scg_deny",
-            ScgDecision::Escalate => "policy.scg_escalate",
+            ScgDecision::Allow => "policy.governance_allow",
+            ScgDecision::Deny => "policy.governance_deny",
+            ScgDecision::Escalate => "policy.governance_escalate",
         };
         vec![reason.to_string()]
     }
@@ -313,7 +313,7 @@ impl GovernanceRuntime for ScgRuntime {
         &mut self,
         proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
-        let outcome = self.fetch_scg_outcome(proposal)?;
+        let outcome = self.fetch_outcome(proposal)?;
         let packet = self.build_packet(&outcome)?;
         self.audit_log.append(&packet);
         Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
@@ -323,7 +323,7 @@ impl GovernanceRuntime for ScgRuntime {
         &self,
         proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
-        let outcome = self.fetch_scg_outcome(proposal)?;
+        let outcome = self.fetch_outcome(proposal)?;
         Ok(Self::build_runtime_outcome(&outcome, None, false))
     }
 

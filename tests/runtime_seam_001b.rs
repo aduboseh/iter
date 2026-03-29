@@ -4,14 +4,14 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
-use scg_governance_bridge::contract::{
+use governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, CONTRACT_VERSION_STR,
 };
-use scg_governance_bridge::trace::{ExecutionTrace, TraceStep};
+use governance_bridge::trace::{ExecutionTrace, TraceStep};
 use serde_json::{json, Value};
 
+use iter_mcp_server::governance_connector::ScgRuntime;
 use iter_mcp_server::runtime::{GovernanceRuntime, GovernanceRuntimeError};
-use iter_mcp_server::scg_connector::ScgRuntime;
 use iter_mcp_server::substrate::stub::GovernanceProposal;
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
@@ -24,7 +24,7 @@ struct McpTestClient {
 }
 
 impl McpTestClient {
-    fn spawn_scg_backed(endpoint: &str) -> Self {
+    fn spawn_governed_backed(endpoint: &str) -> Self {
         let bin_path = env!("CARGO_BIN_EXE_iter-server");
         let governance_hash_path =
             format!("{}/governance/governance.hash", env!("CARGO_MANIFEST_DIR"));
@@ -259,7 +259,7 @@ fn make_trace() -> ExecutionTrace {
     ])
 }
 
-fn scg_outcome(
+fn contract_outcome(
     contract_version: &str,
     decision: ScgDecision,
     governance_hash: &str,
@@ -290,10 +290,10 @@ fn runtime_for(endpoint: &str, hash: &str) -> ScgRuntime {
 }
 
 #[test]
-fn scg_backed_mode_emits_governed_packet() {
+fn governed_backed_mode_emits_governed_packet() {
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
-        body: serde_json::to_string(&scg_outcome(
+        body: serde_json::to_string(&contract_outcome(
             CONTRACT_VERSION_STR,
             ScgDecision::Allow,
             GOVERNANCE_HASH.trim(),
@@ -302,7 +302,7 @@ fn scg_backed_mode_emits_governed_packet() {
         .expect("serialize outcome"),
     }]);
 
-    let mut client = McpTestClient::spawn_scg_backed(server.endpoint());
+    let mut client = McpTestClient::spawn_governed_backed(server.endpoint());
     let outcome = client.extract_tool_json("decision.check", proposal_args());
     let packet = outcome.get("packet").expect("packet");
 
@@ -346,7 +346,7 @@ fn scg_backed_mode_emits_governed_packet() {
 }
 
 #[test]
-fn scg_unavailable_returns_explicit_error() {
+fn governance_endpoint_unavailable_returns_explicit_error() {
     let mut runtime = runtime_for("http://127.0.0.1:1", GOVERNANCE_HASH.trim());
     let err = runtime.evaluate(&proposal()).expect_err("scg unavailable");
     assert!(matches!(err, GovernanceRuntimeError::ScgUnavailable(_)));
@@ -354,7 +354,7 @@ fn scg_unavailable_returns_explicit_error() {
 
 #[test]
 fn replay_trace_is_identical_not_just_output() {
-    let body = serde_json::to_string(&scg_outcome(
+    let body = serde_json::to_string(&contract_outcome(
         CONTRACT_VERSION_STR,
         ScgDecision::Allow,
         GOVERNANCE_HASH.trim(),
@@ -396,7 +396,7 @@ fn governance_hash_absent_fails_boot() {
 }
 
 #[test]
-fn scg_endpoint_absent_fails_boot() {
+fn endpoint_absent_fails_boot() {
     let result = ScgRuntime::connect(String::new(), GOVERNANCE_HASH.trim().to_string());
     assert!(matches!(
         result,
@@ -408,7 +408,7 @@ fn scg_endpoint_absent_fails_boot() {
 fn contract_version_mismatch_fails_closed() {
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
-        body: serde_json::to_string(&scg_outcome(
+        body: serde_json::to_string(&contract_outcome(
             "scg.v0",
             ScgDecision::Allow,
             GOVERNANCE_HASH.trim(),
@@ -429,7 +429,7 @@ fn contract_version_mismatch_fails_closed() {
 fn governance_hash_mismatch_fails_closed() {
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
-        body: serde_json::to_string(&scg_outcome(
+        body: serde_json::to_string(&contract_outcome(
             CONTRACT_VERSION_STR,
             ScgDecision::Allow,
             &"f".repeat(64),
@@ -450,7 +450,7 @@ fn governance_hash_mismatch_fails_closed() {
 fn replay_integrity_violation_fails_closed() {
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
-        body: serde_json::to_string(&scg_outcome(
+        body: serde_json::to_string(&contract_outcome(
             CONTRACT_VERSION_STR,
             ScgDecision::Allow,
             GOVERNANCE_HASH.trim(),

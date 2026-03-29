@@ -59,7 +59,7 @@ schemars = { version = "0.8", optional = true }
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
-scg-governance-bridge = { git = "https://github.com/aduboseh/SCG.git", rev = "5221a59c2baee6581c927ac1a6d50775c3f1b2c3" }
+governance-bridge = { package = "scg-governance-bridge", path = "vendor/governance-bridge" }
 
 # Error handling
 thiserror = "2.0"
