@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -6,7 +6,7 @@ use governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, GovernanceRequest,
     CONTRACT_VERSION_STR,
 };
-use reqwest::blocking::Client;
+use reqwest::{blocking::Client, Url};
 
 use crate::audit::{AuditLog, DecisionPacket};
 use crate::contracts::{PolicyDecision, PolicyEnvelope, SystemState};
@@ -26,19 +26,16 @@ pub struct ScgRuntime {
     http_client: Client,
     graph: StubRuntime,
     audit_log: AuditLog,
-    replay_packets: Vec<DecisionPacket>,
+    replay_packets: VecDeque<DecisionPacket>,
 }
 
 impl ScgRuntime {
+    const REPLAY_PACKET_LIMIT: usize = 1000;
+
     /// Construct a fail-closed connector to the live SCG governance endpoint.
     pub fn connect(endpoint: String, boot_hash: String) -> Result<Self, GovernanceRuntimeError> {
-        let endpoint = endpoint.trim().trim_end_matches('/').to_string();
+        let endpoint = Self::validate_endpoint(endpoint.trim())?;
         let boot_hash = boot_hash.trim().to_string();
-        if endpoint.is_empty() {
-            return Err(GovernanceRuntimeError::ConfigMissing(
-                "SCG_ENDPOINT".to_string(),
-            ));
-        }
         if boot_hash.is_empty() {
             return Err(GovernanceRuntimeError::ConfigMissing(
                 "governance_hash".to_string(),
@@ -57,8 +54,35 @@ impl ScgRuntime {
             http_client,
             graph: StubRuntime::new(),
             audit_log: AuditLog::new(),
-            replay_packets: Vec::new(),
+            replay_packets: VecDeque::new(),
         })
+    }
+
+    fn validate_endpoint(endpoint: &str) -> Result<String, GovernanceRuntimeError> {
+        let endpoint = endpoint.trim().trim_end_matches('/').to_string();
+        if endpoint.is_empty() {
+            return Err(GovernanceRuntimeError::ConfigMissing(
+                "SCG_ENDPOINT".to_string(),
+            ));
+        }
+
+        let url = Url::parse(&endpoint).map_err(|e| {
+            GovernanceRuntimeError::ConfigMissing(format!(
+                "SCG_ENDPOINT must be a valid absolute URL: {}",
+                e
+            ))
+        })?;
+        let host = url.host_str().unwrap_or_default();
+        let allow_loopback_http =
+            url.scheme() == "http" && matches!(host, "localhost" | "127.0.0.1" | "::1");
+
+        if url.scheme() != "https" && !allow_loopback_http {
+            return Err(GovernanceRuntimeError::ConfigMissing(
+                "SCG_ENDPOINT must use https unless host is localhost or loopback".to_string(),
+            ));
+        }
+
+        Ok(endpoint)
     }
 
     /// Read access to the local graph used for non-governance tool surfaces.
@@ -90,6 +114,13 @@ impl ScgRuntime {
                 },
             })
             .collect()
+    }
+
+    fn record_replay_packet(&mut self, packet: DecisionPacket) {
+        if self.replay_packets.len() >= Self::REPLAY_PACKET_LIMIT {
+            self.replay_packets.pop_front();
+        }
+        self.replay_packets.push_back(packet);
     }
 
     fn build_request(
@@ -390,7 +421,7 @@ impl GovernanceRuntime for ScgRuntime {
         let outcome = self.fetch_outcome(proposal)?;
         let packet = self.build_packet(&outcome)?;
         self.audit_log.append(&packet);
-        self.replay_packets.push(packet.clone());
+        self.record_replay_packet(packet.clone());
         Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
     }
 
@@ -406,7 +437,7 @@ impl GovernanceRuntime for ScgRuntime {
         let limit = filter.limit.unwrap_or(100).clamp(1, 1000) as usize;
 
         // main.rs rejects unsupported filters before routing audit.search here.
-        let results: Vec<DecisionSummary> = self
+        let mut results: Vec<DecisionSummary> = self
             .audit_log
             .events()
             .iter()
@@ -419,7 +450,6 @@ impl GovernanceRuntime for ScgRuntime {
                     true
                 }
             })
-            .take(limit)
             .map(|event| DecisionSummary {
                 decision_id: event.decision_id.clone(),
                 principal: "policy".to_string(),
@@ -430,11 +460,18 @@ impl GovernanceRuntime for ScgRuntime {
             })
             .collect();
 
+        results.sort_by(|a, b| {
+            a.timestamp
+                .cmp(&b.timestamp)
+                .then_with(|| a.decision_id.cmp(&b.decision_id))
+        });
+        results.truncate(limit);
+
         let count = results.len();
         AuditSearchResult {
             results,
             count,
-            ordering: "created_at desc".to_string(),
+            ordering: "(timestamp_utc,decision_id) ASC".to_string(),
         }
     }
 
@@ -444,5 +481,102 @@ impl GovernanceRuntime for ScgRuntime {
 
     fn meta(&self) -> GovernanceRuntimeMeta {
         GovernanceRuntimeMeta::governed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::contracts::{EnergyEnvelope, LearningEnvelope, LearningStatus, ReasoningEnvelope};
+
+    fn make_packet(tick: u64, governance_hash: &str) -> DecisionPacket {
+        let energy = EnergyEnvelope::new(100.0, 10.0, 0.95).unwrap();
+        let reasoning = ReasoningEnvelope::new(0.9, 0.5, 0.1, 0.5).unwrap();
+        let learning = LearningEnvelope::new(
+            format!("capsule-{}", tick),
+            1,
+            "a".repeat(64),
+            0.5,
+            0.5,
+            1.0,
+            LearningStatus::Committed,
+            0,
+        )
+        .unwrap();
+        let policy = PolicyEnvelope::new(
+            governance_hash.to_string(),
+            PolicyDecision::Allow,
+            vec!["policy.governance_allow".to_string()],
+        )
+        .unwrap();
+        let state = SystemState::new(tick, energy, reasoning, learning, policy);
+        let mut packet = DecisionPacket::new(
+            env!("ITER_BUILD_HASH").to_string(),
+            env!("SUBSTRATE_BUILD_HASH").to_string(),
+            &state,
+            None,
+            "economics-hash".to_string(),
+            vec!["gateway.snapshot:compare_hash".to_string()],
+        )
+        .unwrap();
+        packet.bind_governance_context(governance_hash.to_string(), vec!["trace-step".to_string()]);
+        packet
+    }
+
+    #[test]
+    fn connect_rejects_remote_http_endpoint() {
+        let err = ScgRuntime::connect("http://example.com".to_string(), "a".repeat(64))
+            .err()
+            .expect("remote http endpoint must fail closed");
+        assert!(matches!(err, GovernanceRuntimeError::ConfigMissing(_)));
+    }
+
+    #[test]
+    fn connect_allows_loopback_http_endpoint() {
+        let runtime = ScgRuntime::connect("http://127.0.0.1:18080".to_string(), "a".repeat(64))
+            .expect("loopback http endpoint remains valid for local seam tests");
+        assert_eq!(runtime.endpoint, "http://127.0.0.1:18080");
+    }
+
+    #[test]
+    fn replay_packet_retention_is_bounded() {
+        let mut runtime =
+            ScgRuntime::connect("https://governance.example.com".to_string(), "a".repeat(64))
+                .expect("https endpoint");
+        let total_packets = ScgRuntime::REPLAY_PACKET_LIMIT + 2;
+        let first_retained_tick = 2_u64;
+
+        for tick in 0..total_packets as u64 {
+            runtime.record_replay_packet(make_packet(tick, &format!("{:064x}", tick + 1)));
+        }
+
+        let results = runtime.replay_decisions();
+        assert_eq!(results.len(), ScgRuntime::REPLAY_PACKET_LIMIT);
+        assert_eq!(
+            results.first().expect("bounded replay result").decision_id,
+            make_packet(
+                first_retained_tick,
+                &format!("{:064x}", first_retained_tick + 1)
+            )
+            .checksum
+        );
+    }
+
+    #[test]
+    fn audit_search_reports_ascending_ordering() {
+        let mut runtime =
+            ScgRuntime::connect("https://governance.example.com".to_string(), "a".repeat(64))
+                .expect("https endpoint");
+        let first = make_packet(1, &format!("{:064x}", 1));
+        let second = make_packet(2, &format!("{:064x}", 2));
+
+        runtime.audit_log.append(&first);
+        runtime.audit_log.append(&second);
+
+        let result = runtime.search_decisions(&AuditSearchFilter::default());
+        assert_eq!(result.ordering, "(timestamp_utc,decision_id) ASC");
+        assert_eq!(result.results.len(), 2);
+        assert_eq!(result.results[0].decision_id, first.checksum);
+        assert_eq!(result.results[1].decision_id, second.checksum);
     }
 }
