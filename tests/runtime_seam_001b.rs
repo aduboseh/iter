@@ -16,7 +16,9 @@ use serde_json::{json, Value};
 
 use iter_mcp_server::governance_connector::ScgRuntime;
 use iter_mcp_server::runtime::{GovernanceRuntime, GovernanceRuntimeError};
-use iter_mcp_server::substrate::stub::{AuditSearchFilter, GovernanceProposal};
+use iter_mcp_server::substrate::stub::{
+    AuditSearchFilter, GovernanceProposal, ReplayResult, ReplayStatus,
+};
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
 
@@ -86,6 +88,14 @@ impl McpTestClient {
         drop(self.stdin);
         let _ = self.server.wait();
     }
+}
+
+fn tool_payload(response: &Value) -> Value {
+    let text = response
+        .pointer("/result/content/0/text")
+        .and_then(|value| value.as_str())
+        .expect("tool response text");
+    serde_json::from_str(text).expect("tool payload json")
 }
 
 struct MockHttpResponse {
@@ -575,4 +585,65 @@ fn audit_search_rejects_unsupported_filters_on_governed_backed_mode() {
     );
 
     client.close();
+}
+
+#[test]
+fn audit_replay_returns_scg_backed_decision_history() {
+    let _guard = seam_guard();
+    let server = MockScgServer::spawn(vec![MockHttpResponse {
+        status_code: 200,
+        body: serde_json::to_string(&contract_outcome(
+            CONTRACT_VERSION_STR,
+            ScgDecision::Allow,
+            GOVERNANCE_HASH.trim(),
+            false,
+        ))
+        .expect("serialize outcome"),
+    }]);
+
+    let mut client = McpTestClient::spawn_governed_backed(server.endpoint());
+    let evaluate_response = client.call(
+        "tools/call",
+        json!({
+            "name": "decision.check",
+            "arguments": {
+                "proposal_id": proposal().proposal_id,
+                "state_snapshot_hash": proposal().state_snapshot_hash,
+                "requested_action": proposal().requested_action,
+                "constraints": {}
+            }
+        }),
+    );
+    let evaluate_payload = tool_payload(&evaluate_response);
+    let decision_id = evaluate_payload
+        .get("packet")
+        .and_then(|packet| packet.get("checksum"))
+        .and_then(|value| value.as_str())
+        .expect("decision packet checksum")
+        .to_string();
+
+    let replay_response = client.call(
+        "tools/call",
+        json!({
+            "name": "audit.replay",
+            "arguments": {}
+        }),
+    );
+    let replay_results: Vec<ReplayResult> =
+        serde_json::from_value(tool_payload(&replay_response)).expect("replay results");
+
+    assert_eq!(
+        replay_results.len(),
+        1,
+        "expected one SCG-backed replay result"
+    );
+    assert_eq!(replay_results[0].decision_id, decision_id);
+    assert_eq!(replay_results[0].replay_status, ReplayStatus::Match);
+    assert_eq!(
+        replay_results[0].propagation_checksum.as_deref(),
+        Some(decision_id.as_str())
+    );
+
+    client.close();
+    server.finish();
 }

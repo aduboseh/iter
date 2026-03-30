@@ -15,7 +15,8 @@ use crate::runtime::{
     GovernanceRuntimeMeta, GovernanceVerdict, ReasonCode,
 };
 use crate::substrate::stub::{
-    AuditSearchFilter, AuditSearchResult, DecisionSummary, GovernanceProposal, StubRuntime,
+    AuditSearchFilter, AuditSearchResult, DecisionSummary, GovernanceProposal, ReplayResult,
+    ReplayStatus, StubRuntime,
 };
 
 /// SCG-backed implementation of Iter's governance runtime boundary.
@@ -25,6 +26,7 @@ pub struct ScgRuntime {
     http_client: Client,
     graph: StubRuntime,
     audit_log: AuditLog,
+    replay_packets: Vec<DecisionPacket>,
 }
 
 impl ScgRuntime {
@@ -55,6 +57,7 @@ impl ScgRuntime {
             http_client,
             graph: StubRuntime::new(),
             audit_log: AuditLog::new(),
+            replay_packets: Vec::new(),
         })
     }
 
@@ -66,6 +69,27 @@ impl ScgRuntime {
     /// Mutable graph access for legacy tool compatibility.
     pub fn graph_mut(&mut self) -> &mut StubRuntime {
         &mut self.graph
+    }
+
+    /// Replay SCG-backed decisions from the persisted packet stream rather than local lineage.
+    pub fn replay_decisions(&self) -> Vec<ReplayResult> {
+        self.replay_packets
+            .iter()
+            .map(|packet| match packet.verify_checksum() {
+                Ok(()) => ReplayResult {
+                    decision_id: packet.checksum.clone(),
+                    replay_status: ReplayStatus::Match,
+                    propagation_checksum: Some(packet.checksum.clone()),
+                    reason: None,
+                },
+                Err(err) => ReplayResult {
+                    decision_id: packet.checksum.clone(),
+                    replay_status: ReplayStatus::Blocked,
+                    propagation_checksum: None,
+                    reason: Some(format!("decision_packet_checksum_mismatch: {}", err)),
+                },
+            })
+            .collect()
     }
 
     fn build_request(
@@ -366,6 +390,7 @@ impl GovernanceRuntime for ScgRuntime {
         let outcome = self.fetch_outcome(proposal)?;
         let packet = self.build_packet(&outcome)?;
         self.audit_log.append(&packet);
+        self.replay_packets.push(packet.clone());
         Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
     }
 

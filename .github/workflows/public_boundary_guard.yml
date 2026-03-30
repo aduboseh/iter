@@ -96,11 +96,40 @@ jobs:
 
       - name: INV-VENDOR-001 — reject floating git deps
         run: |
-          if grep -E 'git\s*=\s*".*SCG' Cargo.toml; then
-            echo "INVARIANT VIOLATION INV-VENDOR-001: floating git dep to SCG found"
-            echo "Use vendored path dep under vendor/ instead"
-            exit 1
-          fi
+          python3 - <<'PY'
+          import pathlib
+          import sys
+          import tomllib
+
+          offenders = []
+          for cargo_toml in pathlib.Path(".").rglob("Cargo.toml"):
+              try:
+                  cargo = tomllib.loads(cargo_toml.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  print(f"INVARIANT VIOLATION INV-VENDOR-001: failed to parse {cargo_toml}: {exc}")
+                  sys.exit(1)
+
+              sections = [
+                  cargo.get("dependencies", {}),
+                  cargo.get("dev-dependencies", {}),
+                  cargo.get("build-dependencies", {}),
+                  cargo.get("workspace", {}).get("dependencies", {}),
+              ]
+              for section in sections:
+                  for name, spec in section.items():
+                      if isinstance(spec, dict):
+                          git_url = spec.get("git")
+                          if isinstance(git_url, str) and "scg" in git_url.lower():
+                              offenders.append(f"{cargo_toml}:{name}")
+
+          if offenders:
+              print(
+                  "INVARIANT VIOLATION INV-VENDOR-001: floating git dep to SCG found: "
+                  + ", ".join(sorted(offenders))
+              )
+              print("Use vendored path dep under vendor/ instead")
+              sys.exit(1)
+          PY
 
       - name: INV-VENDOR-002 — vendor provenance file must exist
         run: |

@@ -754,7 +754,10 @@ fn handle_tool(
             }
         }
         "lineage.replay" | "audit.replay" => {
-            let lineage = runtime.graph().lineage_replay();
+            let lineage = match runtime {
+                ServerRuntime::ScgBacked(runtime) => runtime.replay_decisions(),
+                _ => runtime.graph().lineage_replay(),
+            };
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
         "governance.evaluate" | "decision.check" => {
