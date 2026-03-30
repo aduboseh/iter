@@ -14,10 +14,13 @@ use governance_bridge::contract::{
 use governance_bridge::trace::{ExecutionTrace, TraceStep};
 use serde_json::{json, Value};
 
+use iter_mcp_server::economics::EconomicsConfig;
 use iter_mcp_server::governance_connector::ScgRuntime;
+use iter_mcp_server::governed::GovernedRuntime;
+use iter_mcp_server::policy::PolicyConfig;
 use iter_mcp_server::runtime::{GovernanceRuntime, GovernanceRuntimeError};
 use iter_mcp_server::substrate::stub::{
-    AuditSearchFilter, GovernanceProposal, ReplayResult, ReplayStatus,
+    AuditSearchFilter, GovernanceProposal, ReplayResult, ReplayStatus, StubRuntime,
 };
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
@@ -378,6 +381,14 @@ fn runtime_for(endpoint: &str, hash: &str) -> ScgRuntime {
     ScgRuntime::connect(endpoint.to_string(), hash.to_string()).expect("connect runtime")
 }
 
+fn governed_local_runtime() -> GovernedRuntime {
+    GovernedRuntime::new(
+        StubRuntime::new(),
+        PolicyConfig::default(),
+        EconomicsConfig::default(),
+    )
+}
+
 #[test]
 fn governed_backed_mode_emits_governed_packet() {
     let _guard = seam_guard();
@@ -418,6 +429,36 @@ fn governed_backed_mode_emits_governed_packet() {
     );
     let first = result.results.first().expect("at least one result");
     assert_eq!(first.decision, "ALLOW");
+
+    server.finish();
+}
+
+#[test]
+fn governed_backed_bound_fields_not_overwritten_by_adapter() {
+    let _guard = seam_guard();
+    let server = MockScgServer::spawn(vec![MockHttpResponse {
+        status_code: 200,
+        body: serde_json::to_string(&contract_outcome(
+            CONTRACT_VERSION_STR,
+            ScgDecision::Allow,
+            GOVERNANCE_HASH.trim(),
+            false,
+        ))
+        .expect("serialize outcome"),
+    }]);
+
+    let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+    let outcome = runtime.evaluate(&proposal()).expect("evaluate");
+    let packet = outcome.packet.as_ref().expect("packet");
+
+    assert_eq!(
+        packet.governance_hash.as_deref(),
+        Some(GOVERNANCE_HASH.trim())
+    );
+    assert!(
+        !packet.execution_trace.is_empty(),
+        "scg-backed packet must retain non-empty SCG execution_trace after adapter binding"
+    );
 
     server.finish();
 }
@@ -645,5 +686,84 @@ fn audit_replay_returns_governed_remote_decision_history() {
     );
 
     client.close();
+    server.finish();
+}
+
+#[test]
+fn governed_local_and_governed_backed_produce_structurally_equivalent_packets() {
+    let _guard = seam_guard();
+    let mut local_runtime = governed_local_runtime();
+    let local_outcome = local_runtime
+        .evaluate(&proposal())
+        .expect("governed-local evaluate");
+    let local_packet = local_outcome
+        .packet
+        .expect("governed-local must emit packet");
+
+    let remote_hash = "b".repeat(64);
+    let server = MockScgServer::spawn(vec![MockHttpResponse {
+        status_code: 200,
+        body: serde_json::to_string(&contract_outcome(
+            CONTRACT_VERSION_STR,
+            ScgDecision::Allow,
+            &remote_hash,
+            false,
+        ))
+        .expect("serialize outcome"),
+    }]);
+
+    let mut remote_runtime = runtime_for(server.endpoint(), &remote_hash);
+    let remote_outcome = remote_runtime
+        .evaluate(&proposal())
+        .expect("governed-backed evaluate");
+    let remote_packet = remote_outcome
+        .packet
+        .expect("governed-backed must emit packet");
+
+    assert!(
+        local_packet
+            .governance_hash
+            .as_deref()
+            .map(|hash| !hash.is_empty())
+            .unwrap_or(false),
+        "governed-local: governance_hash must be present and non-empty"
+    );
+    assert!(
+        remote_packet
+            .governance_hash
+            .as_deref()
+            .map(|hash| !hash.is_empty())
+            .unwrap_or(false),
+        "governed-backed: governance_hash must be present and non-empty"
+    );
+    assert!(
+        !local_packet.execution_trace.is_empty(),
+        "governed-local: execution_trace must be present and non-empty"
+    );
+    assert!(
+        !remote_packet.execution_trace.is_empty(),
+        "governed-backed: execution_trace must be present and non-empty"
+    );
+    assert_ne!(
+        local_packet.governance_hash, remote_packet.governance_hash,
+        "governed-local and governed-backed must not be coupled to the same governance_hash in this test fixture"
+    );
+    assert!(
+        !local_packet.iter_build_hash.is_empty(),
+        "governed-local packet must carry iter build identity"
+    );
+    assert!(
+        !remote_packet.iter_build_hash.is_empty(),
+        "governed-backed packet must carry iter build identity"
+    );
+    assert!(
+        !local_packet.substrate_build_hash.is_empty(),
+        "governed-local packet must carry substrate build identity"
+    );
+    assert!(
+        !remote_packet.substrate_build_hash.is_empty(),
+        "governed-backed packet must carry substrate build identity"
+    );
+
     server.finish();
 }

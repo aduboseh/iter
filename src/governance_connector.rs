@@ -72,7 +72,10 @@ impl ScgRuntime {
                 e
             ))
         })?;
-        let host = url.host_str().unwrap_or_default();
+        let host = match url.host_str() {
+            Some(host) => host,
+            None => "",
+        };
         let allow_loopback_http =
             url.scheme() == "http" && matches!(host, "localhost" | "127.0.0.1" | "::1");
 
@@ -121,6 +124,29 @@ impl ScgRuntime {
             self.replay_packets.pop_front();
         }
         self.replay_packets.push_back(packet);
+    }
+
+    fn assert_scg_packet_integrity(
+        packet: &DecisionPacket,
+        context: &str,
+    ) -> Result<(), GovernanceRuntimeError> {
+        let has_valid_governance_hash = match packet.governance_hash.as_deref() {
+            Some(hash) => !hash.is_empty(),
+            None => false,
+        };
+        if !has_valid_governance_hash {
+            return Err(GovernanceRuntimeError::GovernanceHashMismatch(format!(
+                "INV-GOV-HASH: governance_hash empty or absent before packet return [{}]",
+                context
+            )));
+        }
+        if packet.execution_trace.is_empty() {
+            return Err(GovernanceRuntimeError::ReplayIntegrityViolation(format!(
+                "INV-TRACE: execution_trace empty or absent before packet return [{}]",
+                context
+            )));
+        }
+        Ok(())
     }
 
     fn build_request(
@@ -330,15 +356,34 @@ impl ScgRuntime {
             reason: e.to_string(),
         })?;
 
-        packet.bind_governance_context(
-            outcome.governance_hash.clone(),
-            Self::trace_strings(outcome)?,
+        let trace_strings = Self::trace_strings(outcome)?;
+        packet.bind_governance_context(outcome.governance_hash.clone(), trace_strings.clone());
+        // INV-IMMUT-001: SCG-bound fields must not be overwritten after binding.
+        debug_assert!(
+            match packet.governance_hash.as_deref() {
+                Some(hash) => !hash.is_empty(),
+                None => false,
+            },
+            "INV-IMMUT-001: governance_hash must be non-empty after SCG binding"
+        );
+        debug_assert!(
+            packet.governance_hash.as_deref() == Some(outcome.governance_hash.as_str()),
+            "INV-IMMUT-001: governance_hash must not be overwritten after SCG binding"
+        );
+        debug_assert!(
+            !packet.execution_trace.is_empty(),
+            "INV-IMMUT-001: execution_trace must be non-empty after SCG binding"
+        );
+        debug_assert!(
+            packet.execution_trace == trace_strings,
+            "INV-IMMUT-001: execution_trace must not be overwritten after SCG binding"
         );
         packet
             .verify_checksum()
             .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
                 reason: format!("packet checksum verification failed: {}", e),
             })?;
+        Self::assert_scg_packet_integrity(&packet, "ScgBacked::build_packet")?;
 
         Ok(packet)
     }
@@ -420,6 +465,7 @@ impl GovernanceRuntime for ScgRuntime {
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
         let outcome = self.fetch_outcome(proposal)?;
         let packet = self.build_packet(&outcome)?;
+        Self::assert_scg_packet_integrity(&packet, "ScgBacked::evaluate")?;
         self.audit_log.append(&packet);
         self.record_replay_packet(packet.clone());
         Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
@@ -434,7 +480,11 @@ impl GovernanceRuntime for ScgRuntime {
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
-        let limit = filter.limit.unwrap_or(100).clamp(1, 1000) as usize;
+        let limit = match filter.limit {
+            Some(limit) => limit,
+            None => 100,
+        }
+        .clamp(1, 1000) as usize;
 
         // main.rs rejects unsupported filters before routing audit.search here.
         let mut results: Vec<DecisionSummary> = self
@@ -578,5 +628,19 @@ mod tests {
         assert_eq!(result.results.len(), 2);
         assert_eq!(result.results[0].decision_id, first.checksum);
         assert_eq!(result.results[1].decision_id, second.checksum);
+    }
+
+    #[test]
+    fn scg_packet_integrity_enforced_before_return() {
+        let mut missing_hash = make_packet(1, &format!("{:064x}", 1));
+        missing_hash.governance_hash = Some(String::new());
+        assert!(ScgRuntime::assert_scg_packet_integrity(&missing_hash, "test").is_err());
+
+        let mut missing_trace = make_packet(2, &format!("{:064x}", 2));
+        missing_trace.execution_trace.clear();
+        assert!(ScgRuntime::assert_scg_packet_integrity(&missing_trace, "test").is_err());
+
+        let valid_packet = make_packet(3, &format!("{:064x}", 3));
+        assert!(ScgRuntime::assert_scg_packet_integrity(&valid_packet, "test").is_ok());
     }
 }
