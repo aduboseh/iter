@@ -107,3 +107,14 @@ contract_version check: present
 governance_hash mismatch check: present
 verify_replay_id check: present
 SCG↔Iter seam: CLOSED
+
+SURFACE-001 STATUS: 2026-03-30
+README: 6 claims corrected — runtime mode count and pending language; preview runtime note; governed packet emission scope; DecisionPacket governance_hash/execution_trace/build hash semantics; governance profile note; decision.check tool description
+Contract outline: 5 claims corrected — decision.check runtime modes; decision.preview authority; audit.search current filter semantics; DecisionPacket optional field semantics; vendored contract binding note
+Tools classification: 5 claims corrected — governance.evaluate runtime note; decision.preview target-family note; audit.search target-family note; Phase 2 decision.preview note; Phase 2 audit.search note
+Schema descriptions: 2 updated — governance_hash and execution_trace
+Stale WO references resolved: yes
+scg_connector references corrected: none found
+Claims already correct from 0e6934c: governance.evaluate tool description in src/main.rs; decision.check tool description in src/main.rs; decision.preview tool description in src/main.rs; audit.search explicit unsupported-filter error in src/main.rs
+Deferred (required code change): none
+Claim surface: strictly isomorphic to merged PR #37 behavior

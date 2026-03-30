@@ -14,12 +14,13 @@
 
 Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) for deterministic governance evaluation.
 
-Iter currently exposes two public server runtime modes:
+Iter currently exposes three public server runtime modes:
 
 - **Demo mode** (default `iter-server` boot path): Threshold-based governance using stub graph state. Non-authoritative — `authoritative_pdp=false`, `replay_sufficient=false`, no `DecisionPacket` at the MCP edge. Suitable for protocol validation and integration testing.
 - **Governed-local mode** (`--runtime-mode=governed-local`): PolicyEvaluator-based governance with typed contract envelopes. Emits `DecisionPacket` with RFC 8785 JCS checksums, governance hash binding, and ordered execution trace. This mode is replay-capable, but still runs over the local stub substrate rather than SCG.
+- **Scg-backed mode** (`--runtime-mode=scg-backed`): Calls `POST /governance/evaluate` on the live SCG gateway. Requires `SCG_ENDPOINT` and `governance/governance.hash` at boot, fails closed if either is absent or malformed, enforces HTTP status, `contract_version`, replay integrity, and governance hash checks on every response, emits governed packets on `decision.check`, and has no fallback runtime on SCG unavailability. This mode is available but is not the default.
 
-**MCP is the transport. The default public server still runs in demo stub mode; full SCG-backed execution remains pending WO-ITER-RUNTIME-001B.**
+**MCP is the transport. Default server mode remains demo/non-authoritative. SCG↔Iter seam closed — see `SKILLS/runtime-seam.md`.**
 
 ---
 
@@ -106,21 +107,23 @@ The governed runtime implementation is centered on a `GovernanceOutcome` contain
 - `reason_codes` (namespaced: `demo.thresholds.*` or `policy.*`)
 - `packet` (DecisionPacket, governed evaluate only)
 
-Current public server status: `decision.preview` follows the active runtime mode. Default demo mode remains non-authoritative; `--runtime-mode=governed-local` performs authoritative policy preview without emitting a packet.
+Current public server status: `decision.preview` follows the active runtime mode. Default demo mode remains non-authoritative; `--runtime-mode=governed-local` performs authoritative local policy preview without emitting a packet; `--runtime-mode=scg-backed` calls the live SCG endpoint without emitting a packet.
 
-### DecisionPacket (governed mode only)
+### DecisionPacket (governed evaluate paths only)
 
-In governed-local mode, `decision.check` emits a `DecisionPacket` — a replay-sufficient, immutable record containing everything required to reconstruct the governance outcome. The default public boot path still does not emit packets.
+In governed-local mode and scg-backed mode, `decision.check` emits a `DecisionPacket` — a replay-sufficient, immutable record containing everything required to reconstruct the governance outcome. Demo mode does not emit packets.
 
 Each packet includes:
 - System state snapshot (energy, reasoning, learning, policy envelopes)
-- Governance artifact hash and ordered execution trace
+- `governance_hash`: omitted on demo path, populated from local `governance/governance.hash` on governed-local path, populated from the SCG canonical hash on scg-backed path
+- `execution_trace`: omitted on demo path, attached from local evaluation on governed-local path, attached from SCG evaluation on scg-backed path
+- `ITER_BUILD_HASH` and `SUBSTRATE_BUILD_HASH`: real compile-time SHA-256 identifiers that trace the packet to the producing binary
 - Capsule identity and version hashes
 - Policy decisions and explicit reason codes
 - Learning permissions and economic constraints
 - RFC 8785 JCS canonical JSON with SHA-256 checksum
 
-DecisionPreview is non-authoritative in demo mode. In governed-local mode it reflects authoritative policy evaluation, but it is still not replay-sufficient because no packet is emitted.
+DecisionPreview is non-authoritative in demo mode. In governed-local mode and scg-backed mode it reflects authoritative policy evaluation, but it is still not replay-sufficient because no packet is emitted.
 Only DecisionPacket participates in checksum, replay, and audit guarantees.
 
 **Demo mode does not emit DecisionPackets.** Demo verdicts are non-authoritative threshold checks.
@@ -143,13 +146,13 @@ The MCP surface is intentionally small. All tools are deterministic, side-effect
 
 The following tools are available when Iter is run with `--profile=governance`.
 
-Current public server note: `--profile=governance` constrains tool exposure. Runtime behavior then depends on `--runtime-mode`: default demo stub mode or `governed-local` packet-emitting mode. Full SCG-backed execution remains pending WO-ITER-RUNTIME-001B.
+Current public server note: `--profile=governance` constrains tool exposure. Runtime behavior then depends on `--runtime-mode`: default demo stub mode, `governed-local` packet-emitting mode, or `scg-backed` fail-closed mode. SCG↔Iter seam closed — see `SKILLS/runtime-seam.md`.
 
 #### Governance & Audit
 
 | Tool | Description |
 |------|-------------|
-| decision.check | Governance decision gate. Default demo mode is non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate |
+| decision.check | Governance decision gate. Default demo mode is non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate; `--runtime-mode=scg-backed` emits governed packets from the live SCG gateway fail-closed |
 | decision.preview | Governance preview through the active runtime |
 | audit.search | Search governance decision history |
 | audit.export | Export DecisionPacket (canonical) |

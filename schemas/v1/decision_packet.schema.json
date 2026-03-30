@@ -254,7 +254,7 @@
       "description": "Energy snapshot"
     },
     "execution_trace": {
-      "description": "Ordered evaluation trace. Omitted when no trace is attached.",
+      "description": "Ordered evaluation trace. Omitted when no trace is attached and omitted on demo path. Attached from local evaluation on governed-local path. Attached from SCG evaluation on scg-backed path (always attached on scg-backed path in current implementation).",
       "items": {
         "type": "string"
       },
@@ -268,7 +268,7 @@
       "type": "array"
     },
     "governance_hash": {
-      "description": "Canonical governance hash bound to this packet, if available.",
+      "description": "Canonical governance hash. Omitted on demo path. Populated from local governance/governance.hash on governed-local path. Populated from SCG canonical hash on scg-backed path (required, non-empty).",
       "type": "string"
     },
     "iter_build_hash": {

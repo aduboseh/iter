@@ -10,7 +10,7 @@
 
 | Tool Name | Category | Target Role (Future) | Notes (Current Behavior) |
 |-----------|----------|---------------------|--------------------------|
-| `governance.evaluate` | PUBLIC_GOVERNANCE | `decision.check` | Governance decision gate; default runtime is demo/non-authoritative, while `--runtime-mode=governed-local` emits governed packets over the local stub substrate. Accepts `proposal_id`, `state_snapshot_hash`, `requested_action`, optional `constraints`. |
+| `governance.evaluate` | PUBLIC_GOVERNANCE | `decision.check` | Governance decision gate; default runtime is demo/non-authoritative, `--runtime-mode=governed-local` emits governed packets over the local stub substrate, and `--runtime-mode=scg-backed` calls the live SCG governance endpoint fail-closed and emits governed packets. Accepts `proposal_id`, `state_snapshot_hash`, `requested_action`, optional `constraints`. |
 | `governance.status` | OPS/STATUS | `governance.health` | Returns governance health summary. No required parameters. |
 | `governor.status` | OPS/STATUS | `governor.health` | Returns governor coherence/drift metrics. No required parameters. |
 | `esv.audit` | AUDIT/REPLAY | `audit.export` | Audit node ESV (Energy-State-Value). Requires `node_id` (string). Returns compliance status for a specific node. |
@@ -56,11 +56,11 @@ Unsafe or debug-only operations that mutate state without full governance review
 
 ### `decision.*` (PDP / Governance Gate)
 - `decision.check` ← current: `governance.evaluate`
-- `decision.preview` ← **ACTIVE** (non-authoritative simulation, Phase 2)
+- `decision.preview` ← **ACTIVE** (governance preview through the active runtime; demo is non-authoritative, governed-local and scg-backed are authoritative without packet emission)
 - `decision.explain` ← to be added (structured explanation)
 
 ### `audit.*` (Audit & Replay)
-- `audit.search` ← **ACTIVE** (search decisions by criteria, Phase 2)
+- `audit.search` ← **ACTIVE** (deterministic search; current scg-backed path supports `decision` and `limit`, unsupported filters return explicit error)
 - `audit.export` ← current: `esv.audit`
 - `audit.replay` ← current: `lineage.replay`
 
@@ -142,5 +142,5 @@ Phase 0 JSON inventory (`raw-tools-list.phase0.json`) and checksum are unchanged
 
 New tools added to public MCP surface (total tools: 12):
 
-- `decision.preview` — Non-authoritative governance simulation. Returns `DecisionPreview` artifact.
-- `audit.search` — Search governance decision history with filters. Deterministic ordering.
+- `decision.preview` — Governance preview through the active runtime. Demo is non-authoritative; governed-local and scg-backed are authoritative without packet emission.
+- `audit.search` — Search governance decision history with deterministic ordering. Current scg-backed path supports `decision` and `limit`; unsupported filters return explicit error.
