@@ -390,7 +390,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "governance.evaluate",
-            "description": "[DEPRECATED: use decision.check] Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. SCG-backed runtime remains pending WO-ITER-RUNTIME-001B",
+            "description": "[DEPRECATED: use decision.check] Governance decision gate. Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate; `--runtime-mode=scg-backed` calls the live SCG governance endpoint fail-closed",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -404,7 +404,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "decision.check",
-            "description": "Governance decision gate. Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. SCG-backed runtime remains pending WO-ITER-RUNTIME-001B",
+            "description": "Governance decision gate. Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate; `--runtime-mode=scg-backed` calls the live SCG governance endpoint fail-closed",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -418,7 +418,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "decision.preview",
-            "description": "Governance preview through the active runtime. Demo is non-authoritative; governed-local is read-only but packet-capable on evaluate",
+            "description": "Governance preview through the active runtime. Demo is non-authoritative; governed-local is read-only but packet-capable on evaluate; scg-backed previews call the live SCG endpoint without emitting a packet",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -783,6 +783,26 @@ fn handle_tool(
         "audit.search" => {
             let filter: iter_mcp_server::substrate::stub::AuditSearchFilter =
                 serde_json::from_value(args.clone()).unwrap_or_default();
+            if let ServerRuntime::ScgBacked(_) = runtime {
+                let unsupported =
+                    iter_mcp_server::governance_connector::ScgRuntime::unsupported_audit_filters(
+                        &filter,
+                    );
+                if !unsupported.is_empty() {
+                    return json!({
+                        "error": {
+                            "code": 5002,
+                            "message": format!(
+                                "audit.search does not support filters in scg-backed mode: {}",
+                                unsupported.join(", ")
+                            ),
+                            "data": {
+                                "unsupported_filters": unsupported,
+                            }
+                        }
+                    });
+                }
+            }
             let result = runtime.search_decisions(&filter);
             json!({"content": [{"type": "text", "text": serde_json::to_string(&result).unwrap()}]})
         }

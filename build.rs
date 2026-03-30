@@ -16,6 +16,14 @@ fn sha256_file(path: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn sha256_bytes(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/contract.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/trace.rs");
@@ -60,6 +68,26 @@ fn main() {
             "Vendor governance-bridge integrity check failed. The vendored contract does not match the canonical SCG source. To update intentionally: recompute hashes in build.rs and update vendor/governance-bridge/PROVENANCE.md with the new commit and hash."
         );
     }
+
+    let iter_identity = format!(
+        "{}:{}",
+        std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
+        std::env::var("CARGO_PKG_VERSION").unwrap_or_default()
+    );
+    println!(
+        "cargo:rustc-env=ITER_BUILD_HASH={}",
+        sha256_bytes(iter_identity.as_bytes())
+    );
+
+    let substrate_identity = expected
+        .iter()
+        .map(|(path, hash)| format!("{}:{}", path, hash))
+        .collect::<Vec<_>>()
+        .join("\n");
+    println!(
+        "cargo:rustc-env=SUBSTRATE_BUILD_HASH={}",
+        sha256_bytes(substrate_identity.as_bytes())
+    );
 
     // Only check for substrate in full mode (not when public_stub is enabled)
     #[cfg(all(feature = "full_substrate", not(feature = "public_stub")))]

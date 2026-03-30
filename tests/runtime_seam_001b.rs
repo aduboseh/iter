@@ -1,20 +1,31 @@
+use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use governance_bridge::contract::{
-    Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, CONTRACT_VERSION_STR,
+    Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, GovernanceRequest,
+    CONTRACT_VERSION_STR,
 };
 use governance_bridge::trace::{ExecutionTrace, TraceStep};
 use serde_json::{json, Value};
 
 use iter_mcp_server::governance_connector::ScgRuntime;
 use iter_mcp_server::runtime::{GovernanceRuntime, GovernanceRuntimeError};
-use iter_mcp_server::substrate::stub::GovernanceProposal;
+use iter_mcp_server::substrate::stub::{AuditSearchFilter, GovernanceProposal};
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
+
+fn seam_guard() -> std::sync::MutexGuard<'static, ()> {
+    static SEAM_LOCK: Mutex<()> = Mutex::new(());
+    SEAM_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 struct McpTestClient {
     server: Child,
@@ -71,22 +82,6 @@ impl McpTestClient {
         serde_json::from_str(&line).expect("response JSON")
     }
 
-    fn extract_tool_json(&mut self, tool_name: &str, arguments: Value) -> Value {
-        let resp = self.call(
-            "tools/call",
-            json!({
-                "name": tool_name,
-                "arguments": arguments
-            }),
-        );
-
-        let text = resp
-            .pointer("/result/content/0/text")
-            .and_then(|v| v.as_str())
-            .expect("tool response text");
-        serde_json::from_str(text).expect("tool text JSON")
-    }
-
     fn close(mut self) {
         drop(self.stdin);
         let _ = self.server.wait();
@@ -101,6 +96,9 @@ struct MockHttpResponse {
 struct MockScgServer {
     endpoint: String,
     expected_requests: usize,
+    failures: Arc<Mutex<Vec<String>>>,
+    received_requests: Arc<AtomicUsize>,
+    shutdown: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -109,15 +107,47 @@ impl MockScgServer {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock SCG");
         let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
         let expected_requests = responses.len();
+        let failures = Arc::new(Mutex::new(Vec::new()));
+        let received_requests = Arc::new(AtomicUsize::new(0));
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let expected_request = expected_request();
+        let thread_failures = Arc::clone(&failures);
+        let thread_received_requests = Arc::clone(&received_requests);
+        let thread_shutdown = Arc::clone(&shutdown);
 
         let handle = thread::spawn(move || {
             for response in responses {
-                let (mut stream, _) = listener.accept().expect("accept");
+                let (mut stream, _) = loop {
+                    match listener.accept() {
+                        Ok(connection) => break connection,
+                        Err(err) => {
+                            thread_failures
+                                .lock()
+                                .expect("mock failures")
+                                .push(format!("accept failed: {}", err));
+                            return;
+                        }
+                    }
+                };
+                if thread_shutdown.load(Ordering::SeqCst) {
+                    return;
+                }
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .expect("read timeout");
 
-                let _ = read_http_request(&mut stream);
+                let request = read_http_request(&mut stream);
+                if request.is_empty() || find_header_end(&request).is_none() {
+                    if thread_shutdown.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    continue;
+                }
+                if let Err(err) = assert_expected_request(&request, &expected_request) {
+                    thread_failures.lock().expect("mock failures").push(err);
+                    return;
+                }
+                thread_received_requests.fetch_add(1, Ordering::SeqCst);
 
                 let status_line = match response.status_code {
                     200 => "200 OK",
@@ -142,6 +172,9 @@ impl MockScgServer {
         Self {
             endpoint,
             expected_requests,
+            failures,
+            received_requests,
+            shutdown,
             handle: Some(handle),
         }
     }
@@ -149,22 +182,41 @@ impl MockScgServer {
     fn endpoint(&self) -> &str {
         &self.endpoint
     }
+
+    fn finish(mut self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        let _ = std::net::TcpStream::connect(self.endpoint.trim_start_matches("http://"));
+        if let Some(handle) = self.handle.take() {
+            handle.join().expect("join mock governance server");
+        }
+
+        let failures = self.failures.lock().expect("mock failures");
+        assert!(
+            failures.is_empty(),
+            "mock governance server validation failed: {}",
+            failures.join(" | ")
+        );
+        assert_eq!(
+            self.received_requests.load(Ordering::SeqCst),
+            self.expected_requests,
+            "mock governance server received an unexpected number of requests"
+        );
+    }
 }
 
 impl Drop for MockScgServer {
     fn drop(&mut self) {
-        for _ in 0..self.expected_requests {
-            if let Ok(mut stream) =
-                std::net::TcpStream::connect(self.endpoint.trim_start_matches("http://"))
-            {
-                let _ = stream.write_all(
-                    b"POST /governance/evaluate HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-                );
-                let _ = stream.flush();
-            }
-        }
+        self.shutdown.store(true, Ordering::SeqCst);
+        let _ = std::net::TcpStream::connect(self.endpoint.trim_start_matches("http://"));
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
+        }
+        let failures = self.failures.lock().expect("mock failures");
+        if !failures.is_empty() {
+            eprintln!(
+                "mock governance server validation failed during drop: {}",
+                failures.join(" | ")
+            );
         }
     }
 }
@@ -222,12 +274,29 @@ fn parse_content_length(header: &[u8]) -> usize {
     0
 }
 
-fn proposal_args() -> Value {
-    json!({
-        "proposal_id": "runtime-seam-001b",
-        "state_snapshot_hash": "abc123def456abc123def456abc123def456abc123def456abc123def456abc123",
-        "requested_action": "deploy_capsule"
-    })
+fn assert_expected_request(request: &[u8], expected: &GovernanceRequest) -> Result<(), String> {
+    let header_end = find_header_end(request).ok_or_else(|| "missing HTTP headers".to_string())?;
+    let header = String::from_utf8(request[..header_end].to_vec())
+        .map_err(|e| format!("invalid request header encoding: {}", e))?;
+    let mut lines = header.lines();
+    let request_line = lines
+        .next()
+        .ok_or_else(|| "missing HTTP request line".to_string())?;
+    if request_line != "POST /governance/evaluate HTTP/1.1" {
+        return Err(format!("unexpected request line: {}", request_line));
+    }
+
+    let body = &request[header_end + 4..];
+    let actual: GovernanceRequest = serde_json::from_slice(body)
+        .map_err(|e| format!("invalid governance request payload: {}", e))?;
+    if &actual != expected {
+        return Err(format!(
+            "unexpected governance request payload: {}",
+            serde_json::to_string(&actual).unwrap_or_default()
+        ));
+    }
+
+    Ok(())
 }
 
 fn proposal() -> GovernanceProposal {
@@ -239,6 +308,16 @@ fn proposal() -> GovernanceProposal {
         requested_action: "deploy_capsule".to_string(),
         proposal_c14n: None,
         proposal_hash: None,
+    }
+}
+
+fn expected_request() -> GovernanceRequest {
+    GovernanceRequest {
+        proposal_id: "runtime-seam-001b".to_string(),
+        state_snapshot_hash: "abc123def456abc123def456abc123def456abc123def456abc123def456abc123"
+            .to_string(),
+        requested_action: "deploy_capsule".to_string(),
+        constraints: BTreeMap::new(),
     }
 }
 
@@ -291,6 +370,7 @@ fn runtime_for(endpoint: &str, hash: &str) -> ScgRuntime {
 
 #[test]
 fn governed_backed_mode_emits_governed_packet() {
+    let _guard = seam_guard();
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
         body: serde_json::to_string(&contract_outcome(
@@ -302,51 +382,39 @@ fn governed_backed_mode_emits_governed_packet() {
         .expect("serialize outcome"),
     }]);
 
-    let mut client = McpTestClient::spawn_governed_backed(server.endpoint());
-    let outcome = client.extract_tool_json("decision.check", proposal_args());
-    let packet = outcome.get("packet").expect("packet");
+    let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+    let outcome = runtime.evaluate(&proposal()).expect("evaluate");
+    let packet = outcome.packet.as_ref().expect("packet");
 
     assert_eq!(
-        outcome.get("mode").and_then(|v| v.as_str()),
-        Some("governed")
+        outcome.mode,
+        iter_mcp_server::runtime::GovernanceMode::Governed
     );
-    assert_eq!(
-        outcome.get("authoritative_pdp").and_then(|v| v.as_bool()),
-        Some(true)
-    );
-    assert_eq!(
-        packet.get("governance_hash").and_then(|v| v.as_str()),
-        Some(GOVERNANCE_HASH.trim())
-    );
+    assert!(outcome.authoritative_pdp);
+    assert_eq!(packet.governance_hash(), Some(GOVERNANCE_HASH.trim()));
     assert!(
-        packet
-            .get("execution_trace")
-            .and_then(|v| v.as_array())
-            .is_some_and(|trace| !trace.is_empty()),
+        !packet.execution_trace().is_empty(),
         "scg-backed packet must carry the SCG execution trace"
     );
 
-    let result = client.extract_tool_json("audit.search", json!({ "decision": "ALLOW" }));
-    let count = result.get("count").and_then(|v| v.as_u64()).expect("count");
+    let result = runtime.search_decisions(&AuditSearchFilter {
+        decision: Some("ALLOW".to_string()),
+        ..AuditSearchFilter::default()
+    });
+    let count = result.count;
     assert!(
         count >= 1,
         "audit.search must find the SCG-backed ALLOW record"
     );
-    let first = result
-        .get("results")
-        .and_then(|v| v.as_array())
-        .and_then(|v| v.first())
-        .expect("at least one result");
-    assert_eq!(
-        first.get("decision").and_then(|v| v.as_str()),
-        Some("ALLOW")
-    );
+    let first = result.results.first().expect("at least one result");
+    assert_eq!(first.decision, "ALLOW");
 
-    client.close();
+    server.finish();
 }
 
 #[test]
 fn governance_endpoint_unavailable_returns_explicit_error() {
+    let _guard = seam_guard();
     let mut runtime = runtime_for("http://127.0.0.1:1", GOVERNANCE_HASH.trim());
     let err = runtime.evaluate(&proposal()).expect_err("scg unavailable");
     assert!(matches!(err, GovernanceRuntimeError::ScgUnavailable(_)));
@@ -354,6 +422,7 @@ fn governance_endpoint_unavailable_returns_explicit_error() {
 
 #[test]
 fn replay_trace_is_identical_not_just_output() {
+    let _guard = seam_guard();
     let body = serde_json::to_string(&contract_outcome(
         CONTRACT_VERSION_STR,
         ScgDecision::Allow,
@@ -384,10 +453,13 @@ fn replay_trace_is_identical_not_just_output() {
         run1.packet.as_ref().expect("packet").execution_trace,
         run2.packet.as_ref().expect("packet").execution_trace
     );
+
+    server.finish();
 }
 
 #[test]
 fn governance_hash_absent_fails_boot() {
+    let _guard = seam_guard();
     let result = ScgRuntime::connect("http://127.0.0.1:18080".to_string(), String::new());
     assert!(matches!(
         result,
@@ -397,6 +469,7 @@ fn governance_hash_absent_fails_boot() {
 
 #[test]
 fn endpoint_absent_fails_boot() {
+    let _guard = seam_guard();
     let result = ScgRuntime::connect(String::new(), GOVERNANCE_HASH.trim().to_string());
     assert!(matches!(
         result,
@@ -406,6 +479,7 @@ fn endpoint_absent_fails_boot() {
 
 #[test]
 fn contract_version_mismatch_fails_closed() {
+    let _guard = seam_guard();
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
         body: serde_json::to_string(&contract_outcome(
@@ -423,10 +497,13 @@ fn contract_version_mismatch_fails_closed() {
         err,
         GovernanceRuntimeError::ContractVersionMismatch(_)
     ));
+
+    server.finish();
 }
 
 #[test]
 fn governance_hash_mismatch_fails_closed() {
+    let _guard = seam_guard();
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
         body: serde_json::to_string(&contract_outcome(
@@ -444,10 +521,13 @@ fn governance_hash_mismatch_fails_closed() {
         err,
         GovernanceRuntimeError::GovernanceHashMismatch(_)
     ));
+
+    server.finish();
 }
 
 #[test]
 fn replay_integrity_violation_fails_closed() {
+    let _guard = seam_guard();
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
         body: serde_json::to_string(&contract_outcome(
@@ -463,8 +543,36 @@ fn replay_integrity_violation_fails_closed() {
     let err = runtime
         .evaluate(&proposal())
         .expect_err("replay integrity violation");
-    assert!(matches!(
-        err,
-        GovernanceRuntimeError::ReplayIntegrityViolation(_)
-    ));
+    assert!(
+        matches!(err, GovernanceRuntimeError::ReplayIntegrityViolation(_)),
+        "unexpected error: {:?}",
+        err
+    );
+
+    server.finish();
+}
+
+#[test]
+fn audit_search_rejects_unsupported_filters_on_governed_backed_mode() {
+    let _guard = seam_guard();
+    let mut client = McpTestClient::spawn_governed_backed("http://127.0.0.1:1");
+
+    let response = client.call(
+        "tools/call",
+        json!({
+            "name": "audit.search",
+            "arguments": { "principal": "alice" }
+        }),
+    );
+    let message = response
+        .pointer("/result/error/message")
+        .and_then(|value| value.as_str())
+        .expect("unsupported audit.search filter error");
+    assert!(
+        message.contains("audit.search does not support filters in scg-backed mode"),
+        "unexpected audit.search error message: {}",
+        message
+    );
+
+    client.close();
 }

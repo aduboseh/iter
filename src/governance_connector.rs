@@ -264,8 +264,8 @@ impl ScgRuntime {
         // decision_id is content-addressed: identical inputs produce identical IDs.
         // That is the replay guarantee, not a collision bug.
         let mut packet = DecisionPacket::new(
-            env!("CARGO_PKG_VERSION").to_string(),
-            outcome.governance_hash.clone(),
+            env!("ITER_BUILD_HASH").to_string(),
+            env!("SUBSTRATE_BUILD_HASH").to_string(),
             &state,
             None,
             self.graph.economics_config().compute_hash(),
@@ -286,6 +286,56 @@ impl ScgRuntime {
             })?;
 
         Ok(packet)
+    }
+
+    /// Return audit.search filters that ScgBacked mode does not currently support.
+    pub fn unsupported_audit_filters(filter: &AuditSearchFilter) -> Vec<String> {
+        let mut unsupported = Vec::new();
+
+        if filter
+            .principal
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            unsupported.push("principal".to_string());
+        }
+        if filter
+            .action
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            unsupported.push("action".to_string());
+        }
+        if filter
+            .resource
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            unsupported.push("resource".to_string());
+        }
+        if filter
+            .policy_id
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            unsupported.push("policy_id".to_string());
+        }
+        if filter
+            .from
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            unsupported.push("from".to_string());
+        }
+        if filter
+            .to
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            unsupported.push("to".to_string());
+        }
+
+        unsupported
     }
 
     fn build_runtime_outcome(
@@ -330,8 +380,7 @@ impl GovernanceRuntime for ScgRuntime {
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
         let limit = filter.limit.unwrap_or(100).clamp(1, 1000) as usize;
 
-        // Supported filters: decision, limit.
-        // Other AuditSearchFilter fields are deferred to WO-ITER-SURFACE-001.
+        // main.rs rejects unsupported filters before routing audit.search here.
         let results: Vec<DecisionSummary> = self
             .audit_log
             .events()
