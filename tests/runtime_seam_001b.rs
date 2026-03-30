@@ -588,7 +588,7 @@ fn audit_search_rejects_unsupported_filters_on_governed_backed_mode() {
 }
 
 #[test]
-fn audit_replay_returns_scg_backed_decision_history() {
+fn audit_replay_returns_governed_remote_decision_history() {
     let _guard = seam_guard();
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
