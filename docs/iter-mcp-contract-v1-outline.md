@@ -27,15 +27,15 @@ All public MCP tools follow these canonical families:
 
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
-| `decision.check` | `governance.evaluate` | 1 (alias) | Governance decision gate. Default runtime is demo/non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate. |
-|| `decision.preview` | **ACTIVE** | 2 | Non-authoritative simulation. Returns projected decision without committing. |
+| `decision.check` | `governance.evaluate` | 1 (alias) | Governance decision gate. Default runtime is demo/non-authoritative; `--runtime-mode=governed-local` emits governed packets over the local stub substrate; `--runtime-mode=scg-backed` emits governed packets from the live SCG gateway fail-closed. |
+|| `decision.preview` | **ACTIVE** | 2 | Governance preview through the active runtime. Demo is non-authoritative; governed-local and scg-backed preview without committing. |
 | `decision.explain` | *(to be added)* | 3 | Structured explanation of decision rationale with policy trace. |
 
 ### Audit Tools (`audit.*`)
 
 | Canonical ID | Current Implementation | Phase | Description |
 |--------------|----------------------|-------|-------------|
-|| `audit.search` | **ACTIVE** | 2 | Search decisions by criteria (time range, principal, action, outcome). |
+|| `audit.search` | **ACTIVE** | 2 | Search decisions with deterministic ordering. Current scg-backed path supports `decision` and `limit`; unsupported filters return explicit error. |
 | `audit.export` | `esv.audit` | 1 (alias) | Export audit bundle for compliance/archival. Currently node-scoped; may expand to full bundles. |
 | `audit.replay` | `lineage.replay` | 1 (alias) | Deterministic replay of decision history. Verifies checksums and reconstructs lineage. |
 
@@ -115,8 +115,11 @@ Immutable governance decision artifact.
 ```
 
 **Optional Fields (runtime-dependent):**
-- `governance_hash` — canonical mirrored governance hash when the active runtime binds governance identity into the packet
-- `execution_trace` — ordered evaluation trace when the active runtime exposes deterministic trace data
+- `governance_hash` — omitted on demo path, populated from local `governance/governance.hash` on governed-local path, populated from the SCG canonical hash on scg-backed path
+- `execution_trace` — omitted when no trace is attached, attached from local evaluation on governed-local path, attached from SCG evaluation on scg-backed path
+
+**Vendor Contract Note:**
+> The vendored governance contract is cryptographically bound at build time via `build.rs`; it is not fetched as a runtime dependency.
 
 **PEP Statement:**
 > Iter does not enforce obligations. Obligations are advisory only; enforcement is the responsibility of the Policy Enforcement Point (PEP) caller.
@@ -196,7 +199,7 @@ Exportable audit artifact for compliance/archival.
 
 **Example:**
 ```
-audit.search(time_range=[T1, T2], principal="alice")
+audit.search(decision="ALLOW", limit=50)
 → Results ordered by (timestamp ASC, decision_id ASC)
 ```
 
