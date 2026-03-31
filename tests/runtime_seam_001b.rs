@@ -11,7 +11,7 @@ use governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, GovernanceRequest,
     CONTRACT_VERSION_STR,
 };
-use governance_bridge::trace::{ExecutionTrace, TraceStep};
+use governance_bridge::trace::{ExecutionTrace, OperationType, TraceStep};
 use serde_json::{json, Value};
 
 use iter_mcp_server::economics::EconomicsConfig;
@@ -341,12 +341,14 @@ fn make_trace() -> ExecutionTrace {
             operation: "compare_hash".to_string(),
             input_hash: "a".repeat(64),
             output_hash: "b".repeat(64),
+            operation_type: OperationType::HashVerify,
         },
         TraceStep {
             region_id: "governance.validator".to_string(),
             operation: "compose_decision".to_string(),
-            input_hash: "c".repeat(64),
+            input_hash: "b".repeat(64),
             output_hash: "d".repeat(64),
+            operation_type: OperationType::TraceFinalize,
         },
     ])
 }
