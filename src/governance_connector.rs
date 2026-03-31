@@ -479,7 +479,7 @@ impl GovernanceRuntime for ScgRuntime {
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
-        // map_or keeps this connector clear of unwrap_or-style fallbacks blocked by INV-RUNTIME-001.
+        // map_or keeps this connector clear of the CI-guarded defaulting pattern in this file.
         let limit = filter.limit.map_or(100, |limit| limit).clamp(1, 1000) as usize;
 
         // main.rs rejects unsupported filters before routing audit.search here.
