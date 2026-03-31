@@ -72,10 +72,7 @@ impl ScgRuntime {
                 e
             ))
         })?;
-        let host = match url.host_str() {
-            Some(host) => host,
-            None => "",
-        };
+        let host = url.host_str().map_or("", |host| host);
         let allow_loopback_http =
             url.scheme() == "http" && matches!(host, "localhost" | "127.0.0.1" | "::1");
 
@@ -465,6 +462,8 @@ impl GovernanceRuntime for ScgRuntime {
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
         let outcome = self.fetch_outcome(proposal)?;
         let packet = self.build_packet(&outcome)?;
+        // Defense in depth: build_packet enforces packet integrity before returning,
+        // and evaluate re-checks it at the outer boundary before audit/publish.
         Self::assert_scg_packet_integrity(&packet, "ScgBacked::evaluate")?;
         self.audit_log.append(&packet);
         self.record_replay_packet(packet.clone());
@@ -480,11 +479,7 @@ impl GovernanceRuntime for ScgRuntime {
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
-        let limit = match filter.limit {
-            Some(limit) => limit,
-            None => 100,
-        }
-        .clamp(1, 1000) as usize;
+        let limit = filter.limit.map_or(100, |limit| limit).clamp(1, 1000) as usize;
 
         // main.rs rejects unsupported filters before routing audit.search here.
         let mut results: Vec<DecisionSummary> = self
@@ -636,11 +631,15 @@ mod tests {
         missing_hash.governance_hash = Some(String::new());
         assert!(ScgRuntime::assert_scg_packet_integrity(&missing_hash, "test").is_err());
 
-        let mut missing_trace = make_packet(2, &format!("{:064x}", 2));
+        let mut absent_hash = make_packet(2, &format!("{:064x}", 2));
+        absent_hash.governance_hash = None;
+        assert!(ScgRuntime::assert_scg_packet_integrity(&absent_hash, "test").is_err());
+
+        let mut missing_trace = make_packet(3, &format!("{:064x}", 3));
         missing_trace.execution_trace.clear();
         assert!(ScgRuntime::assert_scg_packet_integrity(&missing_trace, "test").is_err());
 
-        let valid_packet = make_packet(3, &format!("{:064x}", 3));
+        let valid_packet = make_packet(4, &format!("{:064x}", 4));
         assert!(ScgRuntime::assert_scg_packet_integrity(&valid_packet, "test").is_ok());
     }
 }

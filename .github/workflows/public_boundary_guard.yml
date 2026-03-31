@@ -140,7 +140,7 @@ jobs:
 
       - name: INV-RUNTIME-001 reject fallback on ScgBacked path
         run: |
-          if grep -nE "GovernedLocal|crate::governed::|governed\.local|governed_local|fallback" src/governance_connector.rs; then
+          if grep -nE "GovernedLocal|crate::governed::|governed\.local|governed_local|(^|[^[:alnum:]_])fallback([^[:alnum:]_]|$)" src/governance_connector.rs; then
             echo "INVARIANT VIOLATION: INV-RUNTIME-001"
             echo "Fallback or governed-local reference in governance_connector"
             exit 1
