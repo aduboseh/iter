@@ -123,7 +123,7 @@ impl ScgRuntime {
         self.replay_packets.push_back(packet);
     }
 
-    fn assert_scg_packet_integrity(
+    fn assert_governed_packet_integrity(
         packet: &DecisionPacket,
         context: &str,
     ) -> Result<(), GovernanceRuntimeError> {
@@ -380,7 +380,7 @@ impl ScgRuntime {
             .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
                 reason: format!("packet checksum verification failed: {}", e),
             })?;
-        Self::assert_scg_packet_integrity(&packet, "ScgBacked::build_packet")?;
+        Self::assert_governed_packet_integrity(&packet, "ScgBacked::build_packet")?;
 
         Ok(packet)
     }
@@ -464,7 +464,7 @@ impl GovernanceRuntime for ScgRuntime {
         let packet = self.build_packet(&outcome)?;
         // Defense in depth: build_packet enforces packet integrity before returning,
         // and evaluate re-checks it at the outer boundary before audit/publish.
-        Self::assert_scg_packet_integrity(&packet, "ScgBacked::evaluate")?;
+        Self::assert_governed_packet_integrity(&packet, "ScgBacked::evaluate")?;
         self.audit_log.append(&packet);
         self.record_replay_packet(packet.clone());
         Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
@@ -479,6 +479,7 @@ impl GovernanceRuntime for ScgRuntime {
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
+        // map_or keeps this connector clear of unwrap_or-style fallbacks blocked by INV-RUNTIME-001.
         let limit = filter.limit.map_or(100, |limit| limit).clamp(1, 1000) as usize;
 
         // main.rs rejects unsupported filters before routing audit.search here.
@@ -626,20 +627,20 @@ mod tests {
     }
 
     #[test]
-    fn scg_packet_integrity_enforced_before_return() {
+    fn governed_packet_integrity_enforced_before_return() {
         let mut missing_hash = make_packet(1, &format!("{:064x}", 1));
         missing_hash.governance_hash = Some(String::new());
-        assert!(ScgRuntime::assert_scg_packet_integrity(&missing_hash, "test").is_err());
+        assert!(ScgRuntime::assert_governed_packet_integrity(&missing_hash, "test").is_err());
 
         let mut absent_hash = make_packet(2, &format!("{:064x}", 2));
         absent_hash.governance_hash = None;
-        assert!(ScgRuntime::assert_scg_packet_integrity(&absent_hash, "test").is_err());
+        assert!(ScgRuntime::assert_governed_packet_integrity(&absent_hash, "test").is_err());
 
         let mut missing_trace = make_packet(3, &format!("{:064x}", 3));
         missing_trace.execution_trace.clear();
-        assert!(ScgRuntime::assert_scg_packet_integrity(&missing_trace, "test").is_err());
+        assert!(ScgRuntime::assert_governed_packet_integrity(&missing_trace, "test").is_err());
 
         let valid_packet = make_packet(4, &format!("{:064x}", 4));
-        assert!(ScgRuntime::assert_scg_packet_integrity(&valid_packet, "test").is_ok());
+        assert!(ScgRuntime::assert_governed_packet_integrity(&valid_packet, "test").is_ok());
     }
 }
