@@ -118,3 +118,10 @@ scg_connector references corrected: none found
 Claims already correct from 0e6934c: governance.evaluate tool description in src/main.rs; decision.check tool description in src/main.rs; decision.preview tool description in src/main.rs; audit.search explicit unsupported-filter error in src/main.rs
 Deferred (required code change): none
 Claim surface: strictly isomorphic to merged PR #37 behavior
+
+HARDEN-002 STATUS: 2026-03-30
+INV-RUNTIME-001 CI guard: added to public_boundary_guard.yml
+INV-IMMUT-001 immutability assertion: present at line 361
+assert_scg_packet_integrity: present, called before packet return
+Cross-mode structural equivalence test: passing
+Remaining enforcement gaps: none

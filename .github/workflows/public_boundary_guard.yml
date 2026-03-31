@@ -138,6 +138,19 @@ jobs:
             exit 1
           fi
 
+      - name: INV-RUNTIME-001 reject fallback on ScgBacked path
+        run: |
+          if grep -nE "GovernedLocal|crate::governed::|governed\.local|governed_local|(^|[^[:alnum:]_])fallback([^[:alnum:]_]|$)" src/governance_connector.rs; then
+            echo "INVARIANT VIOLATION: INV-RUNTIME-001"
+            echo "Fallback or governed-local reference in governance_connector"
+            exit 1
+          fi
+          if grep -nE "unwrap_or|unwrap_or_default|unwrap_or_else" src/governance_connector.rs; then
+            echo "INVARIANT VIOLATION: INV-RUNTIME-001"
+            echo "unwrap_or-style fallback detected in governance_connector"
+            exit 1
+          fi
+
       # ================================================================
       # Build verification
       # ================================================================
