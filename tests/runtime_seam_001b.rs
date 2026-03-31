@@ -346,7 +346,7 @@ fn make_trace() -> ExecutionTrace {
         TraceStep {
             region_id: "governance.validator".to_string(),
             operation: "compose_decision".to_string(),
-            input_hash: "c".repeat(64),
+            input_hash: "b".repeat(64),
             output_hash: "d".repeat(64),
             operation_type: OperationType::TraceFinalize,
         },
