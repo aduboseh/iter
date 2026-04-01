@@ -1,10 +1,12 @@
+use crate::errors::BridgeError;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 // TRACE_SCHEMA_VERSION: bump when TraceStep fields change.
 pub const TRACE_SCHEMA_VERSION: &str = "trace.v1";
 
 // Stable typed operation taxonomy for execution traces.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OperationType {
     PolicyEval,
@@ -14,6 +16,18 @@ pub enum OperationType {
     TraceFinalize,
 }
 
+impl OperationType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::PolicyEval => "policy_eval",
+            Self::HashVerify => "hash_verify",
+            Self::StateCheck => "state_check",
+            Self::DecisionEmit => "decision_emit",
+            Self::TraceFinalize => "trace_finalize",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TraceStep {
     pub region_id: String,
@@ -21,6 +35,10 @@ pub struct TraceStep {
     pub input_hash: String,
     pub output_hash: String,
     pub operation_type: OperationType,
+    #[serde(default)]
+    pub input_payload: String,
+    #[serde(default)]
+    pub output_payload: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -71,6 +89,42 @@ impl ExecutionTrace {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).expect("ExecutionTrace serialization must not fail")
+        serde_json::to_string(self)
+            .expect("ExecutionTrace serialization must not fail")
+            .into_bytes()
     }
+}
+
+impl TraceStep {
+    pub fn verify_hash_binding(&self) -> Result<(), BridgeError> {
+        let expected_input_hash = payload_hash(&self.input_payload);
+        if self.input_hash != expected_input_hash {
+            return Err(BridgeError::TraceDeterminismViolation(format!(
+                "input_hash mismatch for operation '{}' ({}): expected {}, got {}",
+                self.operation,
+                self.operation_type.as_str(),
+                expected_input_hash,
+                self.input_hash
+            )));
+        }
+
+        let expected_output_hash = payload_hash(&self.output_payload);
+        if self.output_hash != expected_output_hash {
+            return Err(BridgeError::TraceDeterminismViolation(format!(
+                "output_hash mismatch for operation '{}' ({}): expected {}, got {}",
+                self.operation,
+                self.operation_type.as_str(),
+                expected_output_hash,
+                self.output_hash
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+fn payload_hash(payload: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(payload.as_bytes());
+    hex::encode_upper(hasher.finalize())
 }

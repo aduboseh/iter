@@ -617,6 +617,7 @@ mod tests {
         let second = make_packet(2, &format!("{:064x}", 2));
 
         runtime.audit_log.append(&first);
+        std::thread::sleep(std::time::Duration::from_millis(2));
         runtime.audit_log.append(&second);
 
         let result = runtime.search_decisions(&AuditSearchFilter::default());

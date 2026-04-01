@@ -33,11 +33,11 @@ fn main() {
     let expected: &[(&str, &str)] = &[
         (
             "vendor/governance-bridge/src/contract.rs",
-            "d7b27a5731c05332f4ef2724bc69b9b34e695d5e7f26b516f3440c01baa4dd94",
+            "ab8671912ac6ab477a87f6a5f91b6031032dfe560557c97b4350c22b45e3a6f4",
         ),
         (
             "vendor/governance-bridge/src/trace.rs",
-            "5ca8df091cd0791c806c36ca35849aae53331674c3bd0a5e5c94320fc4ad6979",
+            "fe26274fc20638810b0d7c215a31ce8e6791494112cb848ab768dd1b25d7cc30",
         ),
         (
             "vendor/governance-bridge/src/errors.rs",
@@ -45,7 +45,7 @@ fn main() {
         ),
         (
             "vendor/governance-bridge/src/lib.rs",
-            "718c723b7b84c06e0ffc035126ff21999ca82ac38707b9fb3c6055ffe84ec112",
+            "e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36",
         ),
     ];
 

@@ -21,7 +21,34 @@ fn stub_hash(value: &str) -> String {
 
     let mut hasher = Sha256::new();
     hasher.update(value.as_bytes());
-    hex::encode(hasher.finalize())
+    hex::encode_upper(hasher.finalize())
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+fn stub_payload<T: serde::Serialize>(value: &T) -> String {
+    serde_json::to_string(value).expect("stub trace payload serialization must not fail")
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+fn stub_trace_step<TInput: serde::Serialize, TOutput: serde::Serialize>(
+    region_id: &str,
+    operation: &str,
+    operation_type: OperationType,
+    input: &TInput,
+    output: &TOutput,
+) -> TraceStep {
+    let input_payload = stub_payload(input);
+    let output_payload = stub_payload(output);
+
+    TraceStep {
+        region_id: region_id.into(),
+        operation: operation.into(),
+        input_hash: stub_hash(&input_payload),
+        output_hash: stub_hash(&output_payload),
+        operation_type,
+        input_payload,
+        output_payload,
+    }
 }
 
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -36,21 +63,72 @@ impl GovernanceBridge for StubBridge {
         let decision = Decision::Allow;
 
         let mut trace = ExecutionTrace::new();
-        let eval_output_hash = stub_hash(&format!("Allow::{}", request.proposal_id));
-        trace.push(TraceStep {
-            region_id: "stub".into(),
-            operation: "eval".into(),
-            input_hash: stub_hash(&request.proposal_id),
-            output_hash: eval_output_hash.clone(),
-            operation_type: OperationType::PolicyEval,
-        });
-        trace.push(TraceStep {
-            region_id: "stub".into(),
-            operation: "trace-finalize".into(),
-            input_hash: eval_output_hash,
-            output_hash: stub_hash(&format!("sealed::Allow::{}", request.proposal_id)),
-            operation_type: OperationType::TraceFinalize,
-        });
+        let hash_input = (
+            request.proposal_id.clone(),
+            request.state_snapshot_hash.clone(),
+            request.requested_action.clone(),
+        );
+        let hash_output = (request.state_snapshot_hash.clone(), true);
+        trace.push(stub_trace_step(
+            "stub",
+            "snapshot-hash-compare",
+            OperationType::HashVerify,
+            &hash_input,
+            &hash_output,
+        ));
+
+        let policy_input = hash_output.clone();
+        let policy_output = (
+            policy_input.clone(),
+            request.requested_action.clone(),
+            decision.clone(),
+        );
+        trace.push(stub_trace_step(
+            "stub",
+            "policy-eval",
+            OperationType::PolicyEval,
+            &policy_input,
+            &policy_output,
+        ));
+
+        let state_input = policy_output.clone();
+        let state_output = (state_input.clone(), "state-ok", false);
+        trace.push(stub_trace_step(
+            "stub",
+            "state-check",
+            OperationType::StateCheck,
+            &state_input,
+            &state_output,
+        ));
+
+        let decision_input = state_output.clone();
+        let decision_output = (
+            decision.clone(),
+            request.requested_action.clone(),
+            request.proposal_id.clone(),
+        );
+        trace.push(stub_trace_step(
+            "stub",
+            "decision-emit",
+            OperationType::DecisionEmit,
+            &decision_input,
+            &decision_output,
+        ));
+
+        let finalize_input = decision_output.clone();
+        let finalize_output = (
+            self.governance_hash.as_str(),
+            CONTRACT_VERSION_STR,
+            request.proposal_id.as_str(),
+            "trace-sealed",
+        );
+        trace.push(stub_trace_step(
+            "stub",
+            "trace-finalize",
+            OperationType::TraceFinalize,
+            &finalize_input,
+            &finalize_output,
+        ));
 
         let replay_id = GovernanceOutcome::compute_replay_id(
             CONTRACT_VERSION_STR,

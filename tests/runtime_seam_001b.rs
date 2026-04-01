@@ -12,7 +12,9 @@ use governance_bridge::contract::{
     CONTRACT_VERSION_STR,
 };
 use governance_bridge::trace::{ExecutionTrace, OperationType, TraceStep};
+use serde::Serialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use iter_mcp_server::economics::EconomicsConfig;
 use iter_mcp_server::governance_connector::ScgRuntime;
@@ -334,22 +336,105 @@ fn expected_request() -> GovernanceRequest {
     }
 }
 
+fn canonical_payload<T: Serialize>(value: &T) -> String {
+    serde_json::to_string(value).expect("trace payload serialization")
+}
+
+fn payload_hash(payload: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(payload.as_bytes());
+    hex::encode_upper(hasher.finalize())
+}
+
+fn trace_step<TInput: Serialize, TOutput: Serialize>(
+    region_id: &str,
+    operation: &str,
+    operation_type: OperationType,
+    input: &TInput,
+    output: &TOutput,
+) -> TraceStep {
+    let input_payload = canonical_payload(input);
+    let output_payload = canonical_payload(output);
+
+    TraceStep {
+        region_id: region_id.to_string(),
+        operation: operation.to_string(),
+        input_hash: payload_hash(&input_payload),
+        output_hash: payload_hash(&output_payload),
+        operation_type,
+        input_payload,
+        output_payload,
+    }
+}
+
 fn make_trace() -> ExecutionTrace {
+    let hash_input = (
+        "runtime-seam-001b".to_string(),
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
+    );
+    let hash_output = (
+        true,
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
+    );
+    let policy_input = hash_output.clone();
+    let policy_output = (policy_input.clone(), 0.0_f64, true);
+    let state_input = policy_output.clone();
+    let state_output = (state_input.clone(), Vec::<String>::new(), false, false);
+    let decision_input = state_output.clone();
+    let decision_output = (
+        ScgDecision::Allow,
+        "deploy_capsule".to_string(),
+        true,
+        true,
+        false,
+        false,
+    );
+    let finalize_input = decision_output.clone();
+    let finalize_output = (
+        GOVERNANCE_HASH.trim(),
+        CONTRACT_VERSION_STR,
+        "runtime-seam-001b",
+        "trace-sealed",
+    );
+
     ExecutionTrace::from_steps(vec![
-        TraceStep {
-            region_id: "gateway.snapshot".to_string(),
-            operation: "compare_hash".to_string(),
-            input_hash: "a".repeat(64),
-            output_hash: "b".repeat(64),
-            operation_type: OperationType::HashVerify,
-        },
-        TraceStep {
-            region_id: "governance.validator".to_string(),
-            operation: "compose_decision".to_string(),
-            input_hash: "b".repeat(64),
-            output_hash: "d".repeat(64),
-            operation_type: OperationType::TraceFinalize,
-        },
+        trace_step(
+            "scg-governor-cluster",
+            "snapshot-hash-compare",
+            OperationType::HashVerify,
+            &hash_input,
+            &hash_output,
+        ),
+        trace_step(
+            "scg-governance",
+            "drift-validate",
+            OperationType::PolicyEval,
+            &policy_input,
+            &policy_output,
+        ),
+        trace_step(
+            "scg-governor-cluster",
+            "violation-scan",
+            OperationType::StateCheck,
+            &state_input,
+            &state_output,
+        ),
+        trace_step(
+            "scg-gateway",
+            "decision-compose",
+            OperationType::DecisionEmit,
+            &decision_input,
+            &decision_output,
+        ),
+        trace_step(
+            "scg-gateway",
+            "trace-finalize",
+            OperationType::TraceFinalize,
+            &finalize_input,
+            &finalize_output,
+        ),
     ])
 }
 

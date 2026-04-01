@@ -9,6 +9,13 @@ use crate::{
 };
 
 pub const CONTRACT_VERSION_STR: &str = "scg.v1";
+const TRACE_V1_REQUIRED_SEQUENCE: [OperationType; 5] = [
+    OperationType::HashVerify,
+    OperationType::PolicyEval,
+    OperationType::StateCheck,
+    OperationType::DecisionEmit,
+    OperationType::TraceFinalize,
+];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GovernanceRequest {
@@ -67,8 +74,7 @@ impl GovernanceOutcome {
     }
 
     pub fn verify_replay_id(&self) -> Result<(), BridgeError> {
-        self.execution_trace.validate_schema_version()?;
-        self.execution_trace.validate_chain()?;
+        self.execution_trace.validate_semantics()?;
         if self.contract_version != CONTRACT_VERSION_STR {
             return Err(BridgeError::ContractVersionMismatch {
                 expected: CONTRACT_VERSION_STR.to_string(),
@@ -140,6 +146,106 @@ impl ExecutionTrace {
                 TRACE_SCHEMA_VERSION, self.trace_version
             )));
         }
+        Ok(())
+    }
+
+    pub fn validate_sequence(&self) -> Result<(), BridgeError> {
+        match self.trace_version.as_str() {
+            TRACE_SCHEMA_VERSION => {
+                let steps = self.steps();
+                if steps.len() < 2 {
+                    return Ok(());
+                }
+
+                for i in 1..steps.len() {
+                    let from = steps[i - 1].operation_type;
+                    let to = steps[i].operation_type;
+                    if !matches!(
+                        (from, to),
+                        (OperationType::HashVerify, OperationType::PolicyEval)
+                            | (OperationType::PolicyEval, OperationType::StateCheck)
+                            | (OperationType::StateCheck, OperationType::DecisionEmit)
+                            | (OperationType::DecisionEmit, OperationType::TraceFinalize)
+                    ) {
+                        return Err(BridgeError::TraceDeterminismViolation(format!(
+                            "invalid trace transition at step {}: {} -> {}",
+                            i,
+                            from.as_str(),
+                            to.as_str()
+                        )));
+                    }
+                }
+
+                Ok(())
+            }
+            _ => self.validate_schema_version(),
+        }
+    }
+
+    pub fn validate_completeness(&self) -> Result<(), BridgeError> {
+        match self.trace_version.as_str() {
+            TRACE_SCHEMA_VERSION => {
+                let steps = self.steps();
+                if steps.len() != TRACE_V1_REQUIRED_SEQUENCE.len() {
+                    return Err(BridgeError::TraceDeterminismViolation(format!(
+                        "trace.v1 governed traces require exactly {} steps, got {}",
+                        TRACE_V1_REQUIRED_SEQUENCE.len(),
+                        steps.len()
+                    )));
+                }
+
+                let mut counts = BTreeMap::new();
+                for step in steps {
+                    *counts.entry(step.operation_type).or_insert(0usize) += 1;
+                }
+
+                for operation in TRACE_V1_REQUIRED_SEQUENCE {
+                    match counts.get(&operation).copied().unwrap_or(0) {
+                        0 => {
+                            return Err(BridgeError::TraceDeterminismViolation(format!(
+                                "trace.v1 governed traces require exactly one {} step, got 0",
+                                operation.as_str()
+                            )))
+                        }
+                        1 => {}
+                        count => {
+                            return Err(BridgeError::TraceDeterminismViolation(format!(
+                                "trace.v1 governed traces require exactly one {} step, got {}",
+                                operation.as_str(),
+                                count
+                            )))
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+            _ => self.validate_schema_version(),
+        }
+    }
+
+    pub fn validate_semantics(&self) -> Result<(), BridgeError> {
+        self.validate_schema_version()?;
+        self.validate_chain()?;
+        self.validate_sequence()?;
+        self.validate_completeness()?;
+        self.verify_hash_bindings_for_all_steps()?;
+        Ok(())
+    }
+
+    fn verify_hash_bindings_for_all_steps(&self) -> Result<(), BridgeError> {
+        for (i, step) in self.steps().iter().enumerate() {
+            step.verify_hash_binding().map_err(|error| match error {
+                BridgeError::TraceDeterminismViolation(message) => {
+                    BridgeError::TraceDeterminismViolation(format!(
+                        "hash binding mismatch at step {}: {}",
+                        i, message
+                    ))
+                }
+                other => other,
+            })?;
+        }
+
         Ok(())
     }
 }
