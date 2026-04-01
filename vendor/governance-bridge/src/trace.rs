@@ -35,7 +35,9 @@ pub struct TraceStep {
     pub input_hash: String,
     pub output_hash: String,
     pub operation_type: OperationType,
+    #[serde(default)]
     pub input_payload: String,
+    #[serde(default)]
     pub output_payload: String,
 }
 

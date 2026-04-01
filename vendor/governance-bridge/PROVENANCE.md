@@ -9,7 +9,7 @@
 | Vendored | 2026-03-31 |
 | CONTRACT_VERSION_STR | `scg.v1` |
 | `contract.rs` SHA256 | `ab8671912ac6ab477a87f6a5f91b6031032dfe560557c97b4350c22b45e3a6f4` |
-| `trace.rs` SHA256 | `049f8b83afb049e2ef98ad383094ad9e56cee80284281573e08fef78f8c0fc87` |
+| `trace.rs` SHA256 | `fe26274fc20638810b0d7c215a31ce8e6791494112cb848ab768dd1b25d7cc30` |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
 | `lib.rs` SHA256 | `e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36` |
 
@@ -30,5 +30,8 @@ To update this snapshot intentionally:
 Semantic trace hardening: `validate_semantics()`, `validate_sequence()`,
 `validate_completeness()`, `verify_hash_binding()`, `input_payload`, and
 `output_payload` fields added to `TraceStep`.
+Iter compatibility shim: `input_payload` and `output_payload` use
+`#[serde(default)]` so pre-semantic `trace.v1` artifacts deserialize and then
+fail closed in semantic validation rather than failing at raw decode.
 
 Do not edit files in this directory without following the update protocol.
