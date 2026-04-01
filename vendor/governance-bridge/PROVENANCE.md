@@ -4,14 +4,14 @@
 |---|---|
 | Source | https://github.com/aduboseh/SCG |
 | Crate path | crates/scg-governance-bridge |
-| SCG source commit | `96236b6a072fddc770158903e65793fce44eec9f` (merge of PR #10) |
-| SCG merged main/master head at vendor time | `96236b6a072fddc770158903e65793fce44eec9f` |
+| SCG source commit | `eb83bf1ca7d761b227a7fc9fa58d3a5d194455b2` (merge of PR #11) |
+| SCG merged main/master head at vendor time | `eb83bf1ca7d761b227a7fc9fa58d3a5d194455b2` |
 | Vendored | 2026-03-31 |
 | CONTRACT_VERSION_STR | `scg.v1` |
-| `contract.rs` SHA256 | `d7b27a5731c05332f4ef2724bc69b9b34e695d5e7f26b516f3440c01baa4dd94` |
-| `trace.rs` SHA256 | `5ca8df091cd0791c806c36ca35849aae53331674c3bd0a5e5c94320fc4ad6979` |
+| `contract.rs` SHA256 | `ab8671912ac6ab477a87f6a5f91b6031032dfe560557c97b4350c22b45e3a6f4` |
+| `trace.rs` SHA256 | `049f8b83afb049e2ef98ad383094ad9e56cee80284281573e08fef78f8c0fc87` |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
-| `lib.rs` SHA256 | `718c723b7b84c06e0ffc035126ff21999ca82ac38707b9fb3c6055ffe84ec112` |
+| `lib.rs` SHA256 | `e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36` |
 
 ## Update Protocol
 
@@ -24,5 +24,11 @@ To update this snapshot intentionally:
 3. Update the constants in `build.rs`.
 4. Update this file with the new commit and hashes.
 5. Open a PR. Changes under `vendor/` require explicit review.
+
+## Notes
+
+Semantic trace hardening: `validate_semantics()`, `validate_sequence()`,
+`validate_completeness()`, `verify_hash_binding()`, `input_payload`, and
+`output_payload` fields added to `TraceStep`.
 
 Do not edit files in this directory without following the update protocol.
