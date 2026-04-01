@@ -4,11 +4,11 @@
 |---|---|
 | Source | https://github.com/aduboseh/SCG |
 | Crate path | crates/scg-governance-bridge |
-| SCG source commit | `eb83bf1ca7d761b227a7fc9fa58d3a5d194455b2` (merge of PR #11) |
+| SCG source commit | `f7d38fd4516cb49759b24fc0dfb7b744ba5eef8b` (open PR #12) |
 | SCG merged main/master head at vendor time | `eb83bf1ca7d761b227a7fc9fa58d3a5d194455b2` |
 | Vendored | 2026-03-31 |
 | CONTRACT_VERSION_STR | `scg.v1` |
-| `contract.rs` SHA256 | `ab8671912ac6ab477a87f6a5f91b6031032dfe560557c97b4350c22b45e3a6f4` |
+| `contract.rs` SHA256 | `1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0` |
 | `trace.rs` SHA256 | `fe26274fc20638810b0d7c215a31ce8e6791494112cb848ab768dd1b25d7cc30` |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
 | `lib.rs` SHA256 | `e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36` |
@@ -33,5 +33,7 @@ Semantic trace hardening: `validate_semantics()`, `validate_sequence()`,
 Iter compatibility shim: `input_payload` and `output_payload` use
 `#[serde(default)]` so pre-semantic `trace.v1` artifacts deserialize and then
 fail closed in semantic validation rather than failing at raw decode.
+Seam audit mirror: `verify_replay_id()` now gates on `contract_version` before
+`validate_semantics()`, matching the canonical SCG seam-audit fix.
 
 Do not edit files in this directory without following the update protocol.

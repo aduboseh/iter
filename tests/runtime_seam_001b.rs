@@ -12,6 +12,7 @@ use governance_bridge::contract::{
     CONTRACT_VERSION_STR,
 };
 use governance_bridge::trace::{ExecutionTrace, OperationType, TraceStep};
+use governance_bridge::{GovernanceBridge as _, StubBridge};
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -853,4 +854,34 @@ fn governed_local_and_governed_backed_produce_structurally_equivalent_packets() 
     );
 
     server.finish();
+}
+
+#[test]
+fn governed_local_trace_passes_semantic_validation() {
+    let _guard = seam_guard();
+    let mut local_runtime = governed_local_runtime();
+    let local_outcome = local_runtime
+        .evaluate(&proposal())
+        .expect("governed-local evaluate");
+    let local_packet = local_outcome
+        .packet
+        .as_ref()
+        .expect("governed-local must emit packet");
+    let bridge = StubBridge {
+        governance_hash: GOVERNANCE_HASH.trim().to_string(),
+    };
+    let outcome = bridge
+        .evaluate(expected_request())
+        .expect("stub bridge evaluate");
+
+    assert_eq!(
+        local_packet.governance_hash.as_deref(),
+        Some(outcome.governance_hash.as_str())
+    );
+    assert!(
+        !local_packet.execution_trace.is_empty(),
+        "governed-local runtime must emit a non-empty packet trace"
+    );
+    assert!(outcome.execution_trace.validate_semantics().is_ok());
+    assert!(outcome.verify_replay_id().is_ok());
 }

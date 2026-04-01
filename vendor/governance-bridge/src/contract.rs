@@ -74,13 +74,13 @@ impl GovernanceOutcome {
     }
 
     pub fn verify_replay_id(&self) -> Result<(), BridgeError> {
-        self.execution_trace.validate_semantics()?;
         if self.contract_version != CONTRACT_VERSION_STR {
             return Err(BridgeError::ContractVersionMismatch {
                 expected: CONTRACT_VERSION_STR.to_string(),
                 got: self.contract_version.clone(),
             });
         }
+        self.execution_trace.validate_semantics()?;
         let expected = Self::compute_replay_id(
             &self.contract_version,
             &self.decision,
