@@ -33,7 +33,7 @@ fn main() {
     let expected: &[(&str, &str)] = &[
         (
             "vendor/governance-bridge/src/contract.rs",
-            "ab8671912ac6ab477a87f6a5f91b6031032dfe560557c97b4350c22b45e3a6f4",
+            "1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0",
         ),
         (
             "vendor/governance-bridge/src/trace.rs",

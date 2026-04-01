@@ -476,6 +476,92 @@ fn governed_local_runtime() -> GovernedRuntime {
     )
 }
 
+fn governed_local_contract_outcome() -> ScgGovernanceOutcome {
+    let request = expected_request();
+    let decision = ScgDecision::Allow;
+
+    let hash_input = (
+        request.proposal_id.clone(),
+        request.state_snapshot_hash.clone(),
+        request.requested_action.clone(),
+    );
+    let hash_output = (request.state_snapshot_hash.clone(), true);
+    let policy_input = hash_output.clone();
+    let policy_output = (
+        policy_input.clone(),
+        request.requested_action.clone(),
+        decision.clone(),
+    );
+    let state_input = policy_output.clone();
+    let state_output = (state_input.clone(), "state-ok", false);
+    let decision_input = state_output.clone();
+    let decision_output = (
+        decision.clone(),
+        request.requested_action.clone(),
+        request.proposal_id.clone(),
+    );
+    let finalize_input = decision_output.clone();
+    let finalize_output = (
+        GOVERNANCE_HASH.trim(),
+        CONTRACT_VERSION_STR,
+        request.proposal_id.as_str(),
+        "trace-sealed",
+    );
+
+    let execution_trace = ExecutionTrace::from_steps(vec![
+        trace_step(
+            "stub",
+            "snapshot-hash-compare",
+            OperationType::HashVerify,
+            &hash_input,
+            &hash_output,
+        ),
+        trace_step(
+            "stub",
+            "policy-eval",
+            OperationType::PolicyEval,
+            &policy_input,
+            &policy_output,
+        ),
+        trace_step(
+            "stub",
+            "state-check",
+            OperationType::StateCheck,
+            &state_input,
+            &state_output,
+        ),
+        trace_step(
+            "stub",
+            "decision-emit",
+            OperationType::DecisionEmit,
+            &decision_input,
+            &decision_output,
+        ),
+        trace_step(
+            "stub",
+            "trace-finalize",
+            OperationType::TraceFinalize,
+            &finalize_input,
+            &finalize_output,
+        ),
+    ]);
+
+    let mut outcome = ScgGovernanceOutcome {
+        contract_version: CONTRACT_VERSION_STR.to_string(),
+        decision,
+        governance_hash: GOVERNANCE_HASH.trim().to_string(),
+        execution_trace,
+        replay_id: String::new(),
+    };
+    outcome.replay_id = ScgGovernanceOutcome::compute_replay_id(
+        &outcome.contract_version,
+        &outcome.decision,
+        &outcome.governance_hash,
+        &outcome.execution_trace,
+    );
+    outcome
+}
+
 #[test]
 fn governed_backed_mode_emits_governed_packet() {
     let _guard = seam_guard();
@@ -853,4 +939,13 @@ fn governed_local_and_governed_backed_produce_structurally_equivalent_packets() 
     );
 
     server.finish();
+}
+
+#[test]
+fn governed_local_trace_passes_semantic_validation() {
+    let _guard = seam_guard();
+    let outcome = governed_local_contract_outcome();
+
+    assert!(outcome.execution_trace.validate_semantics().is_ok());
+    assert!(outcome.verify_replay_id().is_ok());
 }
