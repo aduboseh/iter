@@ -1,6 +1,9 @@
 use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
 
+// Compile-time build attestation baked into the binary.
+const ITER_BUILD_MODE: &str = env!("ITER_BUILD_MODE");
+
 /// Server profile controlling which MCP tools are exposed.
 ///
 /// - `Governance`: Production PDP surface. No kernel/graph tools.
@@ -53,7 +56,16 @@ fn detect_runtime_mode(args: &[String]) -> RuntimeMode {
     }
 }
 
+fn assert_build_mode() {
+    match ITER_BUILD_MODE {
+        "PUBLIC_STUB" | "FULL_SUBSTRATE" => {}
+        other => panic!("ITER_BUILD_MODE is invalid or tampered: {:?}", other),
+    }
+}
+
 fn main() {
+    assert_build_mode();
+
     let args: Vec<String> = std::env::args().collect();
     let json_only = args.iter().any(|a| a == "--json-only");
     let profile = detect_profile(&args);
@@ -83,7 +95,11 @@ fn print_mode_banner(runtime_mode: RuntimeMode) {
     eprintln!("┌────────────────────────────────────────────────────────────┐");
     match runtime_mode {
         RuntimeMode::Demo => {
-            eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
+            if ITER_BUILD_MODE == "PUBLIC_STUB" {
+                eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
+            } else {
+                eprintln!("│ ITER: DEMO MODE (FULL SUBSTRATE BUILD)                     │");
+            }
             eprintln!("│ Proprietary substrate DISABLED                             │");
             eprintln!("│ Responses are deterministic placeholders                   │");
             eprintln!("└────────────────────────────────────────────────────────────┘");

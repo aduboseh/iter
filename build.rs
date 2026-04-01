@@ -54,24 +54,14 @@ fn main() {
         ),
     ];
 
-    let mut failed = false;
     for (path, expected_hash) in expected {
         let actual = sha256_file(path);
         if actual != *expected_hash {
-            println!(
-                "cargo:warning=GOVERNANCE INTEGRITY VIOLATION: {} hash mismatch",
-                path
+            panic!(
+                "\n\nGOVERNANCE INTEGRITY VIOLATION: {} hash mismatch\n  expected: {}\n  actual:   {}\n\nBuild aborted — provenance cannot be established.\n",
+                path, expected_hash, actual
             );
-            println!("cargo:warning=  expected: {}", expected_hash);
-            println!("cargo:warning=  actual:   {}", actual);
-            failed = true;
         }
-    }
-
-    if failed {
-        panic!(
-            "Vendor governance-bridge integrity check failed. The vendored contract does not match the canonical SCG source. To update intentionally: recompute hashes in build.rs and update vendor/governance-bridge/PROVENANCE.md with the new commit and hash."
-        );
     }
 
     let iter_identity = format!(
@@ -118,10 +108,10 @@ fn main() {
         }
     }
 
-    // Print build mode for verification
-    #[cfg(feature = "public_stub")]
-    println!("cargo:warning=Building in PUBLIC STUB mode");
-
-    #[cfg(all(feature = "full_substrate", not(feature = "public_stub")))]
-    println!("cargo:warning=Building with FULL SUBSTRATE");
+    let is_stub_mode = std::env::var_os("CARGO_FEATURE_PUBLIC_STUB").is_some();
+    if is_stub_mode {
+        println!("cargo:rustc-env=ITER_BUILD_MODE=PUBLIC_STUB");
+    } else {
+        println!("cargo:rustc-env=ITER_BUILD_MODE=FULL_SUBSTRATE");
+    }
 }
