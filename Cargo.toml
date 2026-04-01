@@ -59,7 +59,7 @@ schemars = { version = "0.8", optional = true }
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
-governance-bridge = { package = "scg-governance-bridge", path = "vendor/governance-bridge" }
+governance-bridge = { package = "scg-governance-bridge", path = "vendor/governance-bridge", features = ["test-fixtures"] }
 
 # Error handling
 thiserror = "2.0"
