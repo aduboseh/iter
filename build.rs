@@ -37,7 +37,7 @@ fn main() {
         ),
         (
             "vendor/governance-bridge/src/trace.rs",
-            "2a0f2780a8f007306507ff2dcdde9a3c8dd02aeaeca6ace3e52b88aa1a3ada29",
+            "568cb863df5363ea922187dfd8d379a4396ff387be5ac315f75c923a354cdf05",
         ),
         (
             "vendor/governance-bridge/src/errors.rs",
