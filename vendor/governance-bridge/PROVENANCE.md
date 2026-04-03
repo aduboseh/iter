@@ -30,13 +30,11 @@ To update this snapshot intentionally:
 Semantic trace hardening: `validate_semantics()`, `validate_sequence()`,
 `validate_completeness()`, `verify_hash_binding()`, `input_payload`, and
 `output_payload` fields added to `TraceStep`.
-Iter compatibility shim: `input_payload` and `output_payload` use
-`#[serde(default)]` so pre-semantic `trace.v1` artifacts deserialize and then
-fail closed in semantic validation rather than failing at raw decode.
 Seam audit mirror: `verify_replay_id()` now gates on `contract_version` before
 `validate_semantics()`, matching the canonical SCG seam-audit fix.
 
 Do not edit files in this directory without following the update protocol.
+
 ## Symmetry restored — 2026-04-02
 trace.rs is now exactly canonical with SCG upstream at
 commit e5095cb.
