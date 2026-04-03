@@ -16,11 +16,19 @@ use std::collections::HashMap;
 /// - API key metadata
 /// - mTLS certificate subject
 ///
-/// # Example (future)
-/// ```ignore
-/// let ctx = CallerContext::from_token(&jwt)?;
-/// if !ctx.has_permission("node.create") {
-///     return Err(McpError::Forbidden { ... });
+/// # Example
+/// ```rust,no_run
+/// use iter_mcp_server::caller_context::CallerContext;
+/// use iter_mcp_server::McpError;
+///
+/// fn example() -> Result<(), McpError> {
+///     let ctx = CallerContext::system();
+///     if !ctx.has_permission("node.create") {
+///         return Err(McpError::BadRequest {
+///             message: "missing permission: node.create".to_string(),
+///         });
+///     }
+///     Ok(())
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
