@@ -97,6 +97,14 @@ impl ExecutionTrace {
 
 impl TraceStep {
     pub fn verify_hash_binding(&self) -> Result<(), BridgeError> {
+        if self.input_payload.is_empty() {
+            return Err(BridgeError::TraceDeterminismViolation(format!(
+                "input_payload missing for operation '{}' ({})",
+                self.operation,
+                self.operation_type.as_str()
+            )));
+        }
+
         let expected_input_hash = payload_hash(&self.input_payload);
         if self.input_hash != expected_input_hash {
             return Err(BridgeError::TraceDeterminismViolation(format!(
@@ -105,6 +113,14 @@ impl TraceStep {
                 self.operation_type.as_str(),
                 expected_input_hash,
                 self.input_hash
+            )));
+        }
+
+        if self.output_payload.is_empty() {
+            return Err(BridgeError::TraceDeterminismViolation(format!(
+                "output_payload missing for operation '{}' ({})",
+                self.operation,
+                self.operation_type.as_str()
             )));
         }
 
