@@ -4,12 +4,12 @@
 |---|---|
 | Source | https://github.com/aduboseh/SCG |
 | Crate path | crates/scg-governance-bridge |
-| SCG source commit | `b4b165d71377477b62902a9e3615e8ff5d1d5604` (CANON-001 branch head) |
+| SCG source commit | `da14c8390ba8ceeb0ab15d85c598d2042a2029cf` (CANON-001 branch head) |
 | SCG merged main/master head at vendor time | `3e0675073a50ce20bdad7c342f7a5caaa3801504` |
 | Vendored | 2026-04-03 |
 | CONTRACT_VERSION_STR | `scg.v1` |
 | `contract.rs` SHA256 | `1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0` |
-| `trace.rs` SHA256 | `568cb863df5363ea922187dfd8d379a4396ff387be5ac315f75c923a354cdf05` |
+| 	race.rs SHA256 | $scgHash |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
 | `lib.rs` SHA256 | `e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36` |
 
@@ -38,5 +38,5 @@ Do not edit files in this directory without following the update protocol.
 ## Canonical serialization locked — 2026-04-03
 trace.rs canonical_payload() now uses sorted-key JSON (see CANON.md).
 serde_json::to_string removed from canonical form.
-Symmetric with SCG canonical at commit b4b165d71377477b62902a9e3615e8ff5d1d5604.
+Symmetric with SCG canonical at commit da14c8390ba8ceeb0ab15d85c598d2042a2029cf.
 No active drift.

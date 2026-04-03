@@ -89,11 +89,9 @@ impl ExecutionTrace {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let value = serde_json::to_value(self)
-            .expect("ExecutionTrace serialization must not fail");
+        let value = serde_json::to_value(self).expect("ExecutionTrace serialization must not fail");
         let canonical = canonicalize(&value);
-        serde_json::to_vec(&canonical)
-            .expect("canonical serialization must not fail")
+        serde_json::to_vec(&canonical).expect("canonical serialization must not fail")
     }
 }
 
@@ -117,11 +115,9 @@ pub fn canonicalize(value: &serde_json::Value) -> serde_json::Value {
 
 impl TraceStep {
     pub fn canonical_payload(&self) -> Vec<u8> {
-        let value = serde_json::to_value(self)
-            .expect("TraceStep serialization must not fail");
+        let value = serde_json::to_value(self).expect("TraceStep serialization must not fail");
         let canonical = canonicalize(&value);
-        serde_json::to_vec(&canonical)
-            .expect("canonical serialization must not fail")
+        serde_json::to_vec(&canonical).expect("canonical serialization must not fail")
     }
 
     pub fn verify_hash_binding(&self) -> Result<(), BridgeError> {
@@ -133,7 +129,13 @@ impl TraceStep {
             )));
         }
 
-        let expected_input_hash = payload_hash(&self.input_payload);
+        let expected_input_hash = payload_hash(&self.input_payload).map_err(|err| {
+            BridgeError::TraceDeterminismViolation(format!(
+                "input_payload invalid JSON for operation '{}' ({}): {err}",
+                self.operation,
+                self.operation_type.as_str()
+            ))
+        })?;
         if self.input_hash != expected_input_hash {
             return Err(BridgeError::TraceDeterminismViolation(format!(
                 "input_hash mismatch for operation '{}' ({}): expected {}, got {}",
@@ -152,7 +154,13 @@ impl TraceStep {
             )));
         }
 
-        let expected_output_hash = payload_hash(&self.output_payload);
+        let expected_output_hash = payload_hash(&self.output_payload).map_err(|err| {
+            BridgeError::TraceDeterminismViolation(format!(
+                "output_payload invalid JSON for operation '{}' ({}): {err}",
+                self.operation,
+                self.operation_type.as_str()
+            ))
+        })?;
         if self.output_hash != expected_output_hash {
             return Err(BridgeError::TraceDeterminismViolation(format!(
                 "output_hash mismatch for operation '{}' ({}): expected {}, got {}",
@@ -167,13 +175,11 @@ impl TraceStep {
     }
 }
 
-pub fn payload_hash(payload: &str) -> String {
-    let value: serde_json::Value = serde_json::from_str(payload)
-        .expect("payload must be valid JSON — fail-closed");
+pub fn payload_hash(payload: &str) -> Result<String, serde_json::Error> {
+    let value: serde_json::Value = serde_json::from_str(payload)?;
     let canonical = canonicalize(&value);
-    let bytes = serde_json::to_vec(&canonical)
-        .expect("canonical serialization must not fail");
+    let bytes = serde_json::to_vec(&canonical).expect("canonical serialization must not fail");
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
-    hex::encode_upper(hasher.finalize())
+    Ok(hex::encode_upper(hasher.finalize()))
 }
