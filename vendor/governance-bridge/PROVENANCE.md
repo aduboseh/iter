@@ -4,12 +4,12 @@
 |---|---|
 | Source | https://github.com/aduboseh/SCG |
 | Crate path | crates/scg-governance-bridge |
-| SCG source commit | `da14c8390ba8ceeb0ab15d85c598d2042a2029cf` (CANON-001 branch head) |
-| SCG merged main/master head at vendor time | `3e0675073a50ce20bdad7c342f7a5caaa3801504` |
-| Vendored | 2026-04-03 |
+| SCG source commit | `a95d164` |
+| SCG merged main/master head at vendor time | `7f6877409b9d720928379bbecbfd035621eeda11` |
+| Vendored | 2026-04-04 |
 | CONTRACT_VERSION_STR | `scg.v1` |
 | `contract.rs` SHA256 | `1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0` |
-| 	race.rs SHA256 | $scgHash |
+| `trace.rs` SHA256 | `f09664dba3b51d0ce2115d5b3258f93ae4ed75065cc8646c7c3696b9367e31bc` |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
 | `lib.rs` SHA256 | `e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36` |
 
@@ -35,8 +35,9 @@ Seam audit mirror: `verify_replay_id()` now gates on `contract_version` before
 
 Do not edit files in this directory without following the update protocol.
 
-## Canonical serialization locked — 2026-04-03
-trace.rs canonical_payload() now uses sorted-key JSON (see CANON.md).
-serde_json::to_string removed from canonical form.
-Symmetric with SCG canonical at commit da14c8390ba8ceeb0ab15d85c598d2042a2029cf.
+## Canonical serialization locked — 2026-04-04
+Canonical serialization with sorted-key JSON, NFC guard at ingress, adversarial corpus attested.
+unicode-normalization dep added for vendor closure.
+Full bridge test suite: 64/0/0.
+Symmetric with SCG canonical at commit a95d164.
 No active drift.
