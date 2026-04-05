@@ -1,3 +1,5 @@
+* text=auto eol=lf
+
 # Iter MCP Server Line Ending Normalization
 # All text files use LF to ensure deterministic SHA256 checksums
 *.md text eol=lf
