@@ -47,25 +47,39 @@ No active drift.
   Role: replay boundary reference, audit surface, contract origin
   This is a provenance binding, not a comment.
   This commit is on SCG master — it is a governed reference.
+  Artifact-generation commit: 1b410f71cf951647376500098d1056b6f0872fb2
+  Source: CANONICAL_VECTORS.json field `scg_commit`
+  These commits are intentionally different:
+  `scg_commit` records where the vector artifact content was generated,
+  while the master commit above records where that governed artifact
+  entered SCG master as a replay boundary reference.
 
 ### Vendored artifact
   File: vendor/governance-bridge/CANONICAL_VECTORS.json
   sha256: 1e804ac4342da71251d4a404bfcee5ef65a2f5b46d599e0fe9d73c80830c1d75
   Line endings: LF
   Hash computed on: raw bytes (fs::read + ReadAllBytes, no normalization)
-  Hash encoding: lowercase hex (both PowerShell and Rust)
+  Build-time integrity hash encoding: lowercase hex (both PowerShell and Rust)
+  This lowercase encoding applies to the vendored file integrity hash above,
+  not to the four vector digests stored inside CANONICAL_VECTORS.json.
 
 ### Cross-language contract declaration
   Any implementation claiming SCG canonical equivalence must
   reproduce all four vector hashes in CANONICAL_VECTORS.json
   exactly. Input encoding: UTF-8 NFC. Hash algorithm: SHA-256 hex.
   Non-NFC input must be rejected at ingress before hashing.
+  Vector digest casing is part of the SCG contract:
+  the `sha256` values inside CANONICAL_VECTORS.json are uppercase because
+  SCG canonical payload hashing emits uppercase hex. Do not lowercase,
+  normalize, or rewrite those values during vendoring.
 
 ### Build-time enforcement
   build.rs fails cargo build if CANONICAL_VECTORS.json is modified,
   reformatted, or tampered after vendoring. This is intentional.
   "Fixing formatting" = contract break. Open a new WO.
-  Hash comparison is case-sensitive lowercase on both sides.
+  Vendored file integrity comparison is case-sensitive lowercase on both sides.
+  That lowercase integrity check is distinct from the uppercase vector
+  digests preserved inside the JSON artifact itself.
 
 ### Schema version upgrade protocol
   If SCG canonical rules evolve:
