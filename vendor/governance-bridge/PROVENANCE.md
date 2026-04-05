@@ -9,7 +9,7 @@
 | Vendored | 2026-04-03 |
 | CONTRACT_VERSION_STR | `scg.v1` |
 | `contract.rs` SHA256 | `1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0` |
-| 	race.rs SHA256 | $scgHash |
+| `trace.rs` SHA256 | `f1749cb281554807e57be237fcb54c0e6a31d75fc496857973f6b365dbde8167` |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
 | `lib.rs` SHA256 | `e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36` |
 
