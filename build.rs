@@ -29,6 +29,7 @@ fn main() {
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/trace.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/errors.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/lib.rs");
+    println!("cargo:rerun-if-changed=vendor/governance-bridge/CANONICAL_VECTORS.json");
 
     let expected: &[(&str, &str)] = &[
         (
@@ -46,6 +47,10 @@ fn main() {
         (
             "vendor/governance-bridge/src/lib.rs",
             "e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36",
+        ),
+        (
+            "vendor/governance-bridge/CANONICAL_VECTORS.json",
+            "1e804ac4342da71251d4a404bfcee5ef65a2f5b46d599e0fe9d73c80830c1d75",
         ),
     ];
 

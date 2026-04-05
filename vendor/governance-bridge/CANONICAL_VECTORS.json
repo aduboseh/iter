@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "generated_by": "scg-governance-bridge",
+  "scg_commit": "1b410f71cf951647376500098d1056b6f0872fb2",
+  "contract": "Any implementation claiming SCG canonical equivalence must reproduce all hash values in this file exactly. Input encoding: UTF-8 NFC. Hash algorithm: SHA-256 hex.",
+  "vectors": [
+    {
+      "id": "V1",
+      "name": "empty_object",
+      "input": {},
+      "canonical_serialized": "{}",
+      "sha256": "44136FA355B3678A1146AD16F7E8649E94FB4FC21FE77E8310C060F61CAAFF8A"
+    },
+    {
+      "id": "V2",
+      "name": "key_ordering",
+      "input": { "z": 3, "a": 1, "b": 2 },
+      "canonical_serialized": "{\"a\":1,\"b\":2,\"z\":3}",
+      "sha256": "329D4B5A274B8081EF038BB735813DC3082CF6D95855F8029C9CD8432168C112"
+    },
+    {
+      "id": "V3",
+      "name": "nested_sort",
+      "input": { "outer": { "q": 2, "p": 1 }, "a": true },
+      "canonical_serialized": "{\"a\":true,\"outer\":{\"p\":1,\"q\":2}}",
+      "sha256": "A21309223AD721E35FCBE45F1C4DAD9DC35A53971C2FD5BA1B98F0BDAA93E859"
+    },
+    {
+      "id": "V4",
+      "name": "unicode_nfc",
+      "input": { "key": "\u00e9" },
+      "canonical_serialized": "{\"key\":\"é\"}",
+      "sha256": "7DF5D813A85C5A24DE22DAFF98195C40C6D8498602E9934D798899C94F78D8E7"
+    }
+  ]
+}

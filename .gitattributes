@@ -9,3 +9,4 @@
 *.txt text eol=lf
 *.sh text eol=lf
 *.py text eol=lf
+vendor/governance-bridge/CANONICAL_VECTORS.json -text
