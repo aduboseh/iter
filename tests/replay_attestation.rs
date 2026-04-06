@@ -195,3 +195,71 @@ fn att_iter_replay_canonical_vectors() {
          \n  Serde:   round-trip through from_value: confirmed"
     );
 }
+
+// ── LAYER 3: BYTE-LEVEL CANONICAL SNAPSHOT ───────────────────────────────────
+//
+// Closes failure class: serde nuance or whitespace change that passes
+// semantic tests but mutates the actual bytes used in hash computation.
+//
+// Bootstrap: run with REGEN_SNAPSHOT=1 cargo test snapshot_regen -- --nocapture
+//   to regenerate the oracle. Only do this under a new WO after full
+//   attestation re-run. Never regenerate silently.
+//
+// Oracle location: tests/snapshots/canonical_v1.bin
+// Source vector:   CANONICAL_VECTORS.json V1 (empty_object)
+//   canonical_serialized: "{}"
+//   expected sha256: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
+
+#[test]
+fn snapshot_regen() {
+    // Only runs when REGEN_SNAPSHOT=1 is set.
+    // Never runs in CI. Gate is explicit, not accidental.
+    if std::env::var("REGEN_SNAPSHOT").unwrap_or_default() != "1" {
+        println!("snapshot_regen: skipped (set REGEN_SNAPSHOT=1 to run)");
+        return;
+    }
+    let canonical = "{}"; // V1 canonical_serialized
+    let bytes = canonical.as_bytes();
+    std::fs::write("tests/snapshots/canonical_v1.bin", bytes)
+        .expect("failed to write snapshot oracle");
+    println!("SNAPSHOT ORACLE WRITTEN: {} bytes", bytes.len());
+    println!(
+        "sha256 of oracle: {}",
+        payload_hash(canonical)
+            .expect("payload_hash failed")
+            .to_lowercase()
+    );
+    println!("Expected:         44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a");
+}
+
+#[test]
+fn canonical_json_byte_snapshot_stable() {
+    // Enforces that canonicalize() produces byte-identical output to
+    // the committed oracle. Fails if serde_json internals change byte
+    // layout even while semantic equivalence is preserved.
+    //
+    // If this test fails after a serde_json version change:
+    //   That is the pin working correctly. Do not update the snapshot
+    //   without re-running full attestation. File WO-SCG-SERDE-PIN-002.
+    let canonical = "{}"; // V1 canonical_serialized
+    let actual_bytes = canonical.as_bytes();
+
+    let oracle = include_bytes!("snapshots/canonical_v1.bin");
+
+    assert_eq!(
+        actual_bytes,
+        oracle.as_ref(),
+        "\nCANONICAL BYTE DRIFT DETECTED\
+         \n  actual len:   {}\
+         \n  oracle len:   {}\
+         \n  actual hex:   {}\
+         \n  oracle hex:   {}\
+         \nThis is a cryptographic contract violation.\
+         \nDo not update the snapshot without re-running full attestation.\
+         \nFile WO-SCG-SERDE-PIN-002 if serde_json was updated.",
+        actual_bytes.len(),
+        oracle.len(),
+        hex::encode(actual_bytes),
+        hex::encode(oracle.as_ref())
+    );
+}

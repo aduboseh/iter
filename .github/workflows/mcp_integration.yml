@@ -47,6 +47,33 @@ jobs:
           echo "Building with: $CARGO_FEATURES"
           cargo build --release $CARGO_FEATURES
 
+      - name: Enforce lockfile integrity
+        run: |
+          if ! git diff --exit-code Cargo.lock; then
+            echo "LOCKFILE DRIFT DETECTED"
+            echo "Cargo.lock was modified without a corresponding"
+            echo "Cargo.toml change. This may indicate a dependency"
+            echo "pin was bypassed. Do not merge."
+            exit 1
+          fi
+          echo "Lockfile integrity confirmed"
+
+      - name: Enforce cross-repo serde_json version parity
+        run: |
+          ITER_VER=$(grep -A2 'name = "serde_json"' Cargo.lock \
+            | grep version | head -1 | awk '{print $3}' | tr -d '"')
+          echo "Iter serde_json: $ITER_VER"
+
+          PINNED="1.0.149"
+          if [ "$ITER_VER" != "$PINNED" ]; then
+            echo "SERDE_JSON VERSION DRIFT"
+            echo "  expected: $PINNED"
+            echo "  actual:   $ITER_VER"
+            echo "File WO-SCG-SERDE-PIN-002 before updating."
+            exit 1
+          fi
+          echo "serde_json version parity confirmed: $ITER_VER"
+
       - name: Run lib tests (public_stub)
         run: |
           cargo test --lib --release $CARGO_FEATURES
