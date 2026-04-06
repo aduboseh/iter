@@ -108,10 +108,11 @@ fn att_iter_replay_canonical_vectors() {
             .as_str()
             .unwrap_or_else(|| panic!("Vector {} ({}) missing canonical_serialized", id, name));
 
-        let expected_sha256 = vector["sha256"]
+        // The contract artifact publishes uppercase SHA-256 digests.
+        // Preserve exact casing here so any casing regression fails closed.
+        let expected_sha256_upper = vector["sha256"]
             .as_str()
-            .unwrap_or_else(|| panic!("Vector {} ({}) missing sha256", id, name))
-            .to_lowercase();
+            .unwrap_or_else(|| panic!("Vector {} ({}) missing sha256", id, name));
 
         // ── Layer 1: payload_hash must match vector sha256 ───────────
         // Fires BEFORE verify_replay_id(). A mismatch here means
@@ -119,18 +120,13 @@ fn att_iter_replay_canonical_vectors() {
         let (trace, step_hash_upper) = build_governed_trace(canonical_serialized);
 
         assert_eq!(
-            step_hash_upper.to_lowercase(),
-            expected_sha256,
+            step_hash_upper, expected_sha256_upper,
             "\nCANONICAL HASH MISMATCH (Layer 1) — Vector {} ({})\
              \n  expected (vector):  {}\
              \n  computed:           {}\
              \n  payload:            {}\
              \nDo not patch. File a new WO.",
-            id,
-            name,
-            expected_sha256,
-            step_hash_upper.to_lowercase(),
-            canonical_serialized
+            id, name, expected_sha256_upper, step_hash_upper, canonical_serialized
         );
 
         // ── Layer 2: compute replay_id over full outcome ──────────────
@@ -178,7 +174,7 @@ fn att_iter_replay_canonical_vectors() {
             name,
             result.err(),
             canonical_serialized,
-            expected_sha256,
+            expected_sha256_upper,
             step_hash_upper
         );
 
@@ -186,7 +182,7 @@ fn att_iter_replay_canonical_vectors() {
             "  \u{2705}  Vector {} ({})  sha256: {}  replay_id: {}...",
             id,
             name,
-            expected_sha256,
+            expected_sha256_upper,
             &deserialized.replay_id[..16]
         );
     }
