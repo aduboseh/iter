@@ -66,11 +66,16 @@ fn canonical_bytes_from_input(input: &serde_json::Value) -> Vec<u8> {
     serde_json::to_vec(&canonical).expect("canonical serialization must not fail")
 }
 
+fn canonical_string_from_input(input: &serde_json::Value) -> String {
+    String::from_utf8(canonical_bytes_from_input(input))
+        .expect("canonical bytes must be valid UTF-8")
+}
+
 fn snapshot_source_materials() -> (String, String, Vec<u8>) {
     let vectors = load_canonical_vectors();
     let vector = find_vector_by_id(&vectors, SNAPSHOT_VECTOR_ID);
 
-    let canonical_serialized = vector["canonical_serialized"]
+    let published_canonical_serialized = vector["canonical_serialized"]
         .as_str()
         .unwrap_or_else(|| panic!("Vector {} missing canonical_serialized", SNAPSHOT_VECTOR_ID))
         .to_string();
@@ -83,11 +88,11 @@ fn snapshot_source_materials() -> (String, String, Vec<u8>) {
         String::from_utf8(actual_bytes.clone()).expect("canonical bytes must be valid UTF-8");
 
     assert_eq!(
-        actual_canonical, canonical_serialized,
+        actual_canonical, published_canonical_serialized,
         "snapshot source vector must round-trip to the published canonical string"
     );
 
-    (canonical_serialized, expected_sha256_upper, actual_bytes)
+    (actual_canonical, expected_sha256_upper, actual_bytes)
 }
 
 /// Build a fully governed 5-step execution trace over a single canonical payload.
@@ -146,9 +151,19 @@ fn att_iter_replay_canonical_vectors() {
             .as_str()
             .expect("vector.name must be a string");
 
-        let canonical_serialized = vector["canonical_serialized"]
+        let published_canonical_serialized = vector["canonical_serialized"]
             .as_str()
             .unwrap_or_else(|| panic!("Vector {} ({}) missing canonical_serialized", id, name));
+        let canonical_serialized = canonical_string_from_input(&vector["input"]);
+
+        assert_eq!(
+            canonical_serialized, published_canonical_serialized,
+            "\nCANONICAL SERIALIZATION MISMATCH — Vector {} ({})\
+             \n  published:  {}\
+             \n  derived:    {}\
+             \nThis means canonicalize(input) drifted before hashing.",
+            id, name, published_canonical_serialized, canonical_serialized
+        );
 
         // The contract artifact publishes uppercase SHA-256 digests.
         // Preserve exact casing here so any casing regression fails closed.
@@ -156,10 +171,10 @@ fn att_iter_replay_canonical_vectors() {
             .as_str()
             .unwrap_or_else(|| panic!("Vector {} ({}) missing sha256", id, name));
 
-        // -- Layer 1: payload_hash must match vector sha256 -----------------
+        // -- Layer 1: canonicalize(input) -> payload_hash must match vector sha256 --
         // Fires BEFORE verify_replay_id(). A mismatch here means
         // Iter's canonicalize() diverged from SCG's — the primary risk.
-        let (trace, step_hash_upper) = build_governed_trace(canonical_serialized);
+        let (trace, step_hash_upper) = build_governed_trace(&canonical_serialized);
 
         assert_eq!(
             step_hash_upper, expected_sha256_upper,
@@ -232,7 +247,7 @@ fn att_iter_replay_canonical_vectors() {
     println!(
         "\nATTESTATION COMPLETE\
          \n  Seam:    response.json -> verify_replay_id()\
-         \n  Layer 1: payload_hash (UPPERCASE step binding): confirmed\
+         \n  Layer 1: canonicalize(input) + payload_hash (UPPERCASE step binding): confirmed\
          \n  Layer 2: compute_replay_id (lowercase outcome digest): confirmed\
          \n  Serde:   round-trip through from_value: confirmed"
     );
@@ -263,13 +278,22 @@ fn snapshot_regen() {
     }
 
     let (canonical_serialized, expected_sha256_upper, bytes) = snapshot_source_materials();
+    let actual_sha256_upper = payload_hash(&canonical_serialized).expect("payload_hash failed");
+
+    assert_eq!(
+        actual_sha256_upper, expected_sha256_upper,
+        "\nSNAPSHOT REGEN REFUSED\
+         \n  expected sha256: {}\
+         \n  actual sha256:   {}\
+         \n  payload:         {}\
+         \nOracle was not written.",
+        expected_sha256_upper, actual_sha256_upper, canonical_serialized
+    );
+
     std::fs::write(SNAPSHOT_ORACLE_PATH, &bytes).expect("failed to write snapshot oracle");
     println!("SNAPSHOT ORACLE WRITTEN: {} bytes", bytes.len());
     println!("canonical_serialized: {}", canonical_serialized);
-    println!(
-        "sha256 of oracle: {}",
-        payload_hash(&canonical_serialized).expect("payload_hash failed")
-    );
+    println!("sha256 of oracle: {}", actual_sha256_upper);
     println!("Expected:         {}", expected_sha256_upper);
 }
 
