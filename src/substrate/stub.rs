@@ -523,7 +523,7 @@ impl StubRuntime {
                 })?;
 
                 // Compute SHA-256 of canonical bytes
-                let computed_hash = compute_stable_hash(&String::from_utf8_lossy(&c14n_bytes));
+                let computed_hash = crate::canonical::hash_bytes(&c14n_bytes);
 
                 // Verify hash match
                 if computed_hash != *claimed_hash {
@@ -537,11 +537,9 @@ impl StubRuntime {
 
                 Ok(claimed_hash.clone())
             }
-            (None, Some(hash)) => {
-                // Hash provided without canonical bytes - trust but warn
-                // (backwards compatibility for Phase 0 clients)
-                Ok(hash.clone())
-            }
+            (None, Some(_)) => Err(GovernanceError::InvalidCanonicalization {
+                reason: "proposal_hash provided without proposal_c14n; verification impossible - rejected fail-closed".to_string(),
+            }),
             _ => {
                 // Legacy mode: compute hash from proposal fields
                 let legacy_hash = compute_stable_hash(&format!(
@@ -1201,14 +1199,13 @@ pub struct AuditSearchResult {
 }
 
 fn compute_stable_hash(input: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    format!("{:x}", hasher.finalize())
+    crate::canonical::hash_str(input)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
 
     #[test]
     fn stub_is_deterministic() {
@@ -1462,5 +1459,74 @@ mod tests {
         assert_ne!(a1.decision_id, a2.decision_id);
         assert_ne!(a2.decision_id, a3.decision_id);
         assert_ne!(a1.decision_id, a3.decision_id);
+    }
+
+    fn make_proposal(bytes: Option<&[u8]>, hash: Option<String>) -> GovernanceProposal {
+        GovernanceProposal {
+            proposal_id: "t1".into(),
+            state_snapshot_hash: "s1".into(),
+            constraints: serde_json::json!({}),
+            requested_action: "test".into(),
+            proposal_c14n: bytes.map(|b| STANDARD.encode(b)),
+            proposal_hash: hash,
+        }
+    }
+
+    #[test]
+    fn valid_c14n_hash_passes() {
+        let bytes = br#"{"a":1}"#;
+        let hash = crate::canonical::hash_bytes(bytes);
+        let mut rt = StubRuntime::new();
+        assert!(rt
+            .evaluate_governance(&make_proposal(Some(bytes), Some(hash)))
+            .is_ok());
+    }
+
+    #[test]
+    fn tampered_hash_fails() {
+        let bytes = br#"{"a":1}"#;
+        let mut rt = StubRuntime::new();
+        assert!(rt
+            .evaluate_governance(&make_proposal(Some(bytes), Some("bad".into())))
+            .is_err());
+    }
+
+    #[test]
+    fn tampered_bytes_fail() {
+        let good = br#"{"a":1}"#;
+        let bad = br#"{"a":2}"#;
+        let hash = crate::canonical::hash_bytes(good);
+        let mut rt = StubRuntime::new();
+        assert!(rt
+            .evaluate_governance(&make_proposal(Some(bad), Some(hash)))
+            .is_err());
+    }
+
+    #[test]
+    fn invalid_base64_fails() {
+        let mut rt = StubRuntime::new();
+        let p = GovernanceProposal {
+            proposal_id: "x".into(),
+            state_snapshot_hash: "s".into(),
+            constraints: serde_json::json!({}),
+            requested_action: "test".into(),
+            proposal_c14n: Some("!!!".into()),
+            proposal_hash: Some("abc".into()),
+        };
+        assert!(rt.evaluate_governance(&p).is_err());
+    }
+
+    #[test]
+    fn legacy_path_still_works() {
+        let mut rt = StubRuntime::new();
+        assert!(rt.evaluate_governance(&make_proposal(None, None)).is_ok());
+    }
+
+    #[test]
+    fn hash_without_c14n_fails_closed() {
+        let mut rt = StubRuntime::new();
+        assert!(rt
+            .evaluate_governance(&make_proposal(None, Some("a".repeat(64))))
+            .is_err());
     }
 }

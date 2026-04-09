@@ -34,11 +34,10 @@
 // ============================================================================
 
 pub mod caller_context;
-pub mod types;
-
 /// Canonical hash primitives shared by build.rs and the runtime attestation path.
 /// Single source of truth for SHA-256 computation across the codebase.
 pub mod canonical;
+pub mod types;
 
 // ============================================================================
 // ITER-PAR-01: Contract and Governance Modules

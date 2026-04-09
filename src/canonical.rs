@@ -70,7 +70,9 @@ mod tests {
     fn hash_output_is_lowercase_hex_64_chars() {
         let h = hash_bytes(b"test");
         assert_eq!(h.len(), 64);
-        assert!(h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+        assert!(h
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
     }
 
     #[test]
@@ -95,6 +97,9 @@ mod tests {
         // (which would replace 0xFF with U+FFFD replacement character bytes).
         let lossy = String::from_utf8_lossy(raw);
         let h_lossy = hash_bytes(lossy.as_bytes());
-        assert_ne!(h1, h_lossy, "hash_bytes must not apply lossy UTF-8 conversion");
+        assert_ne!(
+            h1, h_lossy,
+            "hash_bytes must not apply lossy UTF-8 conversion"
+        );
     }
 }
