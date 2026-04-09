@@ -109,9 +109,15 @@ fn main() {
     }
 
     let is_stub_mode = std::env::var_os("CARGO_FEATURE_PUBLIC_STUB").is_some();
-    if is_stub_mode {
-        println!("cargo:rustc-env=ITER_BUILD_MODE=PUBLIC_STUB");
-    } else {
-        println!("cargo:rustc-env=ITER_BUILD_MODE=FULL_SUBSTRATE");
+    let is_full_substrate = std::env::var_os("CARGO_FEATURE_FULL_SUBSTRATE").is_some();
+    match (is_stub_mode, is_full_substrate) {
+        (true, false) => println!("cargo:rustc-env=ITER_BUILD_MODE=PUBLIC_STUB"),
+        (false, true) => println!("cargo:rustc-env=ITER_BUILD_MODE=FULL_SUBSTRATE"),
+        (true, true) => {
+            panic!("ITER_BUILD_MODE is ambiguous: both public_stub and full_substrate are enabled")
+        }
+        (false, false) => panic!(
+            "ITER_BUILD_MODE is undefined: neither public_stub nor full_substrate is enabled"
+        ),
     }
 }
