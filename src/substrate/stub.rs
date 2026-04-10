@@ -506,7 +506,7 @@ impl StubRuntime {
     /// - Compute SHA-256 of decoded bytes
     /// - Verify computed hash matches proposal_hash
     ///
-    /// If not provided, falls back to legacy hash computation.
+    /// If neither field is provided, falls back to legacy hash computation.
     fn verify_proposal_hash(
         &self,
         proposal: &GovernanceProposal,
@@ -540,7 +540,10 @@ impl StubRuntime {
             (None, Some(_)) => Err(GovernanceError::InvalidCanonicalization {
                 reason: "proposal_hash provided without proposal_c14n; verification impossible - rejected fail-closed".to_string(),
             }),
-            _ => {
+            (Some(_), None) => Err(GovernanceError::InvalidCanonicalization {
+                reason: "proposal_c14n provided without proposal_hash; verification impossible - rejected fail-closed".to_string(),
+            }),
+            (None, None) => {
                 // Legacy mode: compute hash from proposal fields
                 let legacy_hash = compute_stable_hash(&format!(
                     "{}:{}:{}",
@@ -1527,6 +1530,15 @@ mod tests {
         let mut rt = StubRuntime::new();
         assert!(rt
             .evaluate_governance(&make_proposal(None, Some("a".repeat(64))))
+            .is_err());
+    }
+
+    #[test]
+    fn c14n_without_hash_fails_closed() {
+        let bytes = br#"{"a":1}"#;
+        let mut rt = StubRuntime::new();
+        assert!(rt
+            .evaluate_governance(&make_proposal(Some(bytes), None))
             .is_err());
     }
 }

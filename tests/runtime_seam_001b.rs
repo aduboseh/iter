@@ -133,16 +133,14 @@ impl MockScgServer {
 
         let handle = thread::spawn(move || {
             for response in responses {
-                let (mut stream, _) = loop {
-                    match listener.accept() {
-                        Ok(connection) => break connection,
-                        Err(err) => {
-                            thread_failures
-                                .lock()
-                                .expect("mock failures")
-                                .push(format!("accept failed: {}", err));
-                            return;
-                        }
+                let (mut stream, _) = match listener.accept() {
+                    Ok(connection) => connection,
+                    Err(err) => {
+                        thread_failures
+                            .lock()
+                            .expect("mock failures")
+                            .push(format!("accept failed: {}", err));
+                        return;
                     }
                 };
                 if thread_shutdown.load(Ordering::SeqCst) {
@@ -176,7 +174,7 @@ impl MockScgServer {
                 let reply = format!(
                     "HTTP/1.1 {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                     status_line,
-                    payload.as_bytes().len(),
+                    payload.len(),
                     payload
                 );
 
