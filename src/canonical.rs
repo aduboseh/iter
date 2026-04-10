@@ -1,12 +1,12 @@
-//! Canonical hash computation — single source of truth for build and runtime.
+//! Canonical hash computation primitives for runtime and provenance callers.
 //!
-//! Both `build.rs` (file-integrity hashes) and the runtime proposal attestation
-//! path in `stub.rs` route through these functions. This guarantees identical
-//! algorithm and encoding regardless of call site.
+//! These helpers make the hex casing contract explicit at the call site:
+//! lowercase digests for local provenance/file-integrity surfaces and
+//! uppercase digests for SCG canonical payload attestation.
 //!
 //! # Rules
 //!
-//! - All hashes are SHA-256 of raw bytes, returned as lowercase hex.
+//! - All hashes are SHA-256 of raw bytes.
 //! - No normalization is applied. Callers are responsible for producing
 //!   well-formed input before hashing (e.g. NFC normalization, JCS
 //!   canonicalization).
@@ -14,6 +14,8 @@
 //!   originated from a binary encoding (base64 decode, file read, etc.).
 //! - `hash_str` is a convenience wrapper for UTF-8 string data only. Do NOT
 //!   use it on bytes that were decoded from base64 or other binary encodings.
+//! - `hash_bytes_upper` / `hash_str_upper` are the SCG canonical-payload
+//!   contract helpers and emit uppercase hex.
 
 use sha2::{Digest, Sha256};
 
@@ -48,6 +50,21 @@ pub fn hash_bytes(data: &[u8]) -> String {
 /// ```
 pub fn hash_str(s: &str) -> String {
     hash_bytes(s.as_bytes())
+}
+
+/// Compute SHA-256 of a raw byte slice. Returns uppercase hex string.
+///
+/// Use this for SCG canonical-payload attestation surfaces where the
+/// upstream contract publishes uppercase digests.
+pub fn hash_bytes_upper(data: &[u8]) -> String {
+    hash_bytes(data).to_uppercase()
+}
+
+/// Compute SHA-256 of a UTF-8 string's byte representation as uppercase hex.
+///
+/// Equivalent to `hash_bytes_upper(s.as_bytes())`.
+pub fn hash_str_upper(s: &str) -> String {
+    hash_bytes_upper(s.as_bytes())
 }
 
 #[cfg(test)]
@@ -101,5 +118,20 @@ mod tests {
             h1, h_lossy,
             "hash_bytes must not apply lossy UTF-8 conversion"
         );
+    }
+
+    #[test]
+    fn uppercase_hash_matches_uppercase_contract() {
+        let h = hash_bytes_upper(b"test");
+        assert_eq!(h.len(), 64);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(h.chars().any(|c| c.is_ascii_uppercase()));
+        assert_eq!(h, hash_bytes(b"test").to_uppercase());
+    }
+
+    #[test]
+    fn hash_str_upper_agrees_on_utf8() {
+        let s = "proposal:123:snapshot:abc";
+        assert_eq!(hash_str_upper(s), hash_bytes_upper(s.as_bytes()));
     }
 }

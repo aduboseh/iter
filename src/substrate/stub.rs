@@ -523,7 +523,7 @@ impl StubRuntime {
                 })?;
 
                 // Compute SHA-256 of canonical bytes
-                let computed_hash = crate::canonical::hash_bytes(&c14n_bytes);
+                let computed_hash = crate::canonical::hash_bytes_upper(&c14n_bytes);
 
                 // Verify hash match
                 if computed_hash != *claimed_hash {
@@ -1089,7 +1089,7 @@ pub struct GovernanceProposal {
     /// RFC 8785 (JCS) canonical JSON bytes, base64-encoded
     #[serde(default)]
     pub proposal_c14n: Option<String>,
-    /// SHA-256 hash of proposal_c14n bytes (Haltra computes, Iter verifies)
+    /// SHA-256 hash of proposal_c14n bytes (uppercase hex; Haltra computes, Iter verifies)
     #[serde(default)]
     pub proposal_hash: Option<String>,
 }
@@ -1475,7 +1475,7 @@ mod tests {
     #[test]
     fn valid_c14n_hash_passes() {
         let bytes = br#"{"a":1}"#;
-        let hash = crate::canonical::hash_bytes(bytes);
+        let hash = crate::canonical::hash_bytes_upper(bytes);
         let mut rt = StubRuntime::new();
         assert!(rt
             .evaluate_governance(&make_proposal(Some(bytes), Some(hash)))
@@ -1495,7 +1495,7 @@ mod tests {
     fn tampered_bytes_fail() {
         let good = br#"{"a":1}"#;
         let bad = br#"{"a":2}"#;
-        let hash = crate::canonical::hash_bytes(good);
+        let hash = crate::canonical::hash_bytes_upper(good);
         let mut rt = StubRuntime::new();
         assert!(rt
             .evaluate_governance(&make_proposal(Some(bad), Some(hash)))
