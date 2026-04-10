@@ -30,6 +30,7 @@ fn main() {
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/errors.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/lib.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge/CANONICAL_VECTORS.json");
+    println!("cargo:rerun-if-env-changed=ITER_TAMPER_HASH_FOR_TEST");
 
     let expected: &[(&str, &str)] = &[
         (
@@ -54,11 +55,21 @@ fn main() {
         ),
     ];
 
+    let tamper_hash_for_test = matches!(
+        std::env::var("ITER_TAMPER_HASH_FOR_TEST").as_deref(),
+        Ok("true")
+    );
+
     for (path, expected_hash) in expected {
-        let actual = sha256_file(path);
+        let actual = if tamper_hash_for_test {
+            "000000000000000000000000000000000000000000000000000000000000dead".to_string()
+        } else {
+            sha256_file(path)
+        };
+
         if actual != *expected_hash {
             panic!(
-                "\n\nGOVERNANCE INTEGRITY VIOLATION: {} hash mismatch\n  expected: {}\n  actual:   {}\n\nBuild aborted — provenance cannot be established.\n",
+                "\n\nGOVERNANCE ARTIFACT HASH MISMATCH\nartifact : {}\nexpected : {}\nactual   : {}\n\nBuild aborted — provenance cannot be established.\n",
                 path, expected_hash, actual
             );
         }
