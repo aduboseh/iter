@@ -47,6 +47,23 @@ jobs:
           echo "Building with: $CARGO_FEATURES"
           cargo build --release $CARGO_FEATURES
 
+      - name: Verify build halts on governance hash mismatch
+        env:
+          ITER_TAMPER_HASH_FOR_TEST: "true"
+        run: |
+          set -euo pipefail
+          LOG_FILE=$(mktemp)
+          if cargo build --release $CARGO_FEATURES >"$LOG_FILE" 2>&1; then
+            cat "$LOG_FILE"
+            echo "::error::Build succeeded with injected governance hash mismatch"
+            exit 1
+          fi
+          cat "$LOG_FILE"
+          if ! grep -q "GOVERNANCE ARTIFACT HASH MISMATCH" "$LOG_FILE"; then
+            echo "::error::Tampered build failed without the expected panic message"
+            exit 1
+          fi
+          echo "✅ Tampered build halted on governance hash mismatch"
 
       - name: Run lib tests (public_stub)
         run: |
@@ -238,4 +255,3 @@ jobs:
             exit 1
           fi
           echo "✅ All checks passed. Ready for merge."
-
