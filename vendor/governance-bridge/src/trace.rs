@@ -289,8 +289,7 @@ mod tests {
 
     #[test]
     fn invalid_json_error_includes_payload_context() {
-        let err = validate_payload_json_strings("input_payload", "{\"unterminated\"")
-            .unwrap_err();
+        let err = validate_payload_json_strings("input_payload", "{\"unterminated\"").unwrap_err();
         let message = match err {
             BridgeError::TraceDeterminismViolation(message) => message,
             other => panic!("expected TraceDeterminismViolation, got: {other:?}"),
