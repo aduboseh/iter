@@ -110,6 +110,20 @@ fn assert_nfc(field: &str, value: &str) -> Result<(), BridgeError> {
     Ok(())
 }
 
+fn payload_context(payload: &str) -> String {
+    const PREVIEW_CHARS: usize = 64;
+
+    let preview: String = payload.chars().take(PREVIEW_CHARS).collect();
+    let truncated = payload.chars().count() > PREVIEW_CHARS;
+
+    format!(
+        "payload_len={} snippet={:?}{}",
+        payload.len(),
+        preview,
+        if truncated { "..." } else { "" }
+    )
+}
+
 fn assert_nfc_in_value(field: &str, value: &serde_json::Value) -> Result<(), BridgeError> {
     match value {
         serde_json::Value::String(text) => assert_nfc(field, text),
@@ -121,7 +135,10 @@ fn assert_nfc_in_value(field: &str, value: &serde_json::Value) -> Result<(), Bri
         }
         serde_json::Value::Object(map) => {
             for (key, nested) in map {
-                assert_nfc(&format!("{field} object key"), key)?;
+                assert_nfc(
+                    &format!("{field} object key {:?} (bytes={})", key, key.len()),
+                    key,
+                )?;
                 assert_nfc_in_value(&format!("{field}.{key}"), nested)?;
             }
             Ok(())
@@ -132,7 +149,10 @@ fn assert_nfc_in_value(field: &str, value: &serde_json::Value) -> Result<(), Bri
 
 fn validate_payload_json_strings(field: &str, payload: &str) -> Result<(), BridgeError> {
     let value: serde_json::Value = serde_json::from_str(payload).map_err(|err| {
-        BridgeError::TraceDeterminismViolation(format!("{field} invalid JSON: {err}"))
+        BridgeError::TraceDeterminismViolation(format!(
+            "{field} invalid JSON: {err} ({})",
+            payload_context(payload)
+        ))
     })?;
     assert_nfc_in_value(field, &value)
 }
@@ -245,4 +265,39 @@ pub fn payload_hash(payload: &str) -> Result<String, serde_json::Error> {
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     Ok(hex::encode_upper(hasher.finalize()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{assert_nfc_in_value, validate_payload_json_strings};
+    use crate::errors::BridgeError;
+
+    #[test]
+    fn nfc_error_identifies_object_key() {
+        let value = serde_json::json!({ "e\u{301}": "value" });
+
+        let err = assert_nfc_in_value("input_payload", &value).unwrap_err();
+        let message = match err {
+            BridgeError::TraceDeterminismViolation(message) => message,
+            other => panic!("expected TraceDeterminismViolation, got: {other:?}"),
+        };
+
+        assert!(message.contains("object key"));
+        assert!(message.contains("bytes=3"));
+        assert!(message.contains("NON_CANONICAL_INPUT"));
+    }
+
+    #[test]
+    fn invalid_json_error_includes_payload_context() {
+        let err = validate_payload_json_strings("input_payload", "{\"unterminated\"")
+            .unwrap_err();
+        let message = match err {
+            BridgeError::TraceDeterminismViolation(message) => message,
+            other => panic!("expected TraceDeterminismViolation, got: {other:?}"),
+        };
+
+        assert!(message.contains("input_payload invalid JSON"));
+        assert!(message.contains("payload_len=15"));
+        assert!(message.contains("snippet"));
+    }
 }
