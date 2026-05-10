@@ -872,9 +872,7 @@ fn validate_decision_contract(
     }
 
     let submitted_hash = submitted_hash.expect("checked above");
-    let Some((resource, expected_hash)) = registry.find_match(args) else {
-        return None;
-    };
+    let (resource, expected_hash) = registry.find_match(args)?;
 
     if submitted_hash != expected_hash {
         return Some(contract_rejection(json!({

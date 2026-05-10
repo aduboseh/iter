@@ -887,6 +887,9 @@ mod tests {
         };
 
         let parsed = extract_raw_result(response).expect("tool JSON");
-        assert_eq!(parsed.get("verdict").and_then(|v| v.as_str()), Some("ALLOW"));
+        assert_eq!(
+            parsed.get("verdict").and_then(|v| v.as_str()),
+            Some("ALLOW")
+        );
     }
 }
