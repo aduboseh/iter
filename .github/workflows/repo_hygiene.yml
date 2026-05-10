@@ -1,0 +1,34 @@
+name: Repository Hygiene
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  tracked-generated-files:
+    name: No tracked generated artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Reject tracked generated directories
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tracked="$(
+            git ls-files |
+              grep -E '(^|/)(node_modules|target|dist|__pycache__|\.pytest_cache|\.venv)(/|$)' || true
+          )"
+
+          if [[ -n "$tracked" ]]; then
+            echo "Generated artifacts must not be tracked:"
+            echo "$tracked"
+            exit 1
+          fi
+
+          echo "No tracked generated artifacts found."

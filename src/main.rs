@@ -1,4 +1,5 @@
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
 
 // Compile-time build attestation baked into the binary.
@@ -25,6 +26,136 @@ enum RuntimeMode {
     Demo,
     GovernedLocal,
     ScgBacked,
+}
+
+#[derive(Default)]
+struct ResourceHashRegistry {
+    resources: BTreeMap<String, String>,
+}
+
+impl ResourceHashRegistry {
+    fn register(
+        &mut self,
+        resource_path: &str,
+        expected_hash: &str,
+    ) -> Result<(String, String), String> {
+        let resource = normalize_resource_path(resource_path)
+            .ok_or_else(|| "resource_path must be a non-empty path".to_string())?;
+        let hash = normalize_sha256_hash(expected_hash)
+            .ok_or_else(|| "expected_hash must be a non-empty SHA-256 hex value".to_string())?;
+
+        self.resources.insert(resource.clone(), hash.clone());
+        Ok((resource, hash))
+    }
+
+    fn find_match<'a>(&'a self, args: &serde_json::Value) -> Option<(&'a str, &'a str)> {
+        let candidates = resource_candidates(args);
+        self.resources.iter().find_map(|(resource, hash)| {
+            if candidates.iter().any(|candidate| candidate == resource) {
+                return Some((resource.as_str(), hash.as_str()));
+            }
+
+            let requested_action = args
+                .get("requested_action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim_matches('"')
+                .replace('\\', "/")
+                .to_ascii_lowercase();
+            if requested_action.contains(resource) {
+                Some((resource.as_str(), hash.as_str()))
+            } else {
+                None
+            }
+        })
+    }
+}
+
+fn normalize_sha256_hash(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let hex = trimmed
+        .strip_prefix("sha256:")
+        .or_else(|| trimmed.strip_prefix("SHA256:"))
+        .unwrap_or(trimmed)
+        .trim()
+        .to_ascii_lowercase();
+
+    if hex.is_empty() || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+
+    Some(format!("sha256:{}", hex))
+}
+
+fn hash_prefix(hash: &str) -> String {
+    if let Some(hex) = hash.strip_prefix("sha256:") {
+        format!("sha256:{}", hex.chars().take(8).collect::<String>())
+    } else {
+        hash.chars().take(15).collect()
+    }
+}
+
+fn normalize_resource_path(raw: &str) -> Option<String> {
+    let mut path = raw
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .replace('\\', "/");
+    while path.starts_with("./") {
+        path = path[2..].to_string();
+    }
+
+    let lower = path.to_ascii_lowercase();
+    let repo_root = std::env::current_dir()
+        .ok()
+        .map(|p| p.to_string_lossy().replace('\\', "/").to_ascii_lowercase());
+
+    let relative = if let Some(root) = repo_root {
+        lower
+            .strip_prefix(&root)
+            .map(|s| s.trim_start_matches('/').to_string())
+            .unwrap_or(lower)
+    } else {
+        lower
+    };
+
+    let normalized = relative
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect::<Vec<_>>()
+        .join("/");
+
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+fn resource_candidates(args: &serde_json::Value) -> Vec<String> {
+    let mut candidates = Vec::new();
+    let mut push_candidate = |value: Option<&str>| {
+        if let Some(raw) = value {
+            if let Some(normalized) = normalize_resource_path(raw) {
+                candidates.push(normalized);
+            }
+        }
+    };
+
+    push_candidate(args.get("resource_path").and_then(|v| v.as_str()));
+    push_candidate(args.get("resource").and_then(|v| v.as_str()));
+
+    if let Some(constraints) = args.get("constraints") {
+        push_candidate(constraints.get("scope").and_then(|v| v.as_str()));
+        push_candidate(constraints.get("resource").and_then(|v| v.as_str()));
+        push_candidate(constraints.get("resource_path").and_then(|v| v.as_str()));
+    }
+
+    candidates
 }
 
 /// Parse --profile flag from CLI args. Default: Governance.
@@ -135,6 +266,7 @@ fn run_stdio_server(
     use std::io::BufWriter;
 
     let mut runtime = ServerRuntime::new(runtime_mode)?;
+    let mut resource_registry = ResourceHashRegistry::default();
 
     // Build and validate tool surface before entering server loop (fail-fast).
     let tools_list = build_tools_list(profile);
@@ -173,12 +305,25 @@ fn run_stdio_server(
                         let id = req.get("id").cloned();
 
                         if id.is_none() || id.as_ref().map(|v| v.is_null()).unwrap_or(false) {
-                            let _ =
-                                handle_request(&mut runtime, method, &req, profile, &tools_json);
+                            let _ = handle_request(
+                                &mut runtime,
+                                &mut resource_registry,
+                                method,
+                                &req,
+                                profile,
+                                &tools_json,
+                            );
                             continue;
                         }
 
-                        let resp = handle_request(&mut runtime, method, &req, profile, &tools_json);
+                        let resp = handle_request(
+                            &mut runtime,
+                            &mut resource_registry,
+                            method,
+                            &req,
+                            profile,
+                            &tools_json,
+                        );
                         let response_bytes = serde_json::to_vec(&json!({
                             "jsonrpc": "2.0",
                             "id": id,
@@ -378,7 +523,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                    "node_id": { "type": ["string", "integer"], "description": "Node ID (numeric string or integer)" }
                 },
                 "required": ["node_id"]
             }
@@ -389,7 +534,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                    "node_id": { "type": ["string", "integer"], "description": "Node ID (numeric string or integer)" }
                 },
                 "required": ["node_id"]
             }
@@ -403,6 +548,18 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
             "name": "audit.replay",
             "description": "Deterministic replay of decision history (canonical)",
             "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "register_resource",
+            "description": "Session-scoped resource hash registry. Registers a resource path and its expected SHA-256 baseline hash for contract-layer validation in decision.check. Registry is cleared on server restart. Must be called before decision.check for hash validation to be enforced.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "resource_path": { "type": "string", "description": "Resource path to bind, normalized relative to the current repository root" },
+                    "expected_hash": { "type": "string", "description": "Expected SHA-256 baseline hash, with or without sha256: prefix" }
+                },
+                "required": ["resource_path", "expected_hash"]
+            }
         }),
         json!({
             "name": "governance.evaluate",
@@ -489,7 +646,7 @@ fn kernel_tool_defs() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "node_id": { "type": "string", "description": "Node ID (numeric string)" }
+                    "node_id": { "type": ["string", "integer"], "description": "Node ID (numeric string or integer)" }
                 },
                 "required": ["node_id"]
             }
@@ -500,7 +657,7 @@ fn kernel_tool_defs() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "node_id": { "type": "string", "description": "Node ID (numeric string)" },
+                    "node_id": { "type": ["string", "integer"], "description": "Node ID (numeric string or integer)" },
                     "delta": { "type": "number", "description": "Belief delta" }
                 },
                 "required": ["node_id", "delta"]
@@ -512,8 +669,8 @@ fn kernel_tool_defs() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "src": { "type": "string", "description": "Source node ID (numeric string)" },
-                    "dst": { "type": "string", "description": "Destination node ID (numeric string)" },
+                    "src": { "type": ["string", "integer"], "description": "Source node ID (numeric string or integer)" },
+                    "dst": { "type": ["string", "integer"], "description": "Destination node ID (numeric string or integer)" },
                     "weight": { "type": "number", "description": "Edge weight" }
                 },
                 "required": ["src", "dst", "weight"]
@@ -577,6 +734,7 @@ fn validate_surface(profile: ServerProfile, tools: &[serde_json::Value]) -> Resu
             "audit.export",
             "audit.replay",
             "audit.search",
+            "register_resource",
             "governance.health",
             "governor.health",
         ];
@@ -596,6 +754,7 @@ fn validate_surface(profile: ServerProfile, tools: &[serde_json::Value]) -> Resu
 #[cfg(feature = "public_stub")]
 fn handle_request(
     runtime: &mut ServerRuntime,
+    registry: &mut ResourceHashRegistry,
     method: &str,
     req: &serde_json::Value,
     profile: ServerProfile,
@@ -638,7 +797,7 @@ fn handle_request(
             let tool_name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
             let empty_args = json!({});
             let args = params.get("arguments").unwrap_or(&empty_args);
-            handle_tool(runtime, tool_name, args, profile)
+            handle_tool(runtime, registry, tool_name, args, profile)
         }
         _ => json!({"error": "Unknown method"}),
     }
@@ -684,8 +843,66 @@ fn parse_governance_proposal(
 }
 
 #[cfg(feature = "public_stub")]
+fn tool_text(value: serde_json::Value) -> serde_json::Value {
+    json!({"content": [{"type": "text", "text": serde_json::to_string(&value).unwrap()}]})
+}
+
+#[cfg(feature = "public_stub")]
+fn contract_rejection(value: serde_json::Value) -> serde_json::Value {
+    tool_text(value)
+}
+
+#[cfg(feature = "public_stub")]
+fn validate_decision_contract(
+    args: &serde_json::Value,
+    registry: &ResourceHashRegistry,
+) -> Option<serde_json::Value> {
+    let submitted_hash = args
+        .get("state_snapshot_hash")
+        .and_then(|v| v.as_str())
+        .and_then(normalize_sha256_hash);
+
+    if submitted_hash.is_none() {
+        return Some(contract_rejection(json!({
+            "decision": "CONTRACT_REJECTED",
+            "reason_code": "INCOMPLETE_DECLARATION",
+            "policy_engine_invoked": false,
+            "missing_fields": ["state_snapshot_hash"],
+        })));
+    }
+
+    let submitted_hash = submitted_hash.expect("checked above");
+    let Some((resource, expected_hash)) = registry.find_match(args) else {
+        return None;
+    };
+
+    if submitted_hash != expected_hash {
+        return Some(contract_rejection(json!({
+            "decision": "CONTRACT_REJECTED",
+            "reason_code": "STATE_HASH_MISMATCH",
+            "policy_engine_invoked": false,
+            "resource_matched": resource,
+            "submitted_hash_prefix": hash_prefix(&submitted_hash),
+            "expected_hash_prefix": hash_prefix(expected_hash),
+        })));
+    }
+
+    None
+}
+
+#[cfg(feature = "public_stub")]
+fn u64_arg(args: &serde_json::Value, name: &str) -> Option<u64> {
+    args.get(name).and_then(|value| {
+        value
+            .as_u64()
+            .or_else(|| value.as_str().and_then(|s| s.parse::<u64>().ok()))
+    })
+}
+
+#[cfg(feature = "public_stub")]
 fn handle_tool(
     runtime: &mut ServerRuntime,
+    registry: &mut ResourceHashRegistry,
     tool: &str,
     args: &serde_json::Value,
     profile: ServerProfile,
@@ -705,6 +922,24 @@ fn handle_tool(
     }
 
     match tool {
+        "register_resource" => {
+            let Some(resource_path) = args.get("resource_path").and_then(|v| v.as_str()) else {
+                return json!({"error": {"code": 4000, "message": "resource_path is required"}});
+            };
+            let Some(expected_hash) = args.get("expected_hash").and_then(|v| v.as_str()) else {
+                return json!({"error": {"code": 4000, "message": "expected_hash is required"}});
+            };
+
+            match registry.register(resource_path, expected_hash) {
+                Ok((resource, hash)) => tool_text(json!({
+                    "registered": true,
+                    "resource": resource,
+                    "baseline_hash": hash_prefix(&hash),
+                    "expected_hash": hash,
+                })),
+                Err(message) => json!({"error": {"code": 4000, "message": message}}),
+            }
+        }
         "node.create" => {
             let belief = args.get("belief").and_then(|b| b.as_f64()).unwrap_or(0.5);
             let energy = args.get("energy").and_then(|e| e.as_f64()).unwrap_or(100.0);
@@ -712,8 +947,7 @@ fn handle_tool(
             json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
         }
         "node.query" => {
-            let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
-            let id: u64 = id_str.parse().unwrap_or(0);
+            let id = u64_arg(args, "node_id").unwrap_or(0);
             match runtime.graph().query_node(id) {
                 Some(node) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
@@ -722,8 +956,7 @@ fn handle_tool(
             }
         }
         "node.mutate" => {
-            let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
-            let id: u64 = id_str.parse().unwrap_or(0);
+            let id = u64_arg(args, "node_id").unwrap_or(0);
             let delta = args.get("delta").and_then(|d| d.as_f64()).unwrap_or(0.0);
             match runtime.graph_mut().mutate_node(id, delta) {
                 Some(node) => {
@@ -733,16 +966,8 @@ fn handle_tool(
             }
         }
         "edge.bind" => {
-            let src: u64 = args
-                .get("src")
-                .and_then(|s| s.as_str())
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0);
-            let dst: u64 = args
-                .get("dst")
-                .and_then(|d| d.as_str())
-                .and_then(|d| d.parse().ok())
-                .unwrap_or(0);
+            let src = u64_arg(args, "src").unwrap_or(0);
+            let dst = u64_arg(args, "dst").unwrap_or(0);
             let weight = args.get("weight").and_then(|w| w.as_f64()).unwrap_or(0.5);
             match runtime.graph_mut().bind_edge(src, dst, weight) {
                 Some(edge) => {
@@ -760,8 +985,7 @@ fn handle_tool(
             json!({"content": [{"type": "text", "text": serde_json::to_string(&status).unwrap()}]})
         }
         "esv.audit" | "audit.export" => {
-            let id_str = args.get("node_id").and_then(|i| i.as_str()).unwrap_or("0");
-            let id: u64 = id_str.parse().unwrap_or(0);
+            let id = u64_arg(args, "node_id").unwrap_or(0);
             match runtime.graph().esv_audit(id) {
                 Some(audit) => {
                     json!({"content": [{"type": "text", "text": serde_json::to_string(&audit).unwrap()}]})
@@ -777,6 +1001,10 @@ fn handle_tool(
             json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
         }
         "governance.evaluate" | "decision.check" => {
+            if let Some(rejection) = validate_decision_contract(args, registry) {
+                return rejection;
+            }
+
             let proposal = parse_governance_proposal(args);
 
             match runtime.evaluate(&proposal) {
