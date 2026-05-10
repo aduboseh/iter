@@ -23,6 +23,7 @@ use crate::substrate::stub::{
 pub struct ScgRuntime {
     endpoint: String,
     boot_governance_hash: Arc<String>,
+    auth_token: Option<Arc<str>>,
     http_client: Client,
     graph: StubRuntime,
     audit_log: AuditLog,
@@ -51,6 +52,7 @@ impl ScgRuntime {
         Ok(Self {
             endpoint,
             boot_governance_hash: Arc::new(boot_hash),
+            auth_token: Self::auth_token_from_env(),
             http_client,
             graph: StubRuntime::new(),
             audit_log: AuditLog::new(),
@@ -83,6 +85,15 @@ impl ScgRuntime {
         }
 
         Ok(endpoint)
+    }
+
+    fn auth_token_from_env() -> Option<Arc<str>> {
+        std::env::var("SCG_AUTH_TOKEN")
+            .ok()
+            .or_else(|| std::env::var("SCG_GATEWAY_AUTH_TOKEN").ok())
+            .map(|token| token.trim().to_string())
+            .filter(|token| !token.is_empty())
+            .map(Arc::<str>::from)
     }
 
     /// Read access to the local graph used for non-governance tool surfaces.
@@ -205,10 +216,11 @@ impl ScgRuntime {
     ) -> Result<ScgGovernanceOutcome, GovernanceRuntimeError> {
         let request = Self::build_request(proposal)?;
         let url = format!("{}/governance/evaluate", self.endpoint);
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&request)
+        let mut request_builder = self.http_client.post(&url).json(&request);
+        if let Some(token) = &self.auth_token {
+            request_builder = request_builder.bearer_auth(token.as_ref());
+        }
+        let response = request_builder
             .send()
             .map_err(|e| GovernanceRuntimeError::ScgUnavailable(e.to_string()))?;
 

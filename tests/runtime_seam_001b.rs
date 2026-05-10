@@ -109,6 +109,28 @@ struct MockHttpResponse {
     body: String,
 }
 
+struct EnvVarGuard {
+    key: &'static str,
+    previous: Option<String>,
+}
+
+impl EnvVarGuard {
+    fn set(key: &'static str, value: &str) -> Self {
+        let previous = std::env::var(key).ok();
+        std::env::set_var(key, value);
+        Self { key, previous }
+    }
+}
+
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        match &self.previous {
+            Some(value) => std::env::set_var(self.key, value),
+            None => std::env::remove_var(self.key),
+        }
+    }
+}
+
 struct MockScgServer {
     endpoint: String,
     expected_requests: usize,
@@ -120,6 +142,13 @@ struct MockScgServer {
 
 impl MockScgServer {
     fn spawn(responses: Vec<MockHttpResponse>) -> Self {
+        Self::spawn_with_expected_bearer(responses, None)
+    }
+
+    fn spawn_with_expected_bearer(
+        responses: Vec<MockHttpResponse>,
+        expected_bearer_token: Option<&str>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock SCG");
         let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
         let expected_requests = responses.len();
@@ -130,6 +159,7 @@ impl MockScgServer {
         let thread_failures = Arc::clone(&failures);
         let thread_received_requests = Arc::clone(&received_requests);
         let thread_shutdown = Arc::clone(&shutdown);
+        let expected_authorization = expected_bearer_token.map(|token| format!("Bearer {}", token));
 
         let handle = thread::spawn(move || {
             for response in responses {
@@ -157,7 +187,11 @@ impl MockScgServer {
                     }
                     continue;
                 }
-                if let Err(err) = assert_expected_request(&request, &expected_request) {
+                if let Err(err) = assert_expected_request(
+                    &request,
+                    &expected_request,
+                    expected_authorization.as_deref(),
+                ) {
                     thread_failures.lock().expect("mock failures").push(err);
                     return;
                 }
@@ -288,7 +322,20 @@ fn parse_content_length(header: &[u8]) -> usize {
     0
 }
 
-fn assert_expected_request(request: &[u8], expected: &GovernanceRequest) -> Result<(), String> {
+fn header_value(header: &str, name: &str) -> Option<String> {
+    header.lines().skip(1).find_map(|line| {
+        let (header_name, header_value) = line.split_once(':')?;
+        header_name
+            .eq_ignore_ascii_case(name)
+            .then(|| header_value.trim().to_string())
+    })
+}
+
+fn assert_expected_request(
+    request: &[u8],
+    expected: &GovernanceRequest,
+    expected_authorization: Option<&str>,
+) -> Result<(), String> {
     let header_end = find_header_end(request).ok_or_else(|| "missing HTTP headers".to_string())?;
     let header = String::from_utf8(request[..header_end].to_vec())
         .map_err(|e| format!("invalid request header encoding: {}", e))?;
@@ -298,6 +345,16 @@ fn assert_expected_request(request: &[u8], expected: &GovernanceRequest) -> Resu
         .ok_or_else(|| "missing HTTP request line".to_string())?;
     if request_line != "POST /governance/evaluate HTTP/1.1" {
         return Err(format!("unexpected request line: {}", request_line));
+    }
+    if let Some(expected_authorization) = expected_authorization {
+        let actual = header_value(&header, "authorization")
+            .ok_or_else(|| "missing authorization header".to_string())?;
+        if actual != expected_authorization {
+            return Err(format!(
+                "unexpected authorization header: expected '{}', got '{}'",
+                expected_authorization, actual
+            ));
+        }
     }
 
     let body = &request[header_end + 4..];
@@ -545,6 +602,33 @@ fn governed_backed_bound_fields_not_overwritten_by_adapter() {
         !packet.execution_trace.is_empty(),
         "scg-backed packet must retain non-empty SCG execution_trace after adapter binding"
     );
+
+    server.finish();
+}
+
+#[test]
+fn governed_backed_mode_sends_scg_bearer_auth_when_configured() {
+    let _guard = seam_guard();
+    let _auth = EnvVarGuard::set("SCG_AUTH_TOKEN", "iter-to-scg-secret");
+    let server = MockScgServer::spawn_with_expected_bearer(
+        vec![MockHttpResponse {
+            status_code: 200,
+            body: serde_json::to_string(&contract_outcome(
+                CONTRACT_VERSION_STR,
+                ScgDecision::Allow,
+                GOVERNANCE_HASH.trim(),
+                false,
+            ))
+            .expect("serialize outcome"),
+        }],
+        Some("iter-to-scg-secret"),
+    );
+
+    let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+    let outcome = runtime.evaluate(&proposal()).expect("evaluate");
+
+    assert!(outcome.authoritative_pdp);
+    assert!(outcome.packet.is_some());
 
     server.finish();
 }
