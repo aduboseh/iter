@@ -607,7 +607,7 @@ fn governed_backed_bound_fields_not_overwritten_by_adapter() {
 }
 
 #[test]
-fn governed_backed_mode_sends_scg_bearer_auth_when_configured() {
+fn governed_backed_mode_sends_gateway_bearer_auth_when_configured() {
     let _guard = seam_guard();
     let _auth = EnvVarGuard::set("SCG_AUTH_TOKEN", "iter-to-scg-secret");
     let server = MockScgServer::spawn_with_expected_bearer(
