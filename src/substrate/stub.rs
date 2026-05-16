@@ -39,6 +39,8 @@ pub struct StubNode {
     pub energy: f64,
     /// Whether the node satisfies ESV constraints
     pub esv_valid: bool,
+    /// Deterministic stability score exposed by the public SDK contract
+    pub stability: f64,
 }
 
 /// Stub edge state for protocol validation.
@@ -170,6 +172,7 @@ impl StubRuntime {
             belief: belief.clamp(0.0, 1.0),
             energy: energy.max(0.0),
             esv_valid: true, // Stub always reports valid
+            stability: 1.0,
         };
         self.nodes.insert(id, node.clone());
         self.record_lineage("node.create", &format!("id:{}", id));

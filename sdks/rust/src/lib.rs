@@ -804,10 +804,7 @@ fn extract_raw_result(response: RpcResponse) -> Result<serde_json::Value> {
         });
     }
 
-    response.result.ok_or_else(|| SdkError::RequestFailed {
-        code: -1,
-        message: "No result".into(),
-    })
+    parse_tool_result(response)
 }
 
 // ==============================
@@ -873,5 +870,26 @@ mod tests {
             }
             other => panic!("unexpected error: {other}"),
         }
+    }
+
+    #[test]
+    fn raw_result_parses_tool_text_json() {
+        let response = RpcResponse {
+            jsonrpc: "2.0".into(),
+            result: Some(serde_json::json!({
+                "content": [{
+                    "type": "text",
+                    "text": "{\"verdict\":\"ALLOW\"}"
+                }]
+            })),
+            error: None,
+            id: serde_json::json!(1),
+        };
+
+        let parsed = extract_raw_result(response).expect("tool JSON");
+        assert_eq!(
+            parsed.get("verdict").and_then(|v| v.as_str()),
+            Some("ALLOW")
+        );
     }
 }
