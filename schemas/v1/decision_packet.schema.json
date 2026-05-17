@@ -316,9 +316,38 @@
         "value_signal"
       ],
       "type": "object"
+    },
+    "ReplayScope": {
+      "additionalProperties": false,
+      "description": "Replay scope bound into each proof packet.",
+      "properties": {
+        "cross_platform_replay_claimed": {
+          "description": "Whether this packet claims cross-platform replay equivalence.",
+          "type": "boolean"
+        },
+        "platform": {
+          "description": "Target triple used to build the producing Iter binary.",
+          "type": "string"
+        },
+        "replay_scope": {
+          "description": "Replay guarantee scope for this packet.",
+          "type": "string"
+        },
+        "rustc_version": {
+          "description": "rustc version used to build the producing Iter binary.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cross_platform_replay_claimed",
+        "platform",
+        "replay_scope",
+        "rustc_version"
+      ],
+      "type": "object"
     }
   },
-  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Compile-time SCG contract provenance - Provenance source declarations - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Governance artifact binding - Ordered execution trace - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
+  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Replay scope and build environment - Compile-time SCG contract provenance - Provenance source declarations - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Governance artifact binding - Ordered execution trace - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
   "properties": {
     "checksum": {
       "description": "SHA-256 checksum of packet (excluding this field)",
@@ -408,6 +437,14 @@
       ],
       "description": "Reasoning signature"
     },
+    "replay_scope": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ReplayScope"
+        }
+      ],
+      "description": "Replay scope and build environment for this packet."
+    },
     "substrate_build_hash": {
       "description": "SCG build hash (from contract)",
       "type": "string"
@@ -430,6 +467,7 @@
     "policy",
     "provenance_source",
     "reasoning",
+    "replay_scope",
     "substrate_build_hash",
     "tick"
   ],

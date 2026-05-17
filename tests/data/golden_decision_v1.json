@@ -1,6 +1,12 @@
 {
   "iter_build_hash": "1.0.2",
   "substrate_build_hash": "scg-11.12.0",
+  "replay_scope": {
+    "replay_scope": "same_binary_only",
+    "platform": "x86_64-pc-windows-msvc",
+    "rustc_version": "rustc 1.93.0 (254b59607 2026-01-19)",
+    "cross_platform_replay_claimed": false
+  },
   "contract_provenance": {
     "contract_version": "scg.v1",
     "scg_source_commit": "da14c8390ba8ceeb0ab15d85c598d2042a2029cf",
@@ -53,5 +59,5 @@
     "LEARNING_PERMISSION_GATE",
     "LEARNING_QUALITY_GATE"
   ],
-  "checksum": "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a"
+  "checksum": "f749da2ca5666d5efaeb004064c6a5c12774afff1a0acc7c1d624dcdec90d9e4"
 }

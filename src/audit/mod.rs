@@ -17,6 +17,7 @@ use crate::contracts::{
     ContractError, EnergyEnvelope, LearningEnvelope, PolicyDecision, PolicyEnvelope,
     ReasoningEnvelope, SystemState,
 };
+use crate::provenance;
 
 /// Compile-time SCG contract provenance exported by build.rs.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -46,15 +47,15 @@ impl ContractProvenance {
     /// Read the build-time contract facts emitted by build.rs.
     pub fn compile_time() -> Self {
         Self {
-            contract_version: env!("ITER_SCG_CONTRACT_VERSION").to_string(),
-            scg_source_commit: env!("ITER_SCG_SOURCE_COMMIT").to_string(),
-            scg_vendor_master_head: env!("ITER_SCG_VENDOR_MASTER_HEAD").to_string(),
-            bridge_contract_rs_sha256: env!("ITER_BRIDGE_CONTRACT_RS_SHA256").to_string(),
-            bridge_trace_rs_sha256: env!("ITER_BRIDGE_TRACE_RS_SHA256").to_string(),
-            bridge_errors_rs_sha256: env!("ITER_BRIDGE_ERRORS_RS_SHA256").to_string(),
-            bridge_lib_rs_sha256: env!("ITER_BRIDGE_LIB_RS_SHA256").to_string(),
-            canonical_vectors_sha256: env!("ITER_CANONICAL_VECTORS_SHA256").to_string(),
-            canonicalization_rule: env!("ITER_CANONICALIZATION_RULE").to_string(),
+            contract_version: provenance::CONTRACT_VERSION.to_string(),
+            scg_source_commit: provenance::SCG_SOURCE_COMMIT.to_string(),
+            scg_vendor_master_head: provenance::SCG_VENDOR_MASTER_HEAD.to_string(),
+            bridge_contract_rs_sha256: provenance::BRIDGE_CONTRACT_RS_SHA256.to_string(),
+            bridge_trace_rs_sha256: provenance::BRIDGE_TRACE_RS_SHA256.to_string(),
+            bridge_errors_rs_sha256: provenance::BRIDGE_ERRORS_RS_SHA256.to_string(),
+            bridge_lib_rs_sha256: provenance::BRIDGE_LIB_RS_SHA256.to_string(),
+            canonical_vectors_sha256: provenance::CANONICAL_VECTORS_SHA256.to_string(),
+            canonicalization_rule: provenance::CANONICALIZATION_RULE.to_string(),
         }
     }
 }
@@ -85,10 +86,37 @@ impl ProvenanceSource {
     }
 }
 
+/// Replay scope bound into each proof packet.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReplayScope {
+    /// Replay guarantee scope for this packet.
+    pub replay_scope: String,
+    /// Target triple used to build the producing Iter binary.
+    pub platform: String,
+    /// rustc version used to build the producing Iter binary.
+    pub rustc_version: String,
+    /// Whether this packet claims cross-platform replay equivalence.
+    pub cross_platform_replay_claimed: bool,
+}
+
+impl ReplayScope {
+    /// Read the build environment exported by build.rs.
+    pub fn compile_time() -> Self {
+        Self {
+            replay_scope: provenance::REPLAY_SCOPE.to_string(),
+            platform: provenance::TARGET_TRIPLE.to_string(),
+            rustc_version: provenance::RUSTC_VERSION.to_string(),
+            cross_platform_replay_claimed: provenance::CROSS_PLATFORM_REPLAY_CLAIMED,
+        }
+    }
+}
+
 /// Decision packet - complete audit record for a governed action.
 ///
 /// # Contents
 /// - System identifiers (build hashes)
+/// - Replay scope and build environment
 /// - Compile-time SCG contract provenance
 /// - Provenance source declarations
 /// - Tick
@@ -107,6 +135,8 @@ pub struct DecisionPacket {
     pub iter_build_hash: String,
     /// SCG build hash (from contract)
     pub substrate_build_hash: String,
+    /// Replay scope and build environment for this packet.
+    pub replay_scope: ReplayScope,
     /// Contract-critical bridge provenance exported by build.rs.
     pub contract_provenance: ContractProvenance,
     /// Source declarations for static and dynamic packet values.
@@ -154,6 +184,7 @@ impl DecisionPacket {
         let mut packet = Self {
             iter_build_hash,
             substrate_build_hash,
+            replay_scope: ReplayScope::compile_time(),
             contract_provenance: ContractProvenance::compile_time(),
             provenance_source: ProvenanceSource::compile_time_and_runtime(),
             tick: state.tick,
@@ -494,6 +525,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(packet.contract_provenance.contract_version, "scg.v1");
+        assert_eq!(packet.replay_scope.replay_scope, "same_binary_only");
+        assert!(!packet.replay_scope.platform.is_empty());
+        assert!(packet.replay_scope.rustc_version.starts_with("rustc "));
+        assert!(!packet.replay_scope.cross_platform_replay_claimed);
         assert_eq!(
             packet.contract_provenance.scg_source_commit,
             env!("ITER_SCG_SOURCE_COMMIT")

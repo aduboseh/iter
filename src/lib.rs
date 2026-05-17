@@ -37,6 +37,8 @@ pub mod caller_context;
 /// Canonical hash primitives shared by build.rs and the runtime attestation path.
 /// Single source of truth for SHA-256 computation across the codebase.
 pub mod canonical;
+/// Compile-time Iter/SCG provenance constants exported for downstream consumers.
+pub mod provenance;
 pub mod types;
 
 // ============================================================================

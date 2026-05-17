@@ -1,10 +1,11 @@
-//! Golden Vector Tests — RFC 8785 JCS Checksums
+//! Golden Vector Tests - RFC 8785 JCS Checksums
 //!
-//! These tests verify that JCS canonicalization produces identical checksums
-//! across all platforms. Checksums are hardcoded and enforced.
+//! DecisionPacket checksums bind same-binary replay scope, including target
+//! triple and rustc version. Constructed packet checksums are therefore asserted
+//! for validity and repeatability within the current binary. The committed JSON
+//! fixture covers fixed-artifact replay.
 //!
-//! INVARIANT: Same input => same JCS bytes => same checksum.
-//! If these tests fail on any platform, canonicalization is broken.
+//! INVARIANT: Same input + same binary => same JCS bytes => same checksum.
 
 use iter_mcp_server::audit::DecisionPacket;
 use iter_mcp_server::contracts::{
@@ -18,6 +19,26 @@ use iter_mcp_server::runtime::{
     replay_decision, GovernanceMode, GovernanceRuntime, GovernanceVerdict,
 };
 use iter_mcp_server::substrate::stub::{GovernanceProposal, StubRuntime};
+
+fn assert_same_binary_packet_checksum(packet: &DecisionPacket, vector_name: &str) {
+    assert!(
+        packet.verify_checksum().is_ok(),
+        "{vector_name} packet checksum must verify"
+    );
+    assert_eq!(
+        packet.checksum.len(),
+        64,
+        "{vector_name} checksum must be a SHA-256 hex digest"
+    );
+    assert!(
+        packet.checksum.chars().all(|c| c.is_ascii_hexdigit()),
+        "{vector_name} checksum must be hex"
+    );
+    assert_eq!(packet.replay_scope.replay_scope, "same_binary_only");
+    assert!(!packet.replay_scope.cross_platform_replay_claimed);
+    assert!(!packet.replay_scope.platform.is_empty());
+    assert!(packet.replay_scope.rustc_version.starts_with("rustc "));
+}
 
 /// Golden Vector 1: Basic ALLOW decision with committed learning
 ///
@@ -65,11 +86,7 @@ fn golden_vector_1_allow_committed() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a",
-        "GOLDEN_VECTOR_1 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_1");
 }
 
 /// Golden Vector 2: FREEZE_LEARNING due to scarcity streak
@@ -117,11 +134,7 @@ fn golden_vector_2_freeze_scarcity() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "0b6a56cd917a330eca3993a8b5f7c93f7df954269ee16bfe1c9269c08bfeab4a",
-        "GOLDEN_VECTOR_2 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_2");
     assert!(!packet.policy.reason_codes.is_empty());
 }
 
@@ -168,11 +181,7 @@ fn golden_vector_3_degraded_mode() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "0e067ce895d600ec5a561c753747bce264ec2d599c3efff34b4dfcc0879f2b14",
-        "GOLDEN_VECTOR_3 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_3");
     assert!(packet.permit_hash.is_some());
 }
 
@@ -216,11 +225,7 @@ fn golden_vector_4_boundary_values() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "ad48002751bfa7b76bee45c3762426cb9865b423d5e444373c0efc22960789b0",
-        "GOLDEN_VECTOR_4 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_4");
 }
 
 /// Golden Vector 5: Large values test
@@ -268,11 +273,7 @@ fn golden_vector_5_large_values() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "c2ee5f2a35fe2337c56344357d915f19acdd5847b08a73c8597a2ac839cd08d4",
-        "GOLDEN_VECTOR_5 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_5");
 }
 
 /// Determinism test: Same input must produce same checksum across 10000 iterations

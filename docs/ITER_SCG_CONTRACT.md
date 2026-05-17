@@ -20,6 +20,7 @@ Cargo must rerun `build.rs` when any of those files changes. The build script al
 
 Every `DecisionPacket` includes:
 
+- `replay_scope`: same-binary replay scope, build platform, rustc version, and `cross_platform_replay_claimed=false`
 - `contract_provenance`: actual compile-time values exported by `build.rs` via `cargo:rustc-env`
 - `provenance_source`: source declarations for contract values, decision values, canonical vector integrity, and vector digest casing
 
@@ -82,6 +83,11 @@ Successful product-finish validation must emit:
 ```text
 GOLDEN_PATH_PASS
 contract_version=scg.v1
+claim_registry_version=1.0
+determinism_scope=same_binary_only
+platform=<target_triple>
+rustc_version=<version>
+cross_platform_replay_claimed=false
 scg_source_commit=da14c8390ba8ceeb0ab15d85c598d2042a2029cf
 scg_vendor_master_head=3e0675073a50ce20bdad7c342f7a5caaa3801504
 build_rerun_triggers=verified

@@ -1,8 +1,7 @@
 //! Generates golden DecisionPacket fixture for CLI integration tests.
 //!
-//! Writes tests/data/golden_decision_v1.json — identical to Golden Vector 1
-//! in tests/golden_vectors.rs. The fixture file is deterministic and the
-//! checksum is hardcoded in the golden vector test.
+//! Writes tests/data/golden_decision_v1.json. The fixture is bound to the
+//! same-binary replay scope in the producing build environment.
 //!
 //! Run: cargo run --example generate_golden_fixture
 
@@ -53,10 +52,7 @@ fn main() {
     )
     .expect("valid packet");
 
-    assert_eq!(
-        packet.checksum, "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a",
-        "Generated packet checksum does not match Golden Vector 1"
-    );
+    packet.verify_checksum().expect("generated packet verifies");
 
     let dir = Path::new("tests/data");
     fs::create_dir_all(dir).expect("failed to create tests/data directory");

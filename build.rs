@@ -1,6 +1,7 @@
 //! Build script to validate substrate availability and vendored contract integrity.
 
 use std::io::Read;
+use std::process::Command;
 
 const ITER_SCG_CONTRACT_VERSION: &str = "scg.v1";
 const ITER_SCG_SOURCE_COMMIT: &str = "da14c8390ba8ceeb0ab15d85c598d2042a2029cf";
@@ -36,6 +37,22 @@ fn sha256_bytes(bytes: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn rustc_version() -> String {
+    let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
+    let output = Command::new(rustc)
+        .arg("--version")
+        .output()
+        .expect("RUSTC_VERSION_EXPORT_FAILED: rustc --version must run");
+    if !output.status.success() {
+        panic!("RUSTC_VERSION_EXPORT_FAILED: rustc --version failed");
+    }
+
+    String::from_utf8(output.stdout)
+        .expect("RUSTC_VERSION_EXPORT_FAILED: rustc --version must emit UTF-8")
+        .trim()
+        .to_string()
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge");
@@ -62,6 +79,11 @@ fn main() {
         "cargo:rustc-env=ITER_CANONICALIZATION_RULE={}",
         ITER_CANONICALIZATION_RULE
     );
+    println!(
+        "cargo:rustc-env=ITER_TARGET_TRIPLE={}",
+        std::env::var("TARGET").expect("TARGET_TRIPLE_EXPORT_FAILED: TARGET must be set")
+    );
+    println!("cargo:rustc-env=ITER_RUSTC_VERSION={}", rustc_version());
 
     let expected: &[GovernanceArtifact] = &[
         GovernanceArtifact {

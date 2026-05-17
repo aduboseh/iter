@@ -32,6 +32,8 @@ fn build_script_exports_contract_provenance_to_runtime() {
         "ITER_BRIDGE_LIB_RS_SHA256",
         "ITER_CANONICAL_VECTORS_SHA256",
         "ITER_CANONICALIZATION_RULE",
+        "ITER_TARGET_TRIPLE",
+        "ITER_RUSTC_VERSION",
     ] {
         assert!(
             BUILD_RS.contains(export),
