@@ -66,7 +66,7 @@ fn golden_vector_1_allow_committed() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum, "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe",
+        packet.checksum, "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a",
         "GOLDEN_VECTOR_1 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -118,7 +118,7 @@ fn golden_vector_2_freeze_scarcity() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum, "478342ff53d3a8b5c0e365f7348a88fb323107b5ad76d44f5cdedba24bc85eca",
+        packet.checksum, "0b6a56cd917a330eca3993a8b5f7c93f7df954269ee16bfe1c9269c08bfeab4a",
         "GOLDEN_VECTOR_2 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -169,7 +169,7 @@ fn golden_vector_3_degraded_mode() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum, "06c8c50c10ebdaece5faa46d7fd4a31a5fc9f983f3e2e9b84f9acff3b332e33d",
+        packet.checksum, "0e067ce895d600ec5a561c753747bce264ec2d599c3efff34b4dfcc0879f2b14",
         "GOLDEN_VECTOR_3 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -217,7 +217,7 @@ fn golden_vector_4_boundary_values() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum, "3aa4e02e0c337496be175572b15c04dc19a785a382880d46091364465309bcbb",
+        packet.checksum, "ad48002751bfa7b76bee45c3762426cb9865b423d5e444373c0efc22960789b0",
         "GOLDEN_VECTOR_4 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());
@@ -269,7 +269,7 @@ fn golden_vector_5_large_values() {
     .unwrap();
 
     assert_eq!(
-        packet.checksum, "2ec1473fda2fbb78abaa0eb16b5edcd12353bd132a6f0b6b572269a0c69a93ea",
+        packet.checksum, "c2ee5f2a35fe2337c56344357d915f19acdd5847b08a73c8597a2ac839cd08d4",
         "GOLDEN_VECTOR_5 checksum mismatch — JCS canonicalization changed"
     );
     assert!(packet.verify_checksum().is_ok());

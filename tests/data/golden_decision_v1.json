@@ -1,6 +1,23 @@
 {
   "iter_build_hash": "1.0.2",
   "substrate_build_hash": "scg-11.12.0",
+  "contract_provenance": {
+    "contract_version": "scg.v1",
+    "scg_source_commit": "da14c8390ba8ceeb0ab15d85c598d2042a2029cf",
+    "scg_vendor_master_head": "3e0675073a50ce20bdad7c342f7a5caaa3801504",
+    "bridge_contract_rs_sha256": "1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0",
+    "bridge_trace_rs_sha256": "620892e1986dc22a2a5c17f60ec650e6da70dbe90b847a2862e13c1bf14bce20",
+    "bridge_errors_rs_sha256": "d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af",
+    "bridge_lib_rs_sha256": "e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36",
+    "canonical_vectors_sha256": "1e804ac4342da71251d4a404bfcee5ef65a2f5b46d599e0fe9d73c80830c1d75",
+    "canonicalization_rule": "sorted-key-json+utf8-nfc+sha256"
+  },
+  "provenance_source": {
+    "contract_values": "compile_time_build_rs_rustc_env",
+    "decision_values": "runtime_execution",
+    "canonical_vector_integrity": "raw_byte_sha256",
+    "vector_digest_casing": "raw_text_validation"
+  },
   "tick": 1000,
   "energy": {
     "nodes": 100.0,
@@ -36,5 +53,5 @@
     "LEARNING_PERMISSION_GATE",
     "LEARNING_QUALITY_GATE"
   ],
-  "checksum": "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe"
+  "checksum": "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a"
 }

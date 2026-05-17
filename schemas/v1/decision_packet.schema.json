@@ -3,6 +3,60 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "ContractProvenance": {
+      "additionalProperties": false,
+      "description": "Compile-time SCG contract provenance exported by build.rs.",
+      "properties": {
+        "bridge_contract_rs_sha256": {
+          "description": "SHA-256 of vendored contract.rs.",
+          "type": "string"
+        },
+        "bridge_errors_rs_sha256": {
+          "description": "SHA-256 of vendored errors.rs.",
+          "type": "string"
+        },
+        "bridge_lib_rs_sha256": {
+          "description": "SHA-256 of vendored lib.rs.",
+          "type": "string"
+        },
+        "bridge_trace_rs_sha256": {
+          "description": "SHA-256 of vendored trace.rs.",
+          "type": "string"
+        },
+        "canonical_vectors_sha256": {
+          "description": "Raw-byte SHA-256 of CANONICAL_VECTORS.json.",
+          "type": "string"
+        },
+        "canonicalization_rule": {
+          "description": "Canonicalization rule bound to the vendored contract.",
+          "type": "string"
+        },
+        "contract_version": {
+          "description": "SCG governance bridge contract version.",
+          "type": "string"
+        },
+        "scg_source_commit": {
+          "description": "Exact SCG source commit used as the vendored bridge origin.",
+          "type": "string"
+        },
+        "scg_vendor_master_head": {
+          "description": "SCG master head that had accepted the vendored bridge at vendor time.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bridge_contract_rs_sha256",
+        "bridge_errors_rs_sha256",
+        "bridge_lib_rs_sha256",
+        "bridge_trace_rs_sha256",
+        "canonical_vectors_sha256",
+        "canonicalization_rule",
+        "contract_version",
+        "scg_source_commit",
+        "scg_vendor_master_head"
+      ],
+      "type": "object"
+    },
     "EnergyEnvelope": {
       "additionalProperties": false,
       "description": "Energy envelope - thermodynamic state summary.\n\n# Fields All energy values are non-negative. Integrity in [0.0, 1.0].",
@@ -201,6 +255,35 @@
       ],
       "type": "object"
     },
+    "ProvenanceSource": {
+      "additionalProperties": false,
+      "description": "Provenance source declarations for static and dynamic proof-packet values.",
+      "properties": {
+        "canonical_vector_integrity": {
+          "description": "Integrity validation method for the canonical vector file.",
+          "type": "string"
+        },
+        "contract_values": {
+          "description": "Source of static contract and bridge values.",
+          "type": "string"
+        },
+        "decision_values": {
+          "description": "Source of decision-specific values.",
+          "type": "string"
+        },
+        "vector_digest_casing": {
+          "description": "Validation method for canonical vector digest casing.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "canonical_vector_integrity",
+        "contract_values",
+        "decision_values",
+        "vector_digest_casing"
+      ],
+      "type": "object"
+    },
     "ReasoningEnvelope": {
       "additionalProperties": false,
       "description": "Reasoning envelope - cortex output summary.\n\n# Fields All signals in [0.0, 1.0].",
@@ -235,11 +318,19 @@
       "type": "object"
     }
   },
-  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
+  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Compile-time SCG contract provenance - Provenance source declarations - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Governance artifact binding - Ordered execution trace - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
   "properties": {
     "checksum": {
       "description": "SHA-256 checksum of packet (excluding this field)",
       "type": "string"
+    },
+    "contract_provenance": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ContractProvenance"
+        }
+      ],
+      "description": "Contract-critical bridge provenance exported by build.rs."
     },
     "economics_hash": {
       "description": "Economics config hash",
@@ -253,13 +344,6 @@
       ],
       "description": "Energy snapshot"
     },
-    "execution_trace": {
-      "description": "Ordered evaluation trace. Omitted when no trace is attached and omitted on demo path. Attached from local evaluation on governed-local path. Attached from SCG evaluation on scg-backed path (always attached on scg-backed path in current implementation).",
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
-    },
     "evaluated_rules": {
       "description": "Evaluated rule IDs (ordered)",
       "items": {
@@ -267,9 +351,19 @@
       },
       "type": "array"
     },
+    "execution_trace": {
+      "description": "Ordered evaluation trace. Empty when no trace has been attached.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "governance_hash": {
-      "description": "Canonical governance hash. Omitted on demo path. Populated from local governance/governance.hash on governed-local path. Populated from SCG canonical hash on scg-backed path (required, non-empty).",
-      "type": "string"
+      "description": "Canonical governance hash bound to this packet, if available.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "iter_build_hash": {
       "description": "Iter build hash (compile-time)",
@@ -298,6 +392,14 @@
       ],
       "description": "Policy snapshot"
     },
+    "provenance_source": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProvenanceSource"
+        }
+      ],
+      "description": "Source declarations for static and dynamic packet values."
+    },
     "reasoning": {
       "allOf": [
         {
@@ -319,12 +421,14 @@
   },
   "required": [
     "checksum",
+    "contract_provenance",
     "economics_hash",
     "energy",
     "evaluated_rules",
     "iter_build_hash",
     "learning",
     "policy",
+    "provenance_source",
     "reasoning",
     "substrate_build_hash",
     "tick"

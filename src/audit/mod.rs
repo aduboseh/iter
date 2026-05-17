@@ -18,10 +18,79 @@ use crate::contracts::{
     ReasoningEnvelope, SystemState,
 };
 
+/// Compile-time SCG contract provenance exported by build.rs.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContractProvenance {
+    /// SCG governance bridge contract version.
+    pub contract_version: String,
+    /// Exact SCG source commit used as the vendored bridge origin.
+    pub scg_source_commit: String,
+    /// SCG master head that had accepted the vendored bridge at vendor time.
+    pub scg_vendor_master_head: String,
+    /// SHA-256 of vendored contract.rs.
+    pub bridge_contract_rs_sha256: String,
+    /// SHA-256 of vendored trace.rs.
+    pub bridge_trace_rs_sha256: String,
+    /// SHA-256 of vendored errors.rs.
+    pub bridge_errors_rs_sha256: String,
+    /// SHA-256 of vendored lib.rs.
+    pub bridge_lib_rs_sha256: String,
+    /// Raw-byte SHA-256 of CANONICAL_VECTORS.json.
+    pub canonical_vectors_sha256: String,
+    /// Canonicalization rule bound to the vendored contract.
+    pub canonicalization_rule: String,
+}
+
+impl ContractProvenance {
+    /// Read the build-time contract facts emitted by build.rs.
+    pub fn compile_time() -> Self {
+        Self {
+            contract_version: env!("ITER_SCG_CONTRACT_VERSION").to_string(),
+            scg_source_commit: env!("ITER_SCG_SOURCE_COMMIT").to_string(),
+            scg_vendor_master_head: env!("ITER_SCG_VENDOR_MASTER_HEAD").to_string(),
+            bridge_contract_rs_sha256: env!("ITER_BRIDGE_CONTRACT_RS_SHA256").to_string(),
+            bridge_trace_rs_sha256: env!("ITER_BRIDGE_TRACE_RS_SHA256").to_string(),
+            bridge_errors_rs_sha256: env!("ITER_BRIDGE_ERRORS_RS_SHA256").to_string(),
+            bridge_lib_rs_sha256: env!("ITER_BRIDGE_LIB_RS_SHA256").to_string(),
+            canonical_vectors_sha256: env!("ITER_CANONICAL_VECTORS_SHA256").to_string(),
+            canonicalization_rule: env!("ITER_CANONICALIZATION_RULE").to_string(),
+        }
+    }
+}
+
+/// Provenance source declarations for static and dynamic proof-packet values.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProvenanceSource {
+    /// Source of static contract and bridge values.
+    pub contract_values: String,
+    /// Source of decision-specific values.
+    pub decision_values: String,
+    /// Integrity validation method for the canonical vector file.
+    pub canonical_vector_integrity: String,
+    /// Validation method for canonical vector digest casing.
+    pub vector_digest_casing: String,
+}
+
+impl ProvenanceSource {
+    /// Return the fixed source declarations for Iter decision packets.
+    pub fn compile_time_and_runtime() -> Self {
+        Self {
+            contract_values: "compile_time_build_rs_rustc_env".to_string(),
+            decision_values: "runtime_execution".to_string(),
+            canonical_vector_integrity: "raw_byte_sha256".to_string(),
+            vector_digest_casing: "raw_text_validation".to_string(),
+        }
+    }
+}
+
 /// Decision packet - complete audit record for a governed action.
 ///
 /// # Contents
 /// - System identifiers (build hashes)
+/// - Compile-time SCG contract provenance
+/// - Provenance source declarations
 /// - Tick
 /// - Energy snapshot
 /// - Reasoning signature
@@ -38,6 +107,10 @@ pub struct DecisionPacket {
     pub iter_build_hash: String,
     /// SCG build hash (from contract)
     pub substrate_build_hash: String,
+    /// Contract-critical bridge provenance exported by build.rs.
+    pub contract_provenance: ContractProvenance,
+    /// Source declarations for static and dynamic packet values.
+    pub provenance_source: ProvenanceSource,
     /// Decision tick
     pub tick: u64,
     /// Energy snapshot
@@ -81,6 +154,8 @@ impl DecisionPacket {
         let mut packet = Self {
             iter_build_hash,
             substrate_build_hash,
+            contract_provenance: ContractProvenance::compile_time(),
+            provenance_source: ProvenanceSource::compile_time_and_runtime(),
             tick: state.tick,
             energy: state.energy.clone(),
             reasoning: state.reasoning.clone(),
@@ -402,6 +477,47 @@ mod tests {
         )
         .unwrap();
 
+        assert!(packet.verify_checksum().is_ok());
+    }
+
+    #[test]
+    fn packet_provenance_uses_compile_time_exports() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "economics-hash".to_string(),
+            vec!["rule-1".to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(packet.contract_provenance.contract_version, "scg.v1");
+        assert_eq!(
+            packet.contract_provenance.scg_source_commit,
+            env!("ITER_SCG_SOURCE_COMMIT")
+        );
+        assert_eq!(
+            packet.contract_provenance.scg_vendor_master_head,
+            env!("ITER_SCG_VENDOR_MASTER_HEAD")
+        );
+        assert_eq!(
+            packet.provenance_source.contract_values,
+            "compile_time_build_rs_rustc_env"
+        );
+        assert_eq!(
+            packet.provenance_source.decision_values,
+            "runtime_execution"
+        );
+        assert_eq!(
+            packet.provenance_source.canonical_vector_integrity,
+            "raw_byte_sha256"
+        );
+        assert_eq!(
+            packet.provenance_source.vector_digest_casing,
+            "raw_text_validation"
+        );
         assert!(packet.verify_checksum().is_ok());
     }
 

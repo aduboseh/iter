@@ -21,12 +21,57 @@ use governance_bridge::{
     contract::{Decision, GovernanceOutcome, CONTRACT_VERSION_STR},
     trace::{canonicalize, payload_hash, ExecutionTrace, OperationType, TraceStep},
 };
+use sha2::{Digest, Sha256};
 use std::fs;
 
 const ATTESTATION_GOVERNANCE_HASH: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SNAPSHOT_VECTOR_ID: &str = "V3";
 const SNAPSHOT_ORACLE_PATH: &str = "tests/snapshots/canonical_v3_nested_sort.bin";
+
+fn canonical_vectors_path() -> &'static str {
+    concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/vendor/governance-bridge/CANONICAL_VECTORS.json"
+    )
+}
+
+fn canonical_vectors_raw_bytes() -> Vec<u8> {
+    fs::read(canonical_vectors_path()).expect("CANONICAL_VECTORS.json must be readable")
+}
+
+fn canonical_vectors_raw_text() -> String {
+    String::from_utf8(canonical_vectors_raw_bytes())
+        .expect("CANONICAL_VECTORS.json must be valid UTF-8")
+}
+
+fn sha256_lower(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
+fn raw_sha256_fields(text: &str) -> Vec<String> {
+    let marker = "\"sha256\": \"";
+    let mut rest = text;
+    let mut values = Vec::new();
+    while let Some(start) = rest.find(marker) {
+        let after_marker = &rest[start + marker.len()..];
+        let end = after_marker
+            .find('"')
+            .expect("sha256 field must close with a quote");
+        values.push(after_marker[..end].to_string());
+        rest = &after_marker[end + 1..];
+    }
+    values
+}
+
+fn is_uppercase_hex_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'A'..=b'F').contains(&byte))
+}
 
 // Exact order required by validate_sequence() for trace.v1.
 // Any deviation fails validate_sequence() or validate_completeness().
@@ -39,12 +84,7 @@ const GOVERNED_SEQUENCE: [(OperationType, &str); 5] = [
 ];
 
 fn load_canonical_vectors() -> Vec<serde_json::Value> {
-    let vectors_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/vendor/governance-bridge/CANONICAL_VECTORS.json"
-    );
-
-    let vectors_raw = fs::read(vectors_path).expect("CANONICAL_VECTORS.json must be readable");
+    let vectors_raw = canonical_vectors_raw_bytes();
     let manifest: serde_json::Value =
         serde_json::from_slice(&vectors_raw).expect("CANONICAL_VECTORS.json must parse");
 
@@ -52,6 +92,35 @@ fn load_canonical_vectors() -> Vec<serde_json::Value> {
         .as_array()
         .expect("top-level 'vectors' array must exist")
         .clone()
+}
+
+#[test]
+fn smoke_008_canonical_vectors_raw_byte_hash_locked() {
+    let raw = canonical_vectors_raw_bytes();
+    assert_eq!(
+        sha256_lower(&raw),
+        env!("ITER_CANONICAL_VECTORS_SHA256"),
+        "SMOKE-008: CANONICAL_VECTORS.json integrity must be computed over exact raw bytes"
+    );
+}
+
+#[test]
+fn smoke_009_canonical_vector_digest_casing_preserved() {
+    let raw_text = canonical_vectors_raw_text();
+    let digests = raw_sha256_fields(&raw_text);
+    assert_eq!(
+        digests.len(),
+        4,
+        "SMOKE-009: expected four raw sha256 fields in CANONICAL_VECTORS.json"
+    );
+
+    for digest in digests {
+        assert!(
+            is_uppercase_hex_digest(&digest),
+            "SMOKE-009: canonical vector digest must preserve uppercase hex exactly: {}",
+            digest
+        );
+    }
 }
 
 fn find_vector_by_id<'a>(vectors: &'a [serde_json::Value], id: &str) -> &'a serde_json::Value {

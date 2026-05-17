@@ -20,7 +20,7 @@ use iter_mcp_server::contracts::{
     ReasoningEnvelope, SystemState,
 };
 
-const GV1_CHECKSUM: &str = "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe";
+const GV1_CHECKSUM: &str = "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a";
 const GV1_POLICY_HASH: &str = "b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2";
 
 fn iter_cli_bin() -> PathBuf {

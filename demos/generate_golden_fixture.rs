@@ -54,7 +54,7 @@ fn main() {
     .expect("valid packet");
 
     assert_eq!(
-        packet.checksum, "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe",
+        packet.checksum, "7c87b26cd45156097179930ec92596386e975e4073c28788fded11e8ae24092a",
         "Generated packet checksum does not match Golden Vector 1"
     );
 
