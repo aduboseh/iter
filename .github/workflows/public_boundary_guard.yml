@@ -64,8 +64,9 @@ jobs:
       # ================================================================
       - name: Block substrate crate imports
         run: |
-          # scg-* crates are proprietary and must not appear in public code
-          if grep -r -n --include="*.rs" "scg_" src tests; then
+          # scg-* crates are proprietary and must not be imported by public code.
+          # Contract provenance field names may contain "scg_"; only Rust crate paths are blocked.
+          if grep -r -nE --include="*.rs" '(^|[^[:alnum:]_])(extern[[:space:]]+crate[[:space:]]+scg_[[:alnum:]_]*|use[[:space:]]+scg_[[:alnum:]_]*::|scg_[[:alnum:]_]*::)' src tests; then
             echo "::error::Found scg_ crate imports in public source"
             exit 1
           fi
