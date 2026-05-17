@@ -11,6 +11,7 @@
 //! - INV-ITER-03: Causal completeness — explicit cause for every rejection
 
 pub mod envelopes;
+pub mod numeric;
 pub mod validation;
 
 pub use envelopes::{

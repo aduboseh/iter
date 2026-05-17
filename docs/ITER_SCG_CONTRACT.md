@@ -22,9 +22,9 @@ Every `DecisionPacket` includes:
 
 - `replay_scope`: same-binary replay scope, build platform, rustc version, and `cross_platform_replay_claimed=false`
 - `contract_provenance`: actual compile-time values exported by `build.rs` via `cargo:rustc-env`
-- `provenance_source`: source declarations for contract values, decision values, canonical vector integrity, and vector digest casing
+- `provenance_source`: source declarations for contract values, decision values, proof-critical numeric encoding, canonical vector integrity, and vector digest casing
 
-Static contract facts must come from compile-time build exports. Dynamic decision values must come from runtime execution. A proof packet must not mix hand-maintained literals with runtime values.
+Static contract facts must come from compile-time build exports. Dynamic decision values must come from runtime execution. Proof-critical numeric values must be serialized as exact IEEE-754 lowercase hex strings (`ieee754-f64-bits-lowerhex`), not JSON float numbers. A proof packet must not mix hand-maintained literals with runtime values.
 
 Required `provenance_source` block:
 
@@ -32,6 +32,7 @@ Required `provenance_source` block:
 {
   "contract_values": "compile_time_build_rs_rustc_env",
   "decision_values": "runtime_execution",
+  "numeric_encoding": "ieee754-f64-bits-lowerhex",
   "canonical_vector_integrity": "raw_byte_sha256",
   "vector_digest_casing": "raw_text_validation"
 }
@@ -71,6 +72,7 @@ In code, `ITER_SCG_VENDOR_MASTER_HEAD` means the governed SCG master head at ven
 | `CARGO_CACHE_GOVERNANCE_BYPASS` | Cargo reuses stale build-script output after a governance artifact changes. | Build must rerun `build.rs` and fail closed on mismatch. | `ITER_SIMULATE_DRIFT=1 cargo build` must fail with `BRIDGE_INTEGRITY_MISMATCH_SIMULATED`. | Add or fix rerun triggers; never add warning-only behavior. |
 | `RUSTC_ENV_PROVENANCE_EXPORT_MISSING` | A contract-critical hash, commit, or identifier is not exported through `cargo:rustc-env`. | Runtime compile or provenance tests fail. | Compile-time `env!(...)` access and packet assertions. | Export the missing value in `build.rs` and bind it into `DecisionPacket`. |
 | `PROOF_PACKET_PROVENANCE_DRIFT` | Runtime proof packets use duplicated literals instead of compile-time exports. | Packet provenance tests fail. | Compare `DecisionPacket.contract_provenance` with `env!(...)` values. | Replace literals with `env!(...)`-backed provenance fields. |
+| `PROOF_CRITICAL_NUMERIC_ENCODING_BYPASSED` | DecisionPacket proof-critical numeric fields are serialized as JSON numbers or deserialize without validation. | Packet schema, fixture, or replay tests fail. | Assert numeric fields are 16-char lowercase hex strings and packet verification rejects invalid ranges. | Restore `ieee754-f64-bits-lowerhex` serialization and fail-closed packet validation. |
 | `RAW_BYTE_INTEGRITY_VALIDATION_BYPASSED` | Canonical vector integrity is checked only through parsed JSON or normalized output. | SMOKE-008/009 fail. | Raw byte hash and raw text casing tests. | Restore raw byte hashing and raw text digest-casing checks. |
 | `DRIFT_SIMULATION_FAILED` | `ITER_SIMULATE_DRIFT=1 cargo build` succeeds or fails with the wrong code. | CI fails. | CI grep for `BRIDGE_INTEGRITY_MISMATCH_SIMULATED`. | Fix in-memory drift path in `build.rs`. |
 | `WORKING_TREE_MUTATED_BY_DRIFT_TEST` | Drift simulation writes to vendored files, vectors, or build script. | CI fails. | `git diff --quiet -- vendor/governance-bridge build.rs`. | Keep drift simulation in memory only. |
@@ -98,6 +100,7 @@ canonical_vector_uppercase_digests=verified
 trace_semantics=verified
 proof_packet=<actual_path>
 proof_packet_provenance=compile_time_exports+runtime_decision
+proof_numeric_encoding=ieee754-f64-bits-lowerhex
 replay_verification=verified
 drift_simulation=verified
 working_tree_mutated=false

@@ -40,6 +40,7 @@ bridge_integrity=verified
 canonical_vectors_raw_byte_hash=verified
 canonical_vector_uppercase_digests=verified
 proof_packet_provenance=compile_time_exports+runtime_decision
+proof_numeric_encoding=ieee754-f64-bits-lowerhex
 replay_verification=verified
 drift_simulation=verified
 working_tree_mutated=false
@@ -158,6 +159,7 @@ Each packet includes:
 - Capsule identity and version hashes
 - Policy decisions and explicit reason codes
 - Learning permissions and economic constraints
+- Proof-critical numeric fields encoded as exact IEEE-754 lowercase hex strings (`ieee754-f64-bits-lowerhex`)
 - RFC 8785 JCS canonical JSON with SHA-256 checksum
 
 DecisionPreview is non-authoritative in demo mode. In governed-local mode and scg-backed mode it reflects authoritative policy evaluation, but it is still not replay-sufficient because no packet is emitted.
@@ -169,6 +171,7 @@ Only DecisionPacket participates in checksum, replay, and audit guarantees.
 
 DecisionPackets are deterministic within the declared replay scope:
 - Identical inputs and configuration produce byte-identical packets under the same binary, architecture, toolchain, build hash, and `scg.v1` contract
+- Proof-critical numeric values are serialized as exact IEEE-754 hex strings in the packet; human-readable float displays are not the packet authority.
 - Checksums use RFC 8785 JCS canonicalization
 - Replay verifies policy_version and schema_version (fail-closed on mismatch)
 - Cross-platform replay is not claimed. `cross_platform_replay_claimed=false` is part of the golden-path proof surface.

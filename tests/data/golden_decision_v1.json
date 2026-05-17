@@ -21,28 +21,29 @@
   "provenance_source": {
     "contract_values": "compile_time_build_rs_rustc_env",
     "decision_values": "runtime_execution",
+    "numeric_encoding": "ieee754-f64-bits-lowerhex",
     "canonical_vector_integrity": "raw_byte_sha256",
     "vector_digest_casing": "raw_text_validation"
   },
   "tick": 1000,
   "energy": {
-    "nodes": 100.0,
-    "reservoir": 10.0,
-    "integrity": 0.95
+    "nodes": "4059000000000000",
+    "reservoir": "4024000000000000",
+    "integrity": "3fee666666666666"
   },
   "reasoning": {
-    "quality": 0.95,
-    "value_signal": 0.5,
-    "conflict_signal": 0.1,
-    "control_signal": 0.8
+    "quality": "3fee666666666666",
+    "value_signal": "3fe0000000000000",
+    "conflict_signal": "3fb999999999999a",
+    "control_signal": "3fe999999999999a"
   },
   "learning": {
     "capsule_id": "capsule_alpha",
     "epoch": 42,
     "version_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-    "update_cost": 0.5,
-    "update_paid": 0.5,
-    "update_quality": 1.0,
+    "update_cost": "3fe0000000000000",
+    "update_paid": "3fe0000000000000",
+    "update_quality": "3ff0000000000000",
     "status": "COMMITTED",
     "scarcity_streak": 0
   },
@@ -59,5 +60,5 @@
     "LEARNING_PERMISSION_GATE",
     "LEARNING_QUALITY_GATE"
   ],
-  "checksum": "f749da2ca5666d5efaeb004064c6a5c12774afff1a0acc7c1d624dcdec90d9e4"
+  "checksum": "01a9e3dabd88b41f845285bc7b06386d61b84eaa874f434e9a76e1cf91a984ed"
 }

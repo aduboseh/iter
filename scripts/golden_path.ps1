@@ -91,6 +91,7 @@ try {
     Write-Host "canonical_vectors_raw_byte_hash=verified"
     Write-Host "canonical_vector_uppercase_digests=verified"
     Write-Host "proof_packet_provenance=compile_time_exports+runtime_decision"
+    Write-Host "proof_numeric_encoding=ieee754-f64-bits-lowerhex"
     Write-Host "replay_verification=verified"
     Write-Host "drift_simulation=verified"
     Write-Host "working_tree_mutated=false"

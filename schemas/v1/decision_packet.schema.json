@@ -63,18 +63,18 @@
       "properties": {
         "integrity": {
           "description": "System integrity ratio [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "nodes": {
           "description": "Total energy across all nodes",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "reservoir": {
           "description": "Energy in reservoir",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         }
       },
       "required": [
@@ -114,18 +114,18 @@
         },
         "update_cost": {
           "description": "Cost of proposed update",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "update_paid": {
           "description": "Amount actually paid",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "update_quality": {
           "description": "Payment quality (paid / cost)",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "version_hash": {
           "description": "SHA-256 hash of capsule state (hex-encoded, 64 chars)",
@@ -271,6 +271,10 @@
           "description": "Source of decision-specific values.",
           "type": "string"
         },
+        "numeric_encoding": {
+          "description": "Exact encoding used for proof-critical numeric packet fields.",
+          "type": "string"
+        },
         "vector_digest_casing": {
           "description": "Validation method for canonical vector digest casing.",
           "type": "string"
@@ -280,6 +284,7 @@
         "canonical_vector_integrity",
         "contract_values",
         "decision_values",
+        "numeric_encoding",
         "vector_digest_casing"
       ],
       "type": "object"
@@ -290,23 +295,23 @@
       "properties": {
         "conflict_signal": {
           "description": "Conflict detection signal [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "control_signal": {
           "description": "Control signal [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "quality": {
           "description": "Reasoning quality [0.0, 1.0] - payment ratio",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "value_signal": {
           "description": "Value signal from cortex [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         }
       },
       "required": [

@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::contracts::numeric;
 use crate::contracts::{
     ContractError, EnergyEnvelope, LearningEnvelope, PolicyDecision, PolicyEnvelope,
     ReasoningEnvelope, SystemState,
@@ -68,6 +69,8 @@ pub struct ProvenanceSource {
     pub contract_values: String,
     /// Source of decision-specific values.
     pub decision_values: String,
+    /// Exact encoding used for proof-critical numeric packet fields.
+    pub numeric_encoding: String,
     /// Integrity validation method for the canonical vector file.
     pub canonical_vector_integrity: String,
     /// Validation method for canonical vector digest casing.
@@ -80,6 +83,7 @@ impl ProvenanceSource {
         Self {
             contract_values: "compile_time_build_rs_rustc_env".to_string(),
             decision_values: "runtime_execution".to_string(),
+            numeric_encoding: numeric::F64_HEX_ENCODING.to_string(),
             canonical_vector_integrity: "raw_byte_sha256".to_string(),
             vector_digest_casing: "raw_text_validation".to_string(),
         }
@@ -218,6 +222,7 @@ impl DecisionPacket {
 
     /// Verify packet checksum.
     pub fn verify_checksum(&self) -> Result<(), AuditError> {
+        self.validate_contract_fields()?;
         let computed = self.compute_checksum();
         if computed != self.checksum {
             return Err(AuditError::ChecksumMismatch {
@@ -225,6 +230,25 @@ impl DecisionPacket {
                 actual: computed,
             });
         }
+        Ok(())
+    }
+
+    fn validate_contract_fields(&self) -> Result<(), AuditError> {
+        self.energy
+            .validate()
+            .map_err(|err| AuditError::InvalidPacketContract {
+                reason: err.to_string(),
+            })?;
+        self.reasoning
+            .validate()
+            .map_err(|err| AuditError::InvalidPacketContract {
+                reason: err.to_string(),
+            })?;
+        self.learning
+            .validate()
+            .map_err(|err| AuditError::InvalidPacketContract {
+                reason: err.to_string(),
+            })?;
         Ok(())
     }
 
@@ -273,6 +297,13 @@ impl DecisionPacket {
 /// Audit errors.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum AuditError {
+    /// Packet contract field failed validation
+    #[error("invalid packet contract field: {reason}")]
+    InvalidPacketContract {
+        /// Validation failure reason
+        reason: String,
+    },
+
     /// Checksum mismatch
     #[error("checksum mismatch: expected {expected}, got {actual}")]
     ChecksumMismatch {
@@ -546,6 +577,10 @@ mod tests {
             "runtime_execution"
         );
         assert_eq!(
+            packet.provenance_source.numeric_encoding,
+            crate::contracts::numeric::F64_HEX_ENCODING
+        );
+        assert_eq!(
             packet.provenance_source.canonical_vector_integrity,
             "raw_byte_sha256"
         );
@@ -573,6 +608,65 @@ mod tests {
         packet.tick = 999;
 
         assert!(packet.verify_checksum().is_err());
+    }
+
+    #[test]
+    fn packet_exports_proof_critical_numbers_as_hex_strings() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap();
+        let value = serde_json::to_value(&packet).expect("packet serializes");
+        let energy_nodes = crate::contracts::numeric::f64_to_hex(packet.energy.nodes);
+        let reasoning_quality = crate::contracts::numeric::f64_to_hex(packet.reasoning.quality);
+        let learning_quality =
+            crate::contracts::numeric::f64_to_hex(packet.learning.update_quality);
+
+        assert_eq!(
+            value["energy"]["nodes"].as_str(),
+            Some(energy_nodes.as_str())
+        );
+        assert_eq!(
+            value["reasoning"]["quality"].as_str(),
+            Some(reasoning_quality.as_str())
+        );
+        assert_eq!(
+            value["learning"]["update_quality"].as_str(),
+            Some(learning_quality.as_str())
+        );
+        assert!(value["energy"]["nodes"].as_str().is_some());
+    }
+
+    #[test]
+    fn packet_verify_rejects_out_of_bounds_deserialized_numeric_values() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap();
+        let mut value = serde_json::to_value(&packet).expect("packet serializes");
+        value["energy"]["integrity"] =
+            serde_json::Value::String(crate::contracts::numeric::f64_to_hex(1.5));
+        let packet: DecisionPacket = serde_json::from_value(value).expect("packet deserializes");
+
+        let err = packet
+            .verify_checksum()
+            .expect_err("out-of-bounds packet rejected");
+        assert!(
+            err.to_string().contains("energy.integrity"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
