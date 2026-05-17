@@ -1,3 +1,4 @@
+use serde::Serialize;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
@@ -843,13 +844,18 @@ fn parse_governance_proposal(
 }
 
 #[cfg(feature = "public_stub")]
-fn tool_text(value: serde_json::Value) -> serde_json::Value {
-    json!({"content": [{"type": "text", "text": serde_json::to_string(&value).unwrap()}]})
+fn tool_text<T: Serialize>(value: &T) -> serde_json::Value {
+    match serde_json::to_string(value) {
+        Ok(text) => json!({"content": [{"type": "text", "text": text}]}),
+        Err(e) => {
+            json!({"error": {"code": 5000, "message": format!("response serialization failed: {e}")}})
+        }
+    }
 }
 
 #[cfg(feature = "public_stub")]
 fn contract_rejection(value: serde_json::Value) -> serde_json::Value {
-    tool_text(value)
+    tool_text(&value)
 }
 
 #[cfg(feature = "public_stub")]
@@ -929,7 +935,7 @@ fn handle_tool(
             };
 
             match registry.register(resource_path, expected_hash) {
-                Ok((resource, hash)) => tool_text(json!({
+                Ok((resource, hash)) => tool_text(&json!({
                     "registered": true,
                     "resource": resource,
                     "baseline_hash": hash_prefix(&hash),
@@ -942,14 +948,12 @@ fn handle_tool(
             let belief = args.get("belief").and_then(|b| b.as_f64()).unwrap_or(0.5);
             let energy = args.get("energy").and_then(|e| e.as_f64()).unwrap_or(100.0);
             let node = runtime.graph_mut().create_node(belief, energy);
-            json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
+            tool_text(&node)
         }
         "node.query" => {
             let id = u64_arg(args, "node_id").unwrap_or(0);
             match runtime.graph().query_node(id) {
-                Some(node) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
-                }
+                Some(node) => tool_text(&node),
                 None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
@@ -957,9 +961,7 @@ fn handle_tool(
             let id = u64_arg(args, "node_id").unwrap_or(0);
             let delta = args.get("delta").and_then(|d| d.as_f64()).unwrap_or(0.0);
             match runtime.graph_mut().mutate_node(id, delta) {
-                Some(node) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&node).unwrap()}]})
-                }
+                Some(node) => tool_text(&node),
                 None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
@@ -968,9 +970,7 @@ fn handle_tool(
             let dst = u64_arg(args, "dst").unwrap_or(0);
             let weight = args.get("weight").and_then(|w| w.as_f64()).unwrap_or(0.5);
             match runtime.graph_mut().bind_edge(src, dst, weight) {
-                Some(edge) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&edge).unwrap()}]})
-                }
+                Some(edge) => tool_text(&edge),
                 None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
@@ -980,14 +980,12 @@ fn handle_tool(
         }
         "governor.status" | "governance.status" | "governor.health" | "governance.health" => {
             let status = runtime.graph().governor_status();
-            json!({"content": [{"type": "text", "text": serde_json::to_string(&status).unwrap()}]})
+            tool_text(&status)
         }
         "esv.audit" | "audit.export" => {
             let id = u64_arg(args, "node_id").unwrap_or(0);
             match runtime.graph().esv_audit(id) {
-                Some(audit) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&audit).unwrap()}]})
-                }
+                Some(audit) => tool_text(&audit),
                 None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
@@ -996,7 +994,7 @@ fn handle_tool(
                 ServerRuntime::ScgBacked(runtime) => runtime.replay_decisions(),
                 _ => runtime.graph().lineage_replay(),
             };
-            json!({"content": [{"type": "text", "text": serde_json::to_string(&lineage).unwrap()}]})
+            tool_text(&lineage)
         }
         "governance.evaluate" | "decision.check" => {
             if let Some(rejection) = validate_decision_contract(args, registry) {
@@ -1006,9 +1004,7 @@ fn handle_tool(
             let proposal = parse_governance_proposal(args);
 
             match runtime.evaluate(&proposal) {
-                Ok(outcome) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
-                }
+                Ok(outcome) => tool_text(&outcome),
                 Err(e) => {
                     json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
                 }
@@ -1017,9 +1013,7 @@ fn handle_tool(
         "decision.preview" => {
             let proposal = parse_governance_proposal(args);
             match runtime.preview(&proposal) {
-                Ok(outcome) => {
-                    json!({"content": [{"type": "text", "text": serde_json::to_string(&outcome).unwrap()}]})
-                }
+                Ok(outcome) => tool_text(&outcome),
                 Err(e) => {
                     json!({"error": {"code": 5001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
                 }
@@ -1049,7 +1043,7 @@ fn handle_tool(
                 }
             }
             let result = runtime.search_decisions(&filter);
-            json!({"content": [{"type": "text", "text": serde_json::to_string(&result).unwrap()}]})
+            tool_text(&result)
         }
         _ => json!({"error": {"code": 3000, "message": "Unknown tool"}}),
     }
