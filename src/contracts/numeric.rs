@@ -1,6 +1,6 @@
 //! Exact numeric encodings for proof-critical contract fields.
 
-use serde::{de::Error as _, Deserialize, Deserializer, Serializer};
+use serde::{de::Error as _, ser::Error as _, Deserialize, Deserializer, Serializer};
 
 /// Encoding used for proof-critical f64 values in DecisionPacket JSON.
 pub const F64_HEX_ENCODING: &str = "ieee754-f64-bits-lowerhex";
@@ -43,6 +43,9 @@ pub mod f64_hex {
     where
         S: Serializer,
     {
+        if !value.is_finite() {
+            return Err(S::Error::custom("f64 value must be finite"));
+        }
         serializer.serialize_str(&f64_to_hex(*value))
     }
 

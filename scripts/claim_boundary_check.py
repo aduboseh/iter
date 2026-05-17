@@ -22,7 +22,7 @@ CHECKED_PATHS = [
 ]
 
 SCOPING_WORDS = re.compile(
-    r"\b(not claimed|not claim|must not|not an active|not active|deferred|before claiming|prohibited|same-binary|same binary|scope|non-authoritative)\b",
+    r"\b(not claimed|not claim|must not|not an active|not active|deferred|before claiming|prohibited|same-binary|same binary|non-authoritative|out of scope|within scope)\b",
     re.IGNORECASE,
 )
 
@@ -56,6 +56,7 @@ def main() -> int:
     for relative in CHECKED_PATHS:
         path = ROOT / relative
         if not path.exists():
+            failures.append(f"{relative}:0: required file is missing")
             continue
         for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             for pattern, message in RULES:

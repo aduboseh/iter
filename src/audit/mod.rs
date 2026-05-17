@@ -27,18 +27,25 @@ pub struct ContractProvenance {
     /// SCG governance bridge contract version.
     pub contract_version: String,
     /// Exact SCG source commit used as the vendored bridge origin.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{40}$")))]
     pub scg_source_commit: String,
     /// SCG master head that had accepted the vendored bridge at vendor time.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{40}$")))]
     pub scg_vendor_master_head: String,
     /// SHA-256 of vendored contract.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
     pub bridge_contract_rs_sha256: String,
     /// SHA-256 of vendored trace.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
     pub bridge_trace_rs_sha256: String,
     /// SHA-256 of vendored errors.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
     pub bridge_errors_rs_sha256: String,
     /// SHA-256 of vendored lib.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
     pub bridge_lib_rs_sha256: String,
     /// Raw-byte SHA-256 of CANONICAL_VECTORS.json.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
     pub canonical_vectors_sha256: String,
     /// Canonicalization rule bound to the vendored contract.
     pub canonicalization_rule: String,

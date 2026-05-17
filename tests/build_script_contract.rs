@@ -23,17 +23,31 @@ fn build_script_declares_contract_critical_rerun_triggers() {
 #[test]
 fn build_script_exports_contract_provenance_to_runtime() {
     for export in [
-        "ITER_SCG_CONTRACT_VERSION",
-        "ITER_SCG_SOURCE_COMMIT",
-        "ITER_SCG_VENDOR_MASTER_HEAD",
-        "ITER_BRIDGE_CONTRACT_RS_SHA256",
-        "ITER_BRIDGE_TRACE_RS_SHA256",
-        "ITER_BRIDGE_ERRORS_RS_SHA256",
-        "ITER_BRIDGE_LIB_RS_SHA256",
-        "ITER_CANONICAL_VECTORS_SHA256",
-        "ITER_CANONICALIZATION_RULE",
-        "ITER_TARGET_TRIPLE",
-        "ITER_RUSTC_VERSION",
+        "cargo:rustc-env=ITER_SCG_CONTRACT_VERSION=",
+        "cargo:rustc-env=ITER_SCG_SOURCE_COMMIT=",
+        "cargo:rustc-env=ITER_SCG_VENDOR_MASTER_HEAD=",
+        "cargo:rustc-env=ITER_CANONICALIZATION_RULE=",
+        "cargo:rustc-env=ITER_TARGET_TRIPLE=",
+        "cargo:rustc-env=ITER_RUSTC_VERSION=",
+    ] {
+        assert!(
+            BUILD_RS.contains(export),
+            "RUSTC_ENV_PROVENANCE_EXPORT_MISSING: {}",
+            export
+        );
+    }
+
+    assert!(
+        BUILD_RS.contains("\"cargo:rustc-env={}={}\""),
+        "RUSTC_ENV_PROVENANCE_EXPORT_MISSING: dynamic artifact export directive"
+    );
+
+    for export in [
+        r#"env_name: "ITER_BRIDGE_CONTRACT_RS_SHA256""#,
+        r#"env_name: "ITER_BRIDGE_TRACE_RS_SHA256""#,
+        r#"env_name: "ITER_BRIDGE_ERRORS_RS_SHA256""#,
+        r#"env_name: "ITER_BRIDGE_LIB_RS_SHA256""#,
+        r#"env_name: "ITER_CANONICAL_VECTORS_SHA256""#,
     ] {
         assert!(
             BUILD_RS.contains(export),

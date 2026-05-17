@@ -9,22 +9,27 @@
       "properties": {
         "bridge_contract_rs_sha256": {
           "description": "SHA-256 of vendored contract.rs.",
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "bridge_errors_rs_sha256": {
           "description": "SHA-256 of vendored errors.rs.",
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "bridge_lib_rs_sha256": {
           "description": "SHA-256 of vendored lib.rs.",
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "bridge_trace_rs_sha256": {
           "description": "SHA-256 of vendored trace.rs.",
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "canonical_vectors_sha256": {
           "description": "Raw-byte SHA-256 of CANONICAL_VECTORS.json.",
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "canonicalization_rule": {
@@ -37,10 +42,12 @@
         },
         "scg_source_commit": {
           "description": "Exact SCG source commit used as the vendored bridge origin.",
+          "pattern": "^[0-9a-f]{40}$",
           "type": "string"
         },
         "scg_vendor_master_head": {
           "description": "SCG master head that had accepted the vendored bridge at vendor time.",
+          "pattern": "^[0-9a-f]{40}$",
           "type": "string"
         }
       },

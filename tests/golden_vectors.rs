@@ -36,7 +36,11 @@ fn assert_same_binary_packet_checksum(packet: &DecisionPacket, vector_name: &str
     );
     assert_eq!(packet.replay_scope.replay_scope, "same_binary_only");
     assert!(!packet.replay_scope.cross_platform_replay_claimed);
-    assert!(!packet.replay_scope.platform.is_empty());
+    let triple_parts = packet.replay_scope.platform.split('-').collect::<Vec<_>>();
+    assert!(
+        triple_parts.len() >= 3 && triple_parts.iter().all(|part| !part.is_empty()),
+        "{vector_name} platform must be target-triple-like"
+    );
     assert!(packet.replay_scope.rustc_version.starts_with("rustc "));
 }
 

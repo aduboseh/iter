@@ -37,6 +37,21 @@ function Get-ContractFileHashes {
     return $hashes
 }
 
+function Get-BuildConst {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $buildRs = Get-Content -LiteralPath (Join-Path $RepoRoot "build.rs") -Raw
+    $pattern = 'const\s+' + [regex]::Escape($Name) + '\s*:\s*&str\s*=\s*"([^"]+)";'
+    $match = [regex]::Match($buildRs, $pattern)
+    if (-not $match.Success) {
+        throw "GOLDEN_PATH_FAILED: missing build.rs const $Name"
+    }
+
+    return $match.Groups[1].Value
+}
+
 Push-Location $RepoRoot
 try {
     Invoke-Checked "format_check" { cargo fmt --all -- --check }
@@ -51,7 +66,7 @@ try {
 
     $before = Get-ContractFileHashes
     $env:ITER_SIMULATE_DRIFT = "1"
-    $driftOutput = cargo build --features public_stub 2>&1
+    $driftOutput = cargo build --locked --features public_stub 2>&1
     $driftExit = $LASTEXITCODE
     Remove-Item Env:\ITER_SIMULATE_DRIFT -ErrorAction SilentlyContinue
     $after = Get-ContractFileHashes
@@ -75,6 +90,8 @@ try {
     $rustcVersion = (& rustc --version).Trim()
     $platform = ((& rustc -vV) | Where-Object { $_ -like "host:*" } | Select-Object -First 1)
     $platform = $platform.Replace("host:", "").Trim()
+    $scgSourceCommit = Get-BuildConst "ITER_SCG_SOURCE_COMMIT"
+    $scgVendorMasterHead = Get-BuildConst "ITER_SCG_VENDOR_MASTER_HEAD"
 
     Write-Host "GOLDEN_PATH_PASS"
     Write-Host "contract_version=scg.v1"
@@ -83,8 +100,8 @@ try {
     Write-Host "platform=$platform"
     Write-Host "rustc_version=$rustcVersion"
     Write-Host "cross_platform_replay_claimed=false"
-    Write-Host "scg_source_commit=da14c8390ba8ceeb0ab15d85c598d2042a2029cf"
-    Write-Host "scg_vendor_master_head=3e0675073a50ce20bdad7c342f7a5caaa3801504"
+    Write-Host "scg_source_commit=$scgSourceCommit"
+    Write-Host "scg_vendor_master_head=$scgVendorMasterHead"
     Write-Host "build_rerun_triggers=verified"
     Write-Host "rustc_env_exports=verified"
     Write-Host "bridge_integrity=verified"
