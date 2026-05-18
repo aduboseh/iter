@@ -10,18 +10,126 @@
 //!   reproduce the decision path without re-running learning.
 //! - Packet checksum mismatch is a hard error.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::contracts::numeric;
 use crate::contracts::{
     ContractError, EnergyEnvelope, LearningEnvelope, PolicyDecision, PolicyEnvelope,
     ReasoningEnvelope, SystemState,
 };
+use crate::provenance;
+
+/// Compile-time SCG contract provenance exported by build.rs.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContractProvenance {
+    /// SCG governance bridge contract version.
+    pub contract_version: String,
+    /// Exact SCG source commit used as the vendored bridge origin.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{40}$")))]
+    pub scg_source_commit: String,
+    /// SCG master head that had accepted the vendored bridge at vendor time.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{40}$")))]
+    pub scg_vendor_master_head: String,
+    /// SHA-256 of vendored contract.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
+    pub bridge_contract_rs_sha256: String,
+    /// SHA-256 of vendored trace.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
+    pub bridge_trace_rs_sha256: String,
+    /// SHA-256 of vendored errors.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
+    pub bridge_errors_rs_sha256: String,
+    /// SHA-256 of vendored lib.rs.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
+    pub bridge_lib_rs_sha256: String,
+    /// Raw-byte SHA-256 of CANONICAL_VECTORS.json.
+    #[cfg_attr(feature = "schema-gen", schemars(regex(pattern = "^[0-9a-f]{64}$")))]
+    pub canonical_vectors_sha256: String,
+    /// Canonicalization rule bound to the vendored contract.
+    pub canonicalization_rule: String,
+}
+
+impl ContractProvenance {
+    /// Read the build-time contract facts emitted by build.rs.
+    pub fn compile_time() -> Self {
+        Self {
+            contract_version: provenance::CONTRACT_VERSION.to_string(),
+            scg_source_commit: provenance::SCG_SOURCE_COMMIT.to_string(),
+            scg_vendor_master_head: provenance::SCG_VENDOR_MASTER_HEAD.to_string(),
+            bridge_contract_rs_sha256: provenance::BRIDGE_CONTRACT_RS_SHA256.to_string(),
+            bridge_trace_rs_sha256: provenance::BRIDGE_TRACE_RS_SHA256.to_string(),
+            bridge_errors_rs_sha256: provenance::BRIDGE_ERRORS_RS_SHA256.to_string(),
+            bridge_lib_rs_sha256: provenance::BRIDGE_LIB_RS_SHA256.to_string(),
+            canonical_vectors_sha256: provenance::CANONICAL_VECTORS_SHA256.to_string(),
+            canonicalization_rule: provenance::CANONICALIZATION_RULE.to_string(),
+        }
+    }
+}
+
+/// Provenance source declarations for static and dynamic proof-packet values.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProvenanceSource {
+    /// Source of static contract and bridge values.
+    pub contract_values: String,
+    /// Source of decision-specific values.
+    pub decision_values: String,
+    /// Exact encoding used for proof-critical numeric packet fields.
+    pub numeric_encoding: String,
+    /// Integrity validation method for the canonical vector file.
+    pub canonical_vector_integrity: String,
+    /// Validation method for canonical vector digest casing.
+    pub vector_digest_casing: String,
+}
+
+impl ProvenanceSource {
+    /// Return the fixed source declarations for Iter decision packets.
+    pub fn compile_time_and_runtime() -> Self {
+        Self {
+            contract_values: "compile_time_build_rs_rustc_env".to_string(),
+            decision_values: "runtime_execution".to_string(),
+            numeric_encoding: numeric::F64_HEX_ENCODING.to_string(),
+            canonical_vector_integrity: "raw_byte_sha256".to_string(),
+            vector_digest_casing: "raw_text_validation".to_string(),
+        }
+    }
+}
+
+/// Replay scope bound into each proof packet.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReplayScope {
+    /// Replay guarantee scope for this packet.
+    pub replay_scope: String,
+    /// Target triple used to build the producing Iter binary.
+    pub platform: String,
+    /// rustc version used to build the producing Iter binary.
+    pub rustc_version: String,
+    /// Whether this packet claims cross-platform replay equivalence.
+    pub cross_platform_replay_claimed: bool,
+}
+
+impl ReplayScope {
+    /// Read the build environment exported by build.rs.
+    pub fn compile_time() -> Self {
+        Self {
+            replay_scope: provenance::REPLAY_SCOPE.to_string(),
+            platform: provenance::TARGET_TRIPLE.to_string(),
+            rustc_version: provenance::RUSTC_VERSION.to_string(),
+            cross_platform_replay_claimed: provenance::CROSS_PLATFORM_REPLAY_CLAIMED,
+        }
+    }
+}
 
 /// Decision packet - complete audit record for a governed action.
 ///
 /// # Contents
 /// - System identifiers (build hashes)
+/// - Replay scope and build environment
+/// - Compile-time SCG contract provenance
+/// - Provenance source declarations
 /// - Tick
 /// - Energy snapshot
 /// - Reasoning signature
@@ -32,12 +140,18 @@ use crate::contracts::{
 /// - Permits/budgets if used
 /// - Checksum over the packet
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DecisionPacket {
     /// Iter build hash (compile-time)
     pub iter_build_hash: String,
     /// SCG build hash (from contract)
     pub substrate_build_hash: String,
+    /// Replay scope and build environment for this packet.
+    pub replay_scope: ReplayScope,
+    /// Contract-critical bridge provenance exported by build.rs.
+    pub contract_provenance: ContractProvenance,
+    /// Source declarations for static and dynamic packet values.
+    pub provenance_source: ProvenanceSource,
     /// Decision tick
     pub tick: u64,
     /// Energy snapshot
@@ -65,6 +179,57 @@ pub struct DecisionPacket {
     pub checksum: String,
 }
 
+#[derive(Deserialize)]
+struct DecisionPacketWire {
+    iter_build_hash: String,
+    substrate_build_hash: String,
+    #[serde(default = "ReplayScope::compile_time")]
+    replay_scope: ReplayScope,
+    #[serde(default = "ContractProvenance::compile_time")]
+    contract_provenance: ContractProvenance,
+    #[serde(default = "ProvenanceSource::compile_time_and_runtime")]
+    provenance_source: ProvenanceSource,
+    tick: u64,
+    energy: EnergyEnvelope,
+    reasoning: ReasoningEnvelope,
+    learning: LearningEnvelope,
+    policy: PolicyEnvelope,
+    permit_hash: Option<String>,
+    economics_hash: String,
+    governance_hash: Option<String>,
+    #[serde(default)]
+    execution_trace: Vec<String>,
+    evaluated_rules: Vec<String>,
+    checksum: String,
+}
+
+impl<'de> Deserialize<'de> for DecisionPacket {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = DecisionPacketWire::deserialize(deserializer)?;
+        Ok(Self {
+            iter_build_hash: wire.iter_build_hash,
+            substrate_build_hash: wire.substrate_build_hash,
+            replay_scope: wire.replay_scope,
+            contract_provenance: wire.contract_provenance,
+            provenance_source: wire.provenance_source,
+            tick: wire.tick,
+            energy: wire.energy,
+            reasoning: wire.reasoning,
+            learning: wire.learning,
+            policy: wire.policy,
+            permit_hash: wire.permit_hash,
+            economics_hash: wire.economics_hash,
+            governance_hash: wire.governance_hash,
+            execution_trace: wire.execution_trace,
+            evaluated_rules: wire.evaluated_rules,
+            checksum: wire.checksum,
+        })
+    }
+}
+
 impl DecisionPacket {
     /// Create packet from system state and additional context.
     ///
@@ -81,6 +246,9 @@ impl DecisionPacket {
         let mut packet = Self {
             iter_build_hash,
             substrate_build_hash,
+            replay_scope: ReplayScope::compile_time(),
+            contract_provenance: ContractProvenance::compile_time(),
+            provenance_source: ProvenanceSource::compile_time_and_runtime(),
             tick: state.tick,
             energy: state.energy.clone(),
             reasoning: state.reasoning.clone(),
@@ -112,6 +280,7 @@ impl DecisionPacket {
 
     /// Verify packet checksum.
     pub fn verify_checksum(&self) -> Result<(), AuditError> {
+        self.validate_contract_fields()?;
         let computed = self.compute_checksum();
         if computed != self.checksum {
             return Err(AuditError::ChecksumMismatch {
@@ -119,6 +288,25 @@ impl DecisionPacket {
                 actual: computed,
             });
         }
+        Ok(())
+    }
+
+    fn validate_contract_fields(&self) -> Result<(), AuditError> {
+        self.energy
+            .validate()
+            .map_err(|err| AuditError::InvalidPacketContract {
+                reason: err.to_string(),
+            })?;
+        self.reasoning
+            .validate()
+            .map_err(|err| AuditError::InvalidPacketContract {
+                reason: err.to_string(),
+            })?;
+        self.learning
+            .validate()
+            .map_err(|err| AuditError::InvalidPacketContract {
+                reason: err.to_string(),
+            })?;
         Ok(())
     }
 
@@ -167,6 +355,13 @@ impl DecisionPacket {
 /// Audit errors.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum AuditError {
+    /// Packet contract field failed validation
+    #[error("invalid packet contract field: {reason}")]
+    InvalidPacketContract {
+        /// Validation failure reason
+        reason: String,
+    },
+
     /// Checksum mismatch
     #[error("checksum mismatch: expected {expected}, got {actual}")]
     ChecksumMismatch {
@@ -406,6 +601,55 @@ mod tests {
     }
 
     #[test]
+    fn packet_provenance_uses_compile_time_exports() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "economics-hash".to_string(),
+            vec!["rule-1".to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(packet.contract_provenance.contract_version, "scg.v1");
+        assert_eq!(packet.replay_scope.replay_scope, "same_binary_only");
+        assert!(!packet.replay_scope.platform.is_empty());
+        assert!(packet.replay_scope.rustc_version.starts_with("rustc "));
+        assert!(!packet.replay_scope.cross_platform_replay_claimed);
+        assert_eq!(
+            packet.contract_provenance.scg_source_commit,
+            env!("ITER_SCG_SOURCE_COMMIT")
+        );
+        assert_eq!(
+            packet.contract_provenance.scg_vendor_master_head,
+            env!("ITER_SCG_VENDOR_MASTER_HEAD")
+        );
+        assert_eq!(
+            packet.provenance_source.contract_values,
+            "compile_time_build_rs_rustc_env"
+        );
+        assert_eq!(
+            packet.provenance_source.decision_values,
+            "runtime_execution"
+        );
+        assert_eq!(
+            packet.provenance_source.numeric_encoding,
+            crate::contracts::numeric::F64_HEX_ENCODING
+        );
+        assert_eq!(
+            packet.provenance_source.canonical_vector_integrity,
+            "raw_byte_sha256"
+        );
+        assert_eq!(
+            packet.provenance_source.vector_digest_casing,
+            "raw_text_validation"
+        );
+        assert!(packet.verify_checksum().is_ok());
+    }
+
+    #[test]
     fn packet_verify_fails_for_tampered() {
         let state = make_test_state();
         let mut packet = DecisionPacket::new(
@@ -422,6 +666,100 @@ mod tests {
         packet.tick = 999;
 
         assert!(packet.verify_checksum().is_err());
+    }
+
+    #[test]
+    fn packet_exports_proof_critical_numbers_as_hex_strings() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap();
+        let value = serde_json::to_value(&packet).expect("packet serializes");
+        let energy_nodes = crate::contracts::numeric::f64_to_hex(packet.energy.nodes);
+        let reasoning_quality = crate::contracts::numeric::f64_to_hex(packet.reasoning.quality);
+        let learning_quality =
+            crate::contracts::numeric::f64_to_hex(packet.learning.update_quality);
+
+        assert_eq!(
+            value["energy"]["nodes"].as_str(),
+            Some(energy_nodes.as_str())
+        );
+        assert_eq!(
+            value["reasoning"]["quality"].as_str(),
+            Some(reasoning_quality.as_str())
+        );
+        assert_eq!(
+            value["learning"]["update_quality"].as_str(),
+            Some(learning_quality.as_str())
+        );
+        assert!(value["energy"]["nodes"].as_str().is_some());
+    }
+
+    #[test]
+    fn packet_deserializes_legacy_v1_numbers_and_defaulted_metadata() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap();
+        let mut value = serde_json::to_value(&packet).expect("packet serializes");
+        let obj = value.as_object_mut().expect("packet value is an object");
+        obj.remove("replay_scope");
+        obj.remove("contract_provenance");
+        obj.remove("provenance_source");
+        value["energy"]["nodes"] = serde_json::json!(100.0);
+        value["reasoning"]["quality"] = serde_json::json!(0.9);
+        value["learning"]["update_quality"] = serde_json::json!(1.0);
+
+        let legacy: DecisionPacket =
+            serde_json::from_value(value).expect("legacy v1 packet shape deserializes");
+
+        assert_eq!(legacy.energy.nodes.to_bits(), 100.0f64.to_bits());
+        assert_eq!(legacy.reasoning.quality.to_bits(), 0.9f64.to_bits());
+        assert_eq!(legacy.learning.update_quality.to_bits(), 1.0f64.to_bits());
+        assert_eq!(legacy.replay_scope.replay_scope, "same_binary_only");
+        assert_eq!(legacy.contract_provenance.contract_version, "scg.v1");
+        assert_eq!(
+            legacy.provenance_source.numeric_encoding,
+            crate::contracts::numeric::F64_HEX_ENCODING
+        );
+    }
+
+    #[test]
+    fn packet_verify_rejects_out_of_bounds_deserialized_numeric_values() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap();
+        let mut value = serde_json::to_value(&packet).expect("packet serializes");
+        value["energy"]["integrity"] =
+            serde_json::Value::String(crate::contracts::numeric::f64_to_hex(1.5));
+        let packet: DecisionPacket = serde_json::from_value(value).expect("packet deserializes");
+
+        let err = packet
+            .verify_checksum()
+            .expect_err("out-of-bounds packet rejected");
+        assert!(
+            err.to_string().contains("energy.integrity"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

@@ -1,16 +1,54 @@
-# Iter Server
+# Iter
 
-**Deterministic governance control plane for auditable decision-making, replayable reasoning paths, and policy-enforced execution.**
+Iter is an auditable MCP decision layer for governed AI agents.
+
+It lets an agent request a decision, routes that request through SCG-backed deterministic governance, and emits a proof packet that can be replayed under the active `scg.v1` contract.
+
+The model proposes. Iter asks. SCG decides. The bridge binds. The packet proves. Replay verifies.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![Protocol](https://img.shields.io/badge/protocol-MCP%20%7C%20JSON--RPC%202.0-green.svg)](https://modelcontextprotocol.io/)
 
-**Determinism** · **Governance** · **MCP**
+**Governance** · **Proof Packets** · **Replay** · **MCP**
 
 ---
 
-## What is Iter?
+## What to run
+
+Raw server boot is not the product proof. The golden path is the product proof:
+
+```powershell
+./scripts/golden_path.ps1
+```
+
+Expected result:
+
+```text
+GOLDEN_PATH_PASS
+contract_version=scg.v1
+claim_registry_version=1.0
+determinism_scope=same_binary_only
+platform=<target_triple>
+rustc_version=<version>
+cross_platform_replay_claimed=false
+scg_source_commit=da14c8390ba8ceeb0ab15d85c598d2042a2029cf
+scg_vendor_master_head=3e0675073a50ce20bdad7c342f7a5caaa3801504
+build_rerun_triggers=verified
+rustc_env_exports=verified
+bridge_integrity=verified
+canonical_vectors_raw_byte_hash=verified
+canonical_vector_uppercase_digests=verified
+proof_packet_provenance=compile_time_exports+runtime_decision
+proof_numeric_encoding=ieee754-f64-bits-lowerhex
+replay_verification=verified
+drift_simulation=verified
+working_tree_mutated=false
+```
+
+See [docs/CLAIM_BOUNDARY.md](docs/CLAIM_BOUNDARY.md) for the current claim ceiling.
+
+## Runtime Modes
 
 Iter Server is a hardened Model Context Protocol (MCP) server (JSON-RPC 2.0) for deterministic governance evaluation.
 
@@ -121,6 +159,7 @@ Each packet includes:
 - Capsule identity and version hashes
 - Policy decisions and explicit reason codes
 - Learning permissions and economic constraints
+- Proof-critical numeric fields encoded as exact IEEE-754 lowercase hex strings (`ieee754-f64-bits-lowerhex`)
 - RFC 8785 JCS canonical JSON with SHA-256 checksum
 
 DecisionPreview is non-authoritative in demo mode. In governed-local mode and scg-backed mode it reflects authoritative policy evaluation, but it is still not replay-sufficient because no packet is emitted.
@@ -130,11 +169,12 @@ Only DecisionPacket participates in checksum, replay, and audit guarantees.
 
 #### Determinism Guarantee
 
-DecisionPackets are **deterministic by construction**:
-- Identical inputs and configuration produce **byte-identical packets**
+DecisionPackets are deterministic within the declared replay scope:
+- Identical inputs and configuration produce byte-identical packets under the same binary, architecture, toolchain, build hash, and `scg.v1` contract
+- Proof-critical numeric values are serialized as exact IEEE-754 hex strings in the packet; human-readable float displays are not the packet authority.
 - Checksums use RFC 8785 JCS canonicalization
 - Replay verifies policy_version and schema_version (fail-closed on mismatch)
-- **Platform determinism:** Golden vectors enforced on: **Linux (x86_64, stable Rust)**. Cross-platform determinism (Windows, macOS) will be validated in CI before claiming.
+- Cross-platform replay is not claimed. `cross_platform_replay_claimed=false` is part of the golden-path proof surface.
 
 ---
 

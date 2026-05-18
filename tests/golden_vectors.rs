@@ -1,10 +1,11 @@
-//! Golden Vector Tests — RFC 8785 JCS Checksums
+//! Golden Vector Tests - RFC 8785 JCS Checksums
 //!
-//! These tests verify that JCS canonicalization produces identical checksums
-//! across all platforms. Checksums are hardcoded and enforced.
+//! DecisionPacket checksums bind same-binary replay scope, including target
+//! triple and rustc version. Constructed packet checksums are therefore asserted
+//! for validity and repeatability within the current binary. The committed JSON
+//! fixture covers fixed-artifact replay.
 //!
-//! INVARIANT: Same input => same JCS bytes => same checksum.
-//! If these tests fail on any platform, canonicalization is broken.
+//! INVARIANT: Same input + same binary => same JCS bytes => same checksum.
 
 use iter_mcp_server::audit::DecisionPacket;
 use iter_mcp_server::contracts::{
@@ -18,6 +19,30 @@ use iter_mcp_server::runtime::{
     replay_decision, GovernanceMode, GovernanceRuntime, GovernanceVerdict,
 };
 use iter_mcp_server::substrate::stub::{GovernanceProposal, StubRuntime};
+
+fn assert_same_binary_packet_checksum(packet: &DecisionPacket, vector_name: &str) {
+    assert!(
+        packet.verify_checksum().is_ok(),
+        "{vector_name} packet checksum must verify"
+    );
+    assert_eq!(
+        packet.checksum.len(),
+        64,
+        "{vector_name} checksum must be a SHA-256 hex digest"
+    );
+    assert!(
+        packet.checksum.chars().all(|c| c.is_ascii_hexdigit()),
+        "{vector_name} checksum must be hex"
+    );
+    assert_eq!(packet.replay_scope.replay_scope, "same_binary_only");
+    assert!(!packet.replay_scope.cross_platform_replay_claimed);
+    let triple_parts = packet.replay_scope.platform.split('-').collect::<Vec<_>>();
+    assert!(
+        triple_parts.len() >= 3 && triple_parts.iter().all(|part| !part.is_empty()),
+        "{vector_name} platform must be target-triple-like"
+    );
+    assert!(packet.replay_scope.rustc_version.starts_with("rustc "));
+}
 
 /// Golden Vector 1: Basic ALLOW decision with committed learning
 ///
@@ -65,11 +90,7 @@ fn golden_vector_1_allow_committed() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe",
-        "GOLDEN_VECTOR_1 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_1");
 }
 
 /// Golden Vector 2: FREEZE_LEARNING due to scarcity streak
@@ -117,11 +138,7 @@ fn golden_vector_2_freeze_scarcity() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "478342ff53d3a8b5c0e365f7348a88fb323107b5ad76d44f5cdedba24bc85eca",
-        "GOLDEN_VECTOR_2 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_2");
     assert!(!packet.policy.reason_codes.is_empty());
 }
 
@@ -168,11 +185,7 @@ fn golden_vector_3_degraded_mode() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "06c8c50c10ebdaece5faa46d7fd4a31a5fc9f983f3e2e9b84f9acff3b332e33d",
-        "GOLDEN_VECTOR_3 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_3");
     assert!(packet.permit_hash.is_some());
 }
 
@@ -216,11 +229,7 @@ fn golden_vector_4_boundary_values() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "3aa4e02e0c337496be175572b15c04dc19a785a382880d46091364465309bcbb",
-        "GOLDEN_VECTOR_4 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_4");
 }
 
 /// Golden Vector 5: Large values test
@@ -268,11 +277,7 @@ fn golden_vector_5_large_values() {
     )
     .unwrap();
 
-    assert_eq!(
-        packet.checksum, "2ec1473fda2fbb78abaa0eb16b5edcd12353bd132a6f0b6b572269a0c69a93ea",
-        "GOLDEN_VECTOR_5 checksum mismatch — JCS canonicalization changed"
-    );
-    assert!(packet.verify_checksum().is_ok());
+    assert_same_binary_packet_checksum(&packet, "GOLDEN_VECTOR_5");
 }
 
 /// Determinism test: Same input must produce same checksum across 10000 iterations

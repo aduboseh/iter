@@ -15,10 +15,25 @@ use super::validation::{validate_bounded_float, validate_hash, ContractError};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EnergyEnvelope {
     /// Total energy across all nodes
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub nodes: f64,
     /// Energy in reservoir
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub reservoir: f64,
     /// System integrity ratio [0.0, 1.0]
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub integrity: f64,
 }
 
@@ -34,6 +49,11 @@ impl EnergyEnvelope {
             integrity,
         })
     }
+
+    /// Validate all numeric constraints after deserialization.
+    pub fn validate(&self) -> Result<(), ContractError> {
+        Self::new(self.nodes, self.reservoir, self.integrity).map(|_| ())
+    }
 }
 
 /// Reasoning envelope - cortex output summary.
@@ -44,12 +64,32 @@ impl EnergyEnvelope {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReasoningEnvelope {
     /// Reasoning quality [0.0, 1.0] - payment ratio
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub quality: f64,
     /// Value signal from cortex [0.0, 1.0]
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub value_signal: f64,
     /// Conflict detection signal [0.0, 1.0]
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub conflict_signal: f64,
     /// Control signal [0.0, 1.0]
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub control_signal: f64,
 }
 
@@ -79,6 +119,17 @@ impl ReasoningEnvelope {
     /// Create a starved reasoning envelope (quality degraded, signals zeroed).
     pub fn starved(quality: f64) -> Result<Self, ContractError> {
         Self::new(quality, 0.0, 0.0, 0.0)
+    }
+
+    /// Validate all numeric constraints after deserialization.
+    pub fn validate(&self) -> Result<(), ContractError> {
+        Self::new(
+            self.quality,
+            self.value_signal,
+            self.conflict_signal,
+            self.control_signal,
+        )
+        .map(|_| ())
     }
 }
 
@@ -148,10 +199,25 @@ pub struct LearningEnvelope {
     /// SHA-256 hash of capsule state (hex-encoded, 64 chars)
     pub version_hash: String,
     /// Cost of proposed update
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub update_cost: f64,
     /// Amount actually paid
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub update_paid: f64,
     /// Payment quality (paid / cost)
+    #[serde(with = "super::numeric::f64_hex")]
+    #[cfg_attr(
+        feature = "schema-gen",
+        schemars(with = "String", regex(pattern = "^[0-9a-f]{16}$"))
+    )]
     pub update_quality: f64,
     /// Outcome of learning tick
     pub status: LearningStatus,
@@ -204,6 +270,21 @@ impl LearningEnvelope {
             status: LearningStatus::NoProposalNoDelta,
             scarcity_streak: 0,
         }
+    }
+
+    /// Validate hash and numeric constraints after deserialization.
+    pub fn validate(&self) -> Result<(), ContractError> {
+        Self::new(
+            self.capsule_id.clone(),
+            self.epoch,
+            self.version_hash.clone(),
+            self.update_cost,
+            self.update_paid,
+            self.update_quality,
+            self.status,
+            self.scarcity_streak,
+        )
+        .map(|_| ())
     }
 }
 

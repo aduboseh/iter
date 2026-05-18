@@ -47,23 +47,33 @@ jobs:
           echo "Building with: $CARGO_FEATURES"
           cargo build --release $CARGO_FEATURES
 
-      - name: Verify build halts on governance hash mismatch
+      - name: Verify build halts on simulated governance drift
         env:
-          ITER_TAMPER_HASH_FOR_TEST: "true"
+          ITER_SIMULATE_DRIFT: "1"
         run: |
           set -euo pipefail
           LOG_FILE=$(mktemp)
           if cargo build --release $CARGO_FEATURES >"$LOG_FILE" 2>&1; then
             cat "$LOG_FILE"
-            echo "::error::Build succeeded with injected governance hash mismatch"
+            echo "::error::Build succeeded with simulated governance drift"
             exit 1
           fi
           cat "$LOG_FILE"
-          if ! grep -q "GOVERNANCE ARTIFACT HASH MISMATCH" "$LOG_FILE"; then
-            echo "::error::Tampered build failed without the expected panic message"
+          if ! grep -q "BRIDGE_INTEGRITY_MISMATCH_SIMULATED" "$LOG_FILE"; then
+            echo "::error::Drift simulation failed without the expected panic message"
             exit 1
           fi
-          echo "✅ Tampered build halted on governance hash mismatch"
+          MUTATIONS="$(git status --porcelain --untracked-files=all -- vendor/governance-bridge build.rs)"
+          if [ -n "$MUTATIONS" ]; then
+            echo "::error::Drift simulation mutated governance artifacts"
+            echo "$MUTATIONS"
+            git diff -- vendor/governance-bridge build.rs
+            exit 1
+          fi
+          echo "DRIFT_SIMULATION_PASS"
+          echo "simulation=ITER_SIMULATE_DRIFT"
+          echo "expected_failure=BRIDGE_INTEGRITY_MISMATCH_SIMULATED"
+          echo "working_tree_mutated=false"
 
       - name: Run lib tests (public_stub)
         run: |

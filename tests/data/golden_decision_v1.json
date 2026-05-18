@@ -1,25 +1,49 @@
 {
   "iter_build_hash": "1.0.2",
   "substrate_build_hash": "scg-11.12.0",
+  "replay_scope": {
+    "replay_scope": "same_binary_only",
+    "platform": "x86_64-pc-windows-msvc",
+    "rustc_version": "rustc 1.93.0 (254b59607 2026-01-19)",
+    "cross_platform_replay_claimed": false
+  },
+  "contract_provenance": {
+    "contract_version": "scg.v1",
+    "scg_source_commit": "da14c8390ba8ceeb0ab15d85c598d2042a2029cf",
+    "scg_vendor_master_head": "3e0675073a50ce20bdad7c342f7a5caaa3801504",
+    "bridge_contract_rs_sha256": "1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0",
+    "bridge_trace_rs_sha256": "620892e1986dc22a2a5c17f60ec650e6da70dbe90b847a2862e13c1bf14bce20",
+    "bridge_errors_rs_sha256": "d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af",
+    "bridge_lib_rs_sha256": "e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36",
+    "canonical_vectors_sha256": "1e804ac4342da71251d4a404bfcee5ef65a2f5b46d599e0fe9d73c80830c1d75",
+    "canonicalization_rule": "sorted-key-json+utf8-nfc+sha256"
+  },
+  "provenance_source": {
+    "contract_values": "compile_time_build_rs_rustc_env",
+    "decision_values": "runtime_execution",
+    "numeric_encoding": "ieee754-f64-bits-lowerhex",
+    "canonical_vector_integrity": "raw_byte_sha256",
+    "vector_digest_casing": "raw_text_validation"
+  },
   "tick": 1000,
   "energy": {
-    "nodes": 100.0,
-    "reservoir": 10.0,
-    "integrity": 0.95
+    "nodes": "4059000000000000",
+    "reservoir": "4024000000000000",
+    "integrity": "3fee666666666666"
   },
   "reasoning": {
-    "quality": 0.95,
-    "value_signal": 0.5,
-    "conflict_signal": 0.1,
-    "control_signal": 0.8
+    "quality": "3fee666666666666",
+    "value_signal": "3fe0000000000000",
+    "conflict_signal": "3fb999999999999a",
+    "control_signal": "3fe999999999999a"
   },
   "learning": {
     "capsule_id": "capsule_alpha",
     "epoch": 42,
     "version_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-    "update_cost": 0.5,
-    "update_paid": 0.5,
-    "update_quality": 1.0,
+    "update_cost": "3fe0000000000000",
+    "update_paid": "3fe0000000000000",
+    "update_quality": "3ff0000000000000",
     "status": "COMMITTED",
     "scarcity_streak": 0
   },
@@ -36,5 +60,5 @@
     "LEARNING_PERMISSION_GATE",
     "LEARNING_QUALITY_GATE"
   ],
-  "checksum": "acd92a1cea22df1e26db77689498b62393458ca8dcceddcddd1c40f23aeaa8fe"
+  "checksum": "01a9e3dabd88b41f845285bc7b06386d61b84eaa874f434e9a76e1cf91a984ed"
 }

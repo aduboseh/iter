@@ -73,19 +73,19 @@ tick
 ### 3.1 EnergyEnvelope
 | Field | Type | Range | Required |
 |-------|------|-------|----------|
-| nodes | f64 | [0.0, +∞) | yes |
-| reservoir | f64 | [0.0, +∞) | yes |
-| integrity | f64 | [0.0, 1.0] | yes |
+| nodes | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, +∞) | yes |
+| reservoir | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, +∞) | yes |
+| integrity | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, 1.0] | yes |
 
 Validation: NaN/Inf = hard error `INVALID_FLOAT`
 
 ### 3.2 ReasoningEnvelope
 | Field | Type | Range | Required |
 |-------|------|-------|----------|
-| quality | f64 | [0.0, 1.0] | yes |
-| value_signal | f64 | [0.0, 1.0] | yes |
-| conflict_signal | f64 | [0.0, 1.0] | yes |
-| control_signal | f64 | [0.0, 1.0] | yes |
+| quality | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, 1.0] | yes |
+| value_signal | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, 1.0] | yes |
+| conflict_signal | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, 1.0] | yes |
+| control_signal | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, 1.0] | yes |
 
 Validation: NaN/Inf = hard error `INVALID_FLOAT`
 
@@ -95,9 +95,9 @@ Validation: NaN/Inf = hard error `INVALID_FLOAT`
 | capsule_id | string | any | yes |
 | epoch | u64 | [0, 2^64) | yes |
 | version_hash | string | 64 hex chars | yes |
-| update_cost | f64 | [0.0, +∞) | yes |
-| update_paid | f64 | [0.0, +∞) | yes |
-| update_quality | f64 | [0.0, 1.0] | yes |
+| update_cost | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, +∞) | yes |
+| update_paid | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, +∞) | yes |
+| update_quality | f64 encoded as `ieee754-f64-bits-lowerhex` | [0.0, 1.0] | yes |
 | status | LearningStatus | enum | yes |
 | scarcity_streak | u64 | [0, 2^64) | yes |
 
@@ -197,17 +197,18 @@ A `DecisionPacket` MUST contain everything needed to:
 3. Explain why learning did or did not occur
 4. Identify which policy decided the outcome
 
-Verification: Given identical packet content (excluding checksum), recomputing checksum MUST yield identical result.
+Verification: Given identical packet content (excluding checksum), recomputing checksum MUST yield identical result. Packet verification MUST reject malformed numeric hex, NaN/Inf bit patterns, and out-of-range decoded values before trusting a packet.
 
 ### 6.3 Checksum Verification
 ```
 1. Parse packet JSON
-2. Extract checksum field
-3. Remove checksum field from object
-4. Canonicalize remaining fields per Section 2
-5. Compute SHA-256 of canonical bytes
-6. Compare computed hash to extracted checksum
-7. Mismatch = hard error CHECKSUM_MISMATCH
+2. Decode and validate proof-critical numeric fields from 16-character lowercase IEEE-754 hex strings
+3. Extract checksum field
+4. Remove checksum field from object
+5. Canonicalize remaining fields per Section 2
+6. Compute SHA-256 of canonical bytes
+7. Compare computed hash to extracted checksum
+8. Mismatch = hard error CHECKSUM_MISMATCH
 ```
 
 ## 7. Error Codes

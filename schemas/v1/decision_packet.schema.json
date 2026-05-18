@@ -3,24 +3,85 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "ContractProvenance": {
+      "additionalProperties": false,
+      "description": "Compile-time SCG contract provenance exported by build.rs.",
+      "properties": {
+        "bridge_contract_rs_sha256": {
+          "description": "SHA-256 of vendored contract.rs.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "bridge_errors_rs_sha256": {
+          "description": "SHA-256 of vendored errors.rs.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "bridge_lib_rs_sha256": {
+          "description": "SHA-256 of vendored lib.rs.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "bridge_trace_rs_sha256": {
+          "description": "SHA-256 of vendored trace.rs.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "canonical_vectors_sha256": {
+          "description": "Raw-byte SHA-256 of CANONICAL_VECTORS.json.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "canonicalization_rule": {
+          "description": "Canonicalization rule bound to the vendored contract.",
+          "type": "string"
+        },
+        "contract_version": {
+          "description": "SCG governance bridge contract version.",
+          "type": "string"
+        },
+        "scg_source_commit": {
+          "description": "Exact SCG source commit used as the vendored bridge origin.",
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "scg_vendor_master_head": {
+          "description": "SCG master head that had accepted the vendored bridge at vendor time.",
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bridge_contract_rs_sha256",
+        "bridge_errors_rs_sha256",
+        "bridge_lib_rs_sha256",
+        "bridge_trace_rs_sha256",
+        "canonical_vectors_sha256",
+        "canonicalization_rule",
+        "contract_version",
+        "scg_source_commit",
+        "scg_vendor_master_head"
+      ],
+      "type": "object"
+    },
     "EnergyEnvelope": {
       "additionalProperties": false,
       "description": "Energy envelope - thermodynamic state summary.\n\n# Fields All energy values are non-negative. Integrity in [0.0, 1.0].",
       "properties": {
         "integrity": {
           "description": "System integrity ratio [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "nodes": {
           "description": "Total energy across all nodes",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "reservoir": {
           "description": "Energy in reservoir",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         }
       },
       "required": [
@@ -60,18 +121,18 @@
         },
         "update_cost": {
           "description": "Cost of proposed update",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "update_paid": {
           "description": "Amount actually paid",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "update_quality": {
           "description": "Payment quality (paid / cost)",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "version_hash": {
           "description": "SHA-256 hash of capsule state (hex-encoded, 64 chars)",
@@ -201,29 +262,63 @@
       ],
       "type": "object"
     },
+    "ProvenanceSource": {
+      "additionalProperties": false,
+      "description": "Provenance source declarations for static and dynamic proof-packet values.",
+      "properties": {
+        "canonical_vector_integrity": {
+          "description": "Integrity validation method for the canonical vector file.",
+          "type": "string"
+        },
+        "contract_values": {
+          "description": "Source of static contract and bridge values.",
+          "type": "string"
+        },
+        "decision_values": {
+          "description": "Source of decision-specific values.",
+          "type": "string"
+        },
+        "numeric_encoding": {
+          "description": "Exact encoding used for proof-critical numeric packet fields.",
+          "type": "string"
+        },
+        "vector_digest_casing": {
+          "description": "Validation method for canonical vector digest casing.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "canonical_vector_integrity",
+        "contract_values",
+        "decision_values",
+        "numeric_encoding",
+        "vector_digest_casing"
+      ],
+      "type": "object"
+    },
     "ReasoningEnvelope": {
       "additionalProperties": false,
       "description": "Reasoning envelope - cortex output summary.\n\n# Fields All signals in [0.0, 1.0].",
       "properties": {
         "conflict_signal": {
           "description": "Conflict detection signal [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "control_signal": {
           "description": "Control signal [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "quality": {
           "description": "Reasoning quality [0.0, 1.0] - payment ratio",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         },
         "value_signal": {
           "description": "Value signal from cortex [0.0, 1.0]",
-          "format": "double",
-          "type": "number"
+          "pattern": "^[0-9a-f]{16}$",
+          "type": "string"
         }
       },
       "required": [
@@ -233,13 +328,50 @@
         "value_signal"
       ],
       "type": "object"
+    },
+    "ReplayScope": {
+      "additionalProperties": false,
+      "description": "Replay scope bound into each proof packet.",
+      "properties": {
+        "cross_platform_replay_claimed": {
+          "description": "Whether this packet claims cross-platform replay equivalence.",
+          "type": "boolean"
+        },
+        "platform": {
+          "description": "Target triple used to build the producing Iter binary.",
+          "type": "string"
+        },
+        "replay_scope": {
+          "description": "Replay guarantee scope for this packet.",
+          "type": "string"
+        },
+        "rustc_version": {
+          "description": "rustc version used to build the producing Iter binary.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cross_platform_replay_claimed",
+        "platform",
+        "replay_scope",
+        "rustc_version"
+      ],
+      "type": "object"
     }
   },
-  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
+  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Replay scope and build environment - Compile-time SCG contract provenance - Provenance source declarations - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Governance artifact binding - Ordered execution trace - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
   "properties": {
     "checksum": {
       "description": "SHA-256 checksum of packet (excluding this field)",
       "type": "string"
+    },
+    "contract_provenance": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ContractProvenance"
+        }
+      ],
+      "description": "Contract-critical bridge provenance exported by build.rs."
     },
     "economics_hash": {
       "description": "Economics config hash",
@@ -253,13 +385,6 @@
       ],
       "description": "Energy snapshot"
     },
-    "execution_trace": {
-      "description": "Ordered evaluation trace. Omitted when no trace is attached and omitted on demo path. Attached from local evaluation on governed-local path. Attached from SCG evaluation on scg-backed path (always attached on scg-backed path in current implementation).",
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
-    },
     "evaluated_rules": {
       "description": "Evaluated rule IDs (ordered)",
       "items": {
@@ -267,9 +392,19 @@
       },
       "type": "array"
     },
+    "execution_trace": {
+      "description": "Ordered evaluation trace. Empty when no trace has been attached.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "governance_hash": {
-      "description": "Canonical governance hash. Omitted on demo path. Populated from local governance/governance.hash on governed-local path. Populated from SCG canonical hash on scg-backed path (required, non-empty).",
-      "type": "string"
+      "description": "Canonical governance hash bound to this packet, if available.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "iter_build_hash": {
       "description": "Iter build hash (compile-time)",
@@ -298,6 +433,14 @@
       ],
       "description": "Policy snapshot"
     },
+    "provenance_source": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProvenanceSource"
+        }
+      ],
+      "description": "Source declarations for static and dynamic packet values."
+    },
     "reasoning": {
       "allOf": [
         {
@@ -305,6 +448,14 @@
         }
       ],
       "description": "Reasoning signature"
+    },
+    "replay_scope": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ReplayScope"
+        }
+      ],
+      "description": "Replay scope and build environment for this packet."
     },
     "substrate_build_hash": {
       "description": "SCG build hash (from contract)",
@@ -319,13 +470,16 @@
   },
   "required": [
     "checksum",
+    "contract_provenance",
     "economics_hash",
     "energy",
     "evaluated_rules",
     "iter_build_hash",
     "learning",
     "policy",
+    "provenance_source",
     "reasoning",
+    "replay_scope",
     "substrate_build_hash",
     "tick"
   ],
