@@ -10,7 +10,7 @@
 //!   reproduce the decision path without re-running learning.
 //! - Packet checksum mismatch is a hard error.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::contracts::numeric;
@@ -140,7 +140,7 @@ impl ReplayScope {
 /// - Permits/budgets if used
 /// - Checksum over the packet
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DecisionPacket {
     /// Iter build hash (compile-time)
     pub iter_build_hash: String,
@@ -177,6 +177,57 @@ pub struct DecisionPacket {
     pub evaluated_rules: Vec<String>,
     /// SHA-256 checksum of packet (excluding this field)
     pub checksum: String,
+}
+
+#[derive(Deserialize)]
+struct DecisionPacketWire {
+    iter_build_hash: String,
+    substrate_build_hash: String,
+    #[serde(default = "ReplayScope::compile_time")]
+    replay_scope: ReplayScope,
+    #[serde(default = "ContractProvenance::compile_time")]
+    contract_provenance: ContractProvenance,
+    #[serde(default = "ProvenanceSource::compile_time_and_runtime")]
+    provenance_source: ProvenanceSource,
+    tick: u64,
+    energy: EnergyEnvelope,
+    reasoning: ReasoningEnvelope,
+    learning: LearningEnvelope,
+    policy: PolicyEnvelope,
+    permit_hash: Option<String>,
+    economics_hash: String,
+    governance_hash: Option<String>,
+    #[serde(default)]
+    execution_trace: Vec<String>,
+    evaluated_rules: Vec<String>,
+    checksum: String,
+}
+
+impl<'de> Deserialize<'de> for DecisionPacket {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = DecisionPacketWire::deserialize(deserializer)?;
+        Ok(Self {
+            iter_build_hash: wire.iter_build_hash,
+            substrate_build_hash: wire.substrate_build_hash,
+            replay_scope: wire.replay_scope,
+            contract_provenance: wire.contract_provenance,
+            provenance_source: wire.provenance_source,
+            tick: wire.tick,
+            energy: wire.energy,
+            reasoning: wire.reasoning,
+            learning: wire.learning,
+            policy: wire.policy,
+            permit_hash: wire.permit_hash,
+            economics_hash: wire.economics_hash,
+            governance_hash: wire.governance_hash,
+            execution_trace: wire.execution_trace,
+            evaluated_rules: wire.evaluated_rules,
+            checksum: wire.checksum,
+        })
+    }
 }
 
 impl DecisionPacket {
@@ -648,6 +699,41 @@ mod tests {
             Some(learning_quality.as_str())
         );
         assert!(value["energy"]["nodes"].as_str().is_some());
+    }
+
+    #[test]
+    fn packet_deserializes_legacy_v1_numbers_and_defaulted_metadata() {
+        let state = make_test_state();
+        let packet = DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &state,
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap();
+        let mut value = serde_json::to_value(&packet).expect("packet serializes");
+        let obj = value.as_object_mut().expect("packet value is an object");
+        obj.remove("replay_scope");
+        obj.remove("contract_provenance");
+        obj.remove("provenance_source");
+        value["energy"]["nodes"] = serde_json::json!(100.0);
+        value["reasoning"]["quality"] = serde_json::json!(0.9);
+        value["learning"]["update_quality"] = serde_json::json!(1.0);
+
+        let legacy: DecisionPacket =
+            serde_json::from_value(value).expect("legacy v1 packet shape deserializes");
+
+        assert_eq!(legacy.energy.nodes.to_bits(), 100.0f64.to_bits());
+        assert_eq!(legacy.reasoning.quality.to_bits(), 0.9f64.to_bits());
+        assert_eq!(legacy.learning.update_quality.to_bits(), 1.0f64.to_bits());
+        assert_eq!(legacy.replay_scope.replay_scope, "same_binary_only");
+        assert_eq!(legacy.contract_provenance.contract_version, "scg.v1");
+        assert_eq!(
+            legacy.provenance_source.numeric_encoding,
+            crate::contracts::numeric::F64_HEX_ENCODING
+        );
     }
 
     #[test]

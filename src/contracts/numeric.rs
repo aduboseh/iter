@@ -38,6 +38,13 @@ pub fn f64_from_hex(encoded: &str) -> Result<f64, String> {
 pub mod f64_hex {
     use super::*;
 
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum EncodedF64 {
+        Hex(String),
+        Number(f64),
+    }
+
     /// Serialize an f64 as its exact IEEE-754 hex bit pattern.
     pub fn serialize<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -54,8 +61,16 @@ pub mod f64_hex {
     where
         D: Deserializer<'de>,
     {
-        let encoded = String::deserialize(deserializer)?;
-        f64_from_hex(&encoded).map_err(D::Error::custom)
+        match EncodedF64::deserialize(deserializer)? {
+            EncodedF64::Hex(encoded) => f64_from_hex(&encoded).map_err(D::Error::custom),
+            EncodedF64::Number(value) => {
+                if value.is_finite() {
+                    Ok(value)
+                } else {
+                    Err(D::Error::custom("f64 value must be finite"))
+                }
+            }
+        }
     }
 }
 
@@ -85,5 +100,32 @@ mod tests {
     #[test]
     fn f64_hex_rejects_uppercase_input() {
         assert!(f64_from_hex("3FF0000000000000").is_err());
+    }
+
+    #[test]
+    fn f64_hex_serde_reads_legacy_json_numbers() {
+        #[derive(Deserialize)]
+        struct Probe {
+            #[serde(with = "super::f64_hex")]
+            value: f64,
+        }
+
+        let probe: Probe = serde_json::from_str(r#"{"value":1.25}"#).unwrap();
+        assert_eq!(probe.value.to_bits(), 1.25f64.to_bits());
+    }
+
+    #[test]
+    fn f64_hex_serde_rejects_non_finite_on_write() {
+        #[derive(serde::Serialize)]
+        struct Probe {
+            #[serde(with = "super::f64_hex")]
+            value: f64,
+        }
+
+        let err = serde_json::to_string(&Probe {
+            value: f64::INFINITY,
+        })
+        .expect_err("non-finite value must fail serialization");
+        assert!(err.to_string().contains("f64 value must be finite"));
     }
 }
