@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use iter_mcp_server::audit::DecisionPacket;
 use jsonschema::{Draft, JSONSchema};
 use serde_json::Value;
 
@@ -25,6 +26,15 @@ fn golden_decision_packet_matches_documented_schema() {
             errors.join("\n")
         );
     }
+}
+
+#[test]
+fn golden_decision_packet_checksum_verifies() {
+    let packet: DecisionPacket =
+        serde_json::from_value(load_json(GOLDEN_PACKET)).expect("golden packet deserializes");
+    packet
+        .verify_checksum()
+        .expect("golden DecisionPacket checksum verifies");
 }
 
 fn load_schema(relative: &str) -> Value {

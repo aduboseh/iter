@@ -16,7 +16,10 @@
 //! failures with invalid domain states.
 
 use governance_bridge::{
-    contract::{Decision, GovernanceOutcome, CONTRACT_VERSION_STR},
+    contract::{
+        Decision, GovernanceOutcome, GovernanceStateEnvelope, CONTRACT_VERSION_STR,
+        STATE_ENVELOPE_SCHEMA,
+    },
     trace::{canonicalize, payload_hash, ExecutionTrace, OperationType, TraceStep},
 };
 use proptest::prelude::*;
@@ -55,6 +58,10 @@ const SEQUENCE: [(OperationType, &str); 5] = [
 ];
 
 const GOV_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+fn state_envelope() -> GovernanceStateEnvelope {
+    GovernanceStateEnvelope::new("snapshot-001".to_string(), 110.0, 0.0, 1, 0)
+}
 
 fn build_trace(payload: &str) -> ExecutionTrace {
     let step_hash = payload_hash(payload).expect("generated payload must hash");
@@ -109,11 +116,25 @@ proptest! {
     #[test]
     fn p3_replay_id_is_deterministic(payload in arb_canonical_payload()) {
         let trace = build_trace(&payload);
+        let state_envelope = state_envelope();
+        let state_envelope_hash = state_envelope.compute_hash();
         let id_1 = GovernanceOutcome::compute_replay_id(
-            CONTRACT_VERSION_STR, &Decision::Allow, GOV_HASH, &trace,
+            CONTRACT_VERSION_STR,
+            &Decision::Allow,
+            GOV_HASH,
+            &state_envelope.state_snapshot_hash,
+            STATE_ENVELOPE_SCHEMA,
+            &state_envelope_hash,
+            &trace,
         );
         let id_2 = GovernanceOutcome::compute_replay_id(
-            CONTRACT_VERSION_STR, &Decision::Allow, GOV_HASH, &trace,
+            CONTRACT_VERSION_STR,
+            &Decision::Allow,
+            GOV_HASH,
+            &state_envelope.state_snapshot_hash,
+            STATE_ENVELOPE_SCHEMA,
+            &state_envelope_hash,
+            &trace,
         );
         prop_assert_eq!(&id_1, &id_2,
             "compute_replay_id produced different values for same trace");
@@ -129,13 +150,25 @@ proptest! {
     #[test]
     fn p4_verify_replay_id_is_consistent(payload in arb_canonical_payload()) {
         let trace = build_trace(&payload);
+        let state_envelope = state_envelope();
+        let state_envelope_hash = state_envelope.compute_hash();
         let replay_id = GovernanceOutcome::compute_replay_id(
-            CONTRACT_VERSION_STR, &Decision::Allow, GOV_HASH, &trace,
+            CONTRACT_VERSION_STR,
+            &Decision::Allow,
+            GOV_HASH,
+            &state_envelope.state_snapshot_hash,
+            STATE_ENVELOPE_SCHEMA,
+            &state_envelope_hash,
+            &trace,
         );
         let outcome = GovernanceOutcome {
             contract_version: CONTRACT_VERSION_STR.to_string(),
             decision: Decision::Allow,
             governance_hash: GOV_HASH.to_string(),
+            state_snapshot_hash: state_envelope.state_snapshot_hash.clone(),
+            state_envelope_schema: STATE_ENVELOPE_SCHEMA.to_string(),
+            state_envelope_hash,
+            state_envelope,
             execution_trace: trace,
             replay_id,
         };

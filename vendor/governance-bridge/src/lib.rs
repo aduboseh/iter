@@ -2,7 +2,10 @@ pub mod contract;
 pub mod errors;
 pub mod trace;
 
-pub use contract::{Decision, GovernanceOutcome, GovernanceRequest, CONTRACT_VERSION_STR};
+pub use contract::{
+    Decision, GovernanceOutcome, GovernanceRequest, GovernanceStateEnvelope, CONTRACT_VERSION_STR,
+    STATE_ENVELOPE_SCHEMA,
+};
 pub use errors::BridgeError;
 pub use trace::{ExecutionTrace, OperationType, TraceStep, TRACE_SCHEMA_VERSION};
 
@@ -130,10 +133,16 @@ impl GovernanceBridge for StubBridge {
             &finalize_output,
         ));
 
+        let state_envelope =
+            GovernanceStateEnvelope::new(request.state_snapshot_hash.clone(), 0.0, 0.0, 0, 0);
+        let state_envelope_hash = state_envelope.compute_hash();
         let replay_id = GovernanceOutcome::compute_replay_id(
             CONTRACT_VERSION_STR,
             &decision,
             &self.governance_hash,
+            &request.state_snapshot_hash,
+            STATE_ENVELOPE_SCHEMA,
+            &state_envelope_hash,
             &trace,
         );
 
@@ -141,6 +150,10 @@ impl GovernanceBridge for StubBridge {
             contract_version: CONTRACT_VERSION_STR.to_string(),
             decision,
             governance_hash: self.governance_hash.clone(),
+            state_snapshot_hash: request.state_snapshot_hash,
+            state_envelope_schema: STATE_ENVELOPE_SCHEMA.to_string(),
+            state_envelope_hash,
+            state_envelope,
             execution_trace: trace,
             replay_id,
         })

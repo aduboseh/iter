@@ -18,7 +18,10 @@
 //   Replay level: sha256_hex()   -> lowercase (hex::encode)
 
 use governance_bridge::{
-    contract::{Decision, GovernanceOutcome, CONTRACT_VERSION_STR},
+    contract::{
+        Decision, GovernanceOutcome, GovernanceStateEnvelope, CONTRACT_VERSION_STR,
+        STATE_ENVELOPE_SCHEMA,
+    },
     trace::{canonicalize, payload_hash, ExecutionTrace, OperationType, TraceStep},
 };
 use sha2::{Digest, Sha256};
@@ -257,11 +260,17 @@ fn att_iter_replay_canonical_vectors() {
 
         // -- Layer 2: compute replay_id over full outcome -------------------
         // NOT the vector sha256. Covers {contract_version, decision,
-        // governance_hash, execution_trace} -> lowercase hex.
+        // governance_hash, state envelope proof, execution_trace} -> lowercase hex.
+        let state_envelope =
+            GovernanceStateEnvelope::new("snapshot-001".to_string(), 110.0, 0.0, 1, 0);
+        let state_envelope_hash = state_envelope.compute_hash();
         let replay_id = GovernanceOutcome::compute_replay_id(
             CONTRACT_VERSION_STR,
             &Decision::Allow,
             ATTESTATION_GOVERNANCE_HASH,
+            &state_envelope.state_snapshot_hash,
+            STATE_ENVELOPE_SCHEMA,
+            &state_envelope_hash,
             &trace,
         );
 
@@ -269,6 +278,10 @@ fn att_iter_replay_canonical_vectors() {
             contract_version: CONTRACT_VERSION_STR.to_string(),
             decision: Decision::Allow,
             governance_hash: ATTESTATION_GOVERNANCE_HASH.to_string(),
+            state_snapshot_hash: state_envelope.state_snapshot_hash.clone(),
+            state_envelope_schema: STATE_ENVELOPE_SCHEMA.to_string(),
+            state_envelope_hash,
+            state_envelope,
             execution_trace: trace,
             replay_id,
         };

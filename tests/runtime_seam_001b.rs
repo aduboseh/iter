@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, GovernanceRequest,
-    CONTRACT_VERSION_STR,
+    GovernanceStateEnvelope, CONTRACT_VERSION_STR, STATE_ENVELOPE_SCHEMA,
 };
 use governance_bridge::trace::{ExecutionTrace, OperationType, TraceStep};
 use governance_bridge::{GovernanceBridge as _, StubBridge};
@@ -501,10 +501,17 @@ fn contract_outcome(
     tamper_replay: bool,
 ) -> ScgGovernanceOutcome {
     let execution_trace = make_trace();
+    let state_envelope =
+        GovernanceStateEnvelope::new(proposal().state_snapshot_hash, 220.0, 0.0, 2, 0);
+    let state_envelope_hash = state_envelope.compute_hash();
     let mut outcome = ScgGovernanceOutcome {
         contract_version: contract_version.to_string(),
         decision,
         governance_hash: governance_hash.to_string(),
+        state_snapshot_hash: state_envelope.state_snapshot_hash.clone(),
+        state_envelope_schema: STATE_ENVELOPE_SCHEMA.to_string(),
+        state_envelope_hash: state_envelope_hash.clone(),
+        state_envelope,
         execution_trace,
         replay_id: String::new(),
     };
@@ -512,6 +519,9 @@ fn contract_outcome(
         &outcome.contract_version,
         &outcome.decision,
         &outcome.governance_hash,
+        &outcome.state_snapshot_hash,
+        &outcome.state_envelope_schema,
+        &outcome.state_envelope_hash,
         &outcome.execution_trace,
     );
     if tamper_replay {
@@ -556,6 +566,25 @@ fn governed_backed_mode_emits_governed_packet() {
     );
     assert!(outcome.authoritative_pdp);
     assert_eq!(packet.governance_hash(), Some(GOVERNANCE_HASH.trim()));
+    assert_eq!(
+        packet.state_envelope_schema.as_deref(),
+        Some(STATE_ENVELOPE_SCHEMA)
+    );
+    assert_eq!(
+        packet.state_snapshot_hash.as_deref(),
+        Some(proposal().state_snapshot_hash.as_str())
+    );
+    assert_eq!(
+        packet.learning.version_hash,
+        packet
+            .state_envelope_hash
+            .clone()
+            .expect("SCG state envelope hash")
+    );
+    assert_eq!(
+        packet.energy.nodes, 220.0,
+        "scg-backed packets must source energy from SCG state envelope, not local stub state"
+    );
     assert!(
         !packet.execution_trace().is_empty(),
         "scg-backed packet must carry the SCG execution trace"

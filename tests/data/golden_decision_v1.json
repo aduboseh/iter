@@ -9,12 +9,12 @@
   },
   "contract_provenance": {
     "contract_version": "scg.v1",
-    "scg_source_commit": "da14c8390ba8ceeb0ab15d85c598d2042a2029cf",
-    "scg_vendor_master_head": "3e0675073a50ce20bdad7c342f7a5caaa3801504",
-    "bridge_contract_rs_sha256": "1179dcdd5e8bc51f88324136fdfb55bfe58be00167cbfe091d0c8731e9b51ab0",
+    "scg_source_commit": "0306feb600e12c627dc4b10963fc8f7781dc0e18",
+    "scg_vendor_master_head": "b6c9a3b641291631358fcf9f8deace74d71e7615",
+    "bridge_contract_rs_sha256": "82800952f5e03851422fe4469fd159738b927e93b6a284c79f2703070516b3db",
     "bridge_trace_rs_sha256": "620892e1986dc22a2a5c17f60ec650e6da70dbe90b847a2862e13c1bf14bce20",
     "bridge_errors_rs_sha256": "d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af",
-    "bridge_lib_rs_sha256": "e2556d561acba83914a85b445186d6c6a97d4a75b19a95c37ea552c192f61f36",
+    "bridge_lib_rs_sha256": "52b4e25270e9b4b001175f9beba8bb020b6d64f9140fbc47b67789e9fa1badd8",
     "canonical_vectors_sha256": "1e804ac4342da71251d4a404bfcee5ef65a2f5b46d599e0fe9d73c80830c1d75",
     "canonicalization_rule": "sorted-key-json+utf8-nfc+sha256"
   },
@@ -60,5 +60,5 @@
     "LEARNING_PERMISSION_GATE",
     "LEARNING_QUALITY_GATE"
   ],
-  "checksum": "01a9e3dabd88b41f845285bc7b06386d61b84eaa874f434e9a76e1cf91a984ed"
+  "checksum": "00307ae28e90ef03fa0e9c1e98658ec607c590525ee0adfab90f72adacf126d2"
 }
