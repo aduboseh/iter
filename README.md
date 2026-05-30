@@ -32,8 +32,8 @@ determinism_scope=same_binary_only
 platform=<target_triple>
 rustc_version=<version>
 cross_platform_replay_claimed=false
-scg_source_commit=da14c8390ba8ceeb0ab15d85c598d2042a2029cf
-scg_vendor_master_head=3e0675073a50ce20bdad7c342f7a5caaa3801504
+scg_source_commit=0306feb600e12c627dc4b10963fc8f7781dc0e18
+scg_vendor_master_head=b6c9a3b641291631358fcf9f8deace74d71e7615
 build_rerun_triggers=verified
 rustc_env_exports=verified
 bridge_integrity=verified
@@ -56,7 +56,7 @@ Iter currently exposes three public server runtime modes:
 
 - **Demo mode** (default `iter-server` boot path): Threshold-based governance using stub graph state. Non-authoritative — `authoritative_pdp=false`, `replay_sufficient=false`, no `DecisionPacket` at the MCP edge. Suitable for protocol validation and integration testing.
 - **Governed-local mode** (`--runtime-mode=governed-local`): PolicyEvaluator-based governance with typed contract envelopes. Emits `DecisionPacket` with RFC 8785 JCS checksums, governance hash binding, and ordered execution trace. This mode is replay-capable, but still runs over the local stub substrate rather than SCG.
-- **Scg-backed mode** (`--runtime-mode=scg-backed`): Calls `POST /governance/evaluate` on the live SCG gateway. Requires `SCG_ENDPOINT` and `governance/governance.hash` at boot, sends `Authorization: Bearer <token>` when `SCG_AUTH_TOKEN` or `SCG_GATEWAY_AUTH_TOKEN` is configured, fails closed if required configuration is absent or malformed, enforces HTTP status, `contract_version`, replay integrity, and governance hash checks on every response, emits governed packets on `decision.check`, and has no fallback runtime on SCG unavailability. This mode is available but is not the default.
+- **Scg-backed mode** (`--runtime-mode=scg-backed`): Calls `POST /governance/evaluate` on the live SCG gateway. Requires `SCG_ENDPOINT` and `governance/governance.hash` at boot, sends `Authorization: Bearer <token>` when `SCG_AUTH_TOKEN` or `SCG_GATEWAY_AUTH_TOKEN` is configured, fails closed if required configuration is absent or malformed, enforces HTTP status, `contract_version`, replay integrity, governance hash, and SCG state-envelope checks on every response, emits governed packets on `decision.check`, and has no fallback runtime on SCG unavailability. This mode is available but is not the default.
 
 **MCP is the transport. Default server mode remains demo/non-authoritative. SCG↔Iter seam closed — see `SKILLS/runtime-seam.md`.**
 

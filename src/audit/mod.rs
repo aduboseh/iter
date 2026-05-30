@@ -170,6 +170,15 @@ pub struct DecisionPacket {
     /// Canonical governance hash bound to this packet, if available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub governance_hash: Option<String>,
+    /// SCG state snapshot hash bound to this packet, if available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_snapshot_hash: Option<String>,
+    /// SCG state envelope schema bound to this packet, if available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_envelope_schema: Option<String>,
+    /// SCG state envelope hash bound to this packet, if available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_envelope_hash: Option<String>,
     /// Ordered evaluation trace. Empty when no trace has been attached.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_trace: Vec<String>,
@@ -197,6 +206,9 @@ struct DecisionPacketWire {
     permit_hash: Option<String>,
     economics_hash: String,
     governance_hash: Option<String>,
+    state_snapshot_hash: Option<String>,
+    state_envelope_schema: Option<String>,
+    state_envelope_hash: Option<String>,
     #[serde(default)]
     execution_trace: Vec<String>,
     evaluated_rules: Vec<String>,
@@ -223,6 +235,9 @@ impl<'de> Deserialize<'de> for DecisionPacket {
             permit_hash: wire.permit_hash,
             economics_hash: wire.economics_hash,
             governance_hash: wire.governance_hash,
+            state_snapshot_hash: wire.state_snapshot_hash,
+            state_envelope_schema: wire.state_envelope_schema,
+            state_envelope_hash: wire.state_envelope_hash,
             execution_trace: wire.execution_trace,
             evaluated_rules: wire.evaluated_rules,
             checksum: wire.checksum,
@@ -257,6 +272,9 @@ impl DecisionPacket {
             permit_hash,
             economics_hash,
             governance_hash: None,
+            state_snapshot_hash: None,
+            state_envelope_schema: None,
+            state_envelope_hash: None,
             execution_trace: Vec::new(),
             evaluated_rules,
             checksum: String::new(),
@@ -328,6 +346,19 @@ impl DecisionPacket {
     ) {
         self.governance_hash = Some(governance_hash);
         self.execution_trace = execution_trace;
+        self.checksum = self.compute_checksum();
+    }
+
+    /// Attach SCG-owned state provenance and refresh the packet checksum.
+    pub(crate) fn bind_scg_state_context(
+        &mut self,
+        state_snapshot_hash: String,
+        state_envelope_schema: String,
+        state_envelope_hash: String,
+    ) {
+        self.state_snapshot_hash = Some(state_snapshot_hash);
+        self.state_envelope_schema = Some(state_envelope_schema);
+        self.state_envelope_hash = Some(state_envelope_hash);
         self.checksum = self.compute_checksum();
     }
 

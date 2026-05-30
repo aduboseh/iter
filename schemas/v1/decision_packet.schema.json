@@ -359,7 +359,7 @@
       "type": "object"
     }
   },
-  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Replay scope and build environment - Compile-time SCG contract provenance - Provenance source declarations - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Governance artifact binding - Ordered execution trace - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
+  "description": "Decision packet - complete audit record for a governed action.\n\n# Contents - System identifiers (build hashes) - Replay scope and build environment - Compile-time SCG contract provenance - Provenance source declarations - Tick - Energy snapshot - Reasoning signature - Learning audit (status, hashes, scarcity streak) - Governance artifact binding - Optional SCG state-envelope binding - Ordered execution trace - Policy snapshot (hash, evaluated rules, decision, reason codes) - Permits/budgets if used - Checksum over the packet",
   "properties": {
     "checksum": {
       "description": "SHA-256 checksum of packet (excluding this field)",
@@ -456,6 +456,20 @@
         }
       ],
       "description": "Replay scope and build environment for this packet."
+    },
+    "state_envelope_hash": {
+      "description": "SCG canonical state-envelope hash bound to this packet, if available.",
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "state_envelope_schema": {
+      "description": "SCG state-envelope schema identifier bound to this packet, if available.",
+      "const": "scg.gateway.state_envelope.v1",
+      "type": "string"
+    },
+    "state_snapshot_hash": {
+      "description": "SCG state snapshot hash bound to this packet, if available.",
+      "type": "string"
     },
     "substrate_build_hash": {
       "description": "SCG build hash (from contract)",

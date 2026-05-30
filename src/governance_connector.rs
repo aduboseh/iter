@@ -4,12 +4,15 @@ use std::time::Duration;
 
 use governance_bridge::contract::{
     Decision as ScgDecision, GovernanceOutcome as ScgGovernanceOutcome, GovernanceRequest,
-    CONTRACT_VERSION_STR,
+    GovernanceStateEnvelope, CONTRACT_VERSION_STR, STATE_ENVELOPE_SCHEMA,
 };
 use reqwest::{blocking::Client, Url};
 
 use crate::audit::{AuditLog, DecisionPacket};
-use crate::contracts::{PolicyDecision, PolicyEnvelope, SystemState};
+use crate::contracts::{
+    EnergyEnvelope, LearningEnvelope, LearningStatus, PolicyDecision, PolicyEnvelope,
+    ReasoningEnvelope, SystemState,
+};
 use crate::runtime::{
     GovernanceMode, GovernanceOutcome, GovernanceRuntime, GovernanceRuntimeError,
     GovernanceRuntimeMeta, GovernanceVerdict, ReasonCode,
@@ -154,6 +157,21 @@ impl ScgRuntime {
                 context
             )));
         }
+        let has_state_provenance = matches!(
+            (
+                packet.state_snapshot_hash.as_deref(),
+                packet.state_envelope_schema.as_deref(),
+                packet.state_envelope_hash.as_deref(),
+            ),
+            (Some(snapshot), Some(schema), Some(hash))
+                if !snapshot.is_empty() && !schema.is_empty() && !hash.is_empty()
+        );
+        if !has_state_provenance {
+            return Err(GovernanceRuntimeError::ReplayIntegrityViolation(format!(
+                "INV-SCG-STATE: SCG state provenance incomplete before packet return [{}]",
+                context
+            )));
+        }
         Ok(())
     }
 
@@ -262,7 +280,28 @@ impl ScgRuntime {
             });
         }
 
+        Self::validate_state_provenance(&outcome)?;
+
         Ok(outcome)
+    }
+
+    fn validate_state_provenance(
+        outcome: &ScgGovernanceOutcome,
+    ) -> Result<(), GovernanceRuntimeError> {
+        if outcome.state_snapshot_hash.trim().is_empty() {
+            return Err(GovernanceRuntimeError::EvaluationFailed {
+                reason: "SCG response missing state_snapshot_hash".to_string(),
+            });
+        }
+        if outcome.state_envelope_schema != STATE_ENVELOPE_SCHEMA {
+            return Err(GovernanceRuntimeError::ContractVersionMismatch(format!(
+                "expected state envelope schema {}, got {}",
+                STATE_ENVELOPE_SCHEMA, outcome.state_envelope_schema
+            )));
+        }
+        outcome
+            .verify_state_envelope()
+            .map_err(|e| GovernanceRuntimeError::ReplayIntegrityViolation(e.to_string()))
     }
 
     fn trace_strings(
@@ -323,17 +362,48 @@ impl ScgRuntime {
         vec![reason.to_string()]
     }
 
+    fn scg_state_from_envelope(
+        envelope: &GovernanceStateEnvelope,
+        envelope_hash: &str,
+        policy: PolicyEnvelope,
+    ) -> Result<SystemState, GovernanceRuntimeError> {
+        let bounded_drift = envelope.global_energy_drift.min(1.0);
+        let integrity = (1.0 - bounded_drift).clamp(0.0, 1.0);
+        let has_violations = envelope.violation_count > 0;
+        let quality = if has_violations { 0.0 } else { integrity };
+        let conflict = if has_violations { 1.0 } else { 0.0 };
+
+        let energy = EnergyEnvelope::new(envelope.total_energy, 0.0, integrity).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
+                reason: format!("SCG state energy envelope invalid: {}", e),
+            }
+        })?;
+        let reasoning = ReasoningEnvelope::new(quality, quality, conflict, 1.0).map_err(|e| {
+            GovernanceRuntimeError::EvaluationFailed {
+                reason: format!("SCG state reasoning envelope invalid: {}", e),
+            }
+        })?;
+        let learning = LearningEnvelope::new(
+            "scg-governance-state".to_string(),
+            envelope.active_simulations,
+            envelope_hash.to_string(),
+            0.0,
+            0.0,
+            0.0,
+            LearningStatus::NoProposalNoDelta,
+            envelope.violation_count,
+        )
+        .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
+            reason: format!("SCG state learning envelope invalid: {}", e),
+        })?;
+
+        Ok(SystemState::new(0, energy, reasoning, learning, policy))
+    }
+
     fn build_packet(
         &self,
         outcome: &ScgGovernanceOutcome,
     ) -> Result<DecisionPacket, GovernanceRuntimeError> {
-        let base_state =
-            self.graph
-                .system_state()
-                .map_err(|e| GovernanceRuntimeError::EvaluationFailed {
-                    reason: e.to_string(),
-                })?;
-
         let policy = PolicyEnvelope::new(
             outcome.governance_hash.clone(),
             Self::policy_decision(outcome.decision.clone()),
@@ -343,13 +413,12 @@ impl ScgRuntime {
             reason: e.to_string(),
         })?;
 
-        let state = SystemState::new(
-            base_state.tick,
-            base_state.energy,
-            base_state.reasoning,
-            base_state.learning,
+        Self::validate_state_provenance(outcome)?;
+        let state = Self::scg_state_from_envelope(
+            &outcome.state_envelope,
+            &outcome.state_envelope_hash,
             policy,
-        );
+        )?;
 
         // decision_id is content-addressed: identical inputs produce identical IDs.
         // That is the replay guarantee, not a collision bug.
@@ -367,6 +436,11 @@ impl ScgRuntime {
 
         let trace_strings = Self::trace_strings(outcome)?;
         packet.bind_governance_context(outcome.governance_hash.clone(), trace_strings.clone());
+        packet.bind_scg_state_context(
+            outcome.state_snapshot_hash.clone(),
+            outcome.state_envelope_schema.clone(),
+            outcome.state_envelope_hash.clone(),
+        );
         // INV-IMMUT-001: SCG-bound fields must not be overwritten after binding.
         debug_assert!(
             match packet.governance_hash.as_deref() {
@@ -578,6 +652,11 @@ mod tests {
         )
         .unwrap();
         packet.bind_governance_context(governance_hash.to_string(), vec!["trace-step".to_string()]);
+        packet.bind_scg_state_context(
+            "snapshot-hash".to_string(),
+            STATE_ENVELOPE_SCHEMA.to_string(),
+            "f".repeat(64),
+        );
         packet
     }
 
@@ -652,6 +731,10 @@ mod tests {
         let mut missing_trace = make_packet(3, &format!("{:064x}", 3));
         missing_trace.execution_trace.clear();
         assert!(ScgRuntime::assert_governed_packet_integrity(&missing_trace, "test").is_err());
+
+        let mut missing_state = make_packet(4, &format!("{:064x}", 4));
+        missing_state.state_envelope_hash = None;
+        assert!(ScgRuntime::assert_governed_packet_integrity(&missing_state, "test").is_err());
 
         let valid_packet = make_packet(4, &format!("{:064x}", 4));
         assert!(ScgRuntime::assert_governed_packet_integrity(&valid_packet, "test").is_ok());
