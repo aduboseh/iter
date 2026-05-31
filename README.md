@@ -283,6 +283,14 @@ Cryptographic checksums (SHA-256)
 
 Append-only audit logs
 
+Production durability:
+
+`ITER_AUDIT_LEDGER_PATH=/path/to/iter-audit.jsonl` enables a durable JSONL audit ledger for governed and `scg-backed` decisions.
+
+`ITER_REQUIRE_AUDIT_LEDGER=1` makes the ledger mandatory. In that mode, startup fails if the ledger path is missing or the existing hash chain is invalid, and evaluation fails closed if the decision packet cannot be appended, flushed, and synced.
+
+Ledger records are hash-chained and include the `AuditEvent` plus replay-sufficient `DecisionPacket`; this is single-writer process-local durability and integrity evidence. Immutable storage, retention, and cross-region replication remain deployment responsibilities.
+
 Details:
 
 `docs/SECURITY.md`

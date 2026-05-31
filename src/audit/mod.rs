@@ -10,6 +10,10 @@
 //!   reproduce the decision path without re-running learning.
 //! - Packet checksum mismatch is a hard error.
 
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -405,6 +409,27 @@ pub enum AuditError {
     /// Contract error
     #[error("contract error: {0}")]
     ContractError(#[from] ContractError),
+
+    /// Audit ledger configuration error
+    #[error("audit ledger configuration error: {reason}")]
+    LedgerConfig {
+        /// Configuration failure reason
+        reason: String,
+    },
+
+    /// Audit ledger persistence error
+    #[error("audit ledger persistence error: {reason}")]
+    LedgerPersistence {
+        /// Persistence failure reason
+        reason: String,
+    },
+
+    /// Audit ledger integrity error
+    #[error("audit ledger integrity error: {reason}")]
+    LedgerIntegrity {
+        /// Integrity failure reason
+        reason: String,
+    },
 }
 
 // ============================================================================
@@ -486,10 +511,25 @@ impl AuditEvent {
         );
         format!("{:x}", hasher.finalize())
     }
+
+    /// Verify event checksum.
+    pub fn verify_checksum(&self) -> Result<(), AuditError> {
+        let computed = self.compute_checksum();
+        if computed != self.checksum {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit event checksum mismatch: expected {}, got {}",
+                    self.checksum, computed
+                ),
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Append-only audit log.
 pub struct AuditLog {
+    base_sequence: u64,
     events: Vec<AuditEvent>,
 }
 
@@ -502,20 +542,40 @@ impl Default for AuditLog {
 impl AuditLog {
     /// Create empty log.
     pub fn new() -> Self {
-        Self { events: Vec::new() }
+        Self::with_starting_sequence(0)
+    }
+
+    /// Create empty log whose next sequence starts at a durable ledger tail.
+    pub fn with_starting_sequence(starting_sequence: u64) -> Self {
+        Self {
+            base_sequence: starting_sequence,
+            events: Vec::new(),
+        }
     }
 
     /// Append event from packet.
     pub fn append(&mut self, packet: &DecisionPacket) -> &AuditEvent {
-        let sequence = self.events.len() as u64;
+        let sequence = self.next_sequence();
         let event = AuditEvent::from_packet(sequence, packet);
+        self.append_event(event)
+    }
+
+    /// Return the next in-memory audit event sequence.
+    pub fn next_sequence(&self) -> u64 {
+        self.base_sequence + self.events.len() as u64
+    }
+
+    /// Append a prebuilt event.
+    pub fn append_event(&mut self, event: AuditEvent) -> &AuditEvent {
+        debug_assert_eq!(event.sequence, self.next_sequence());
         self.events.push(event);
         self.events.last().expect("just pushed")
     }
 
     /// Get event by sequence.
     pub fn get(&self, sequence: u64) -> Option<&AuditEvent> {
-        self.events.get(sequence as usize)
+        let index = sequence.checked_sub(self.base_sequence)?;
+        self.events.get(index as usize)
     }
 
     /// Get all events.
@@ -537,6 +597,299 @@ impl AuditLog {
     pub fn export(&self) -> String {
         serde_json::to_string_pretty(&self.events).unwrap_or_default()
     }
+}
+
+// ============================================================================
+// Persistent Audit Ledger
+// ============================================================================
+
+const LEDGER_SCHEMA: &str = "iter.audit.ledger.v1";
+const ZERO_RECORD_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
+/// Durable JSONL record for a replay-sufficient decision packet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditLedgerRecord {
+    /// Ledger record schema.
+    pub schema: String,
+    /// Monotonic durable ledger sequence.
+    pub ledger_sequence: u64,
+    /// Previous durable ledger record hash.
+    pub previous_record_hash: String,
+    /// In-memory audit event captured at decision time.
+    pub event: AuditEvent,
+    /// Replay-sufficient decision packet.
+    pub packet: DecisionPacket,
+    /// SHA-256 over this record with this field blank.
+    pub record_hash: String,
+}
+
+/// File-backed append-only audit ledger.
+///
+/// Records are JSONL, hash-chained, flushed and fsynced on every append. The
+/// chain is verified when opened so a production process fails closed on
+/// malformed, truncated, or checksum-invalid evidence.
+#[derive(Debug)]
+pub struct PersistentAuditLedger {
+    path: PathBuf,
+    next_sequence: u64,
+    last_record_hash: String,
+}
+
+impl PersistentAuditLedger {
+    /// Open and verify a ledger at `path`, creating parent directories if needed.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, AuditError> {
+        let path = path.as_ref().to_path_buf();
+        if path.as_os_str().is_empty() {
+            return Err(AuditError::LedgerConfig {
+                reason: "ITER_AUDIT_LEDGER_PATH must not be empty".to_string(),
+            });
+        }
+
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            fs::create_dir_all(parent).map_err(|err| AuditError::LedgerPersistence {
+                reason: format!(
+                    "failed to create audit ledger directory {:?}: {}",
+                    parent, err
+                ),
+            })?;
+        }
+
+        let mut ledger = Self {
+            path,
+            next_sequence: 0,
+            last_record_hash: ZERO_RECORD_HASH.to_string(),
+        };
+        ledger.assert_appendable()?;
+        ledger.verify_existing_records()?;
+        Ok(ledger)
+    }
+
+    /// Open an optional ledger from environment configuration.
+    ///
+    /// - `ITER_AUDIT_LEDGER_PATH=/path/to/ledger.jsonl` enables durable writes.
+    /// - `ITER_REQUIRE_AUDIT_LEDGER=1` fails closed when the path is absent.
+    pub fn from_env() -> Result<Option<Self>, AuditError> {
+        let path = std::env::var("ITER_AUDIT_LEDGER_PATH")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        Self::from_config(path, env_truthy("ITER_REQUIRE_AUDIT_LEDGER"))
+    }
+
+    /// Open an optional ledger from explicit config.
+    pub fn from_config(path: Option<String>, required: bool) -> Result<Option<Self>, AuditError> {
+        match path {
+            Some(path) => {
+                if required && !Path::new(&path).exists() {
+                    return Err(AuditError::LedgerConfig {
+                        reason: format!(
+                            "ITER_REQUIRE_AUDIT_LEDGER=1 requires existing audit ledger at {}",
+                            path
+                        ),
+                    });
+                }
+                Ok(Some(Self::open(path)?))
+            }
+            None if required => Err(AuditError::LedgerConfig {
+                reason: "ITER_REQUIRE_AUDIT_LEDGER=1 requires ITER_AUDIT_LEDGER_PATH".to_string(),
+            }),
+            None => Ok(None),
+        }
+    }
+
+    /// Append one packet/event pair and fsync it before returning success.
+    pub fn append(
+        &mut self,
+        event: &AuditEvent,
+        packet: &DecisionPacket,
+    ) -> Result<AuditLedgerRecord, AuditError> {
+        let mut record = AuditLedgerRecord {
+            schema: LEDGER_SCHEMA.to_string(),
+            ledger_sequence: self.next_sequence,
+            previous_record_hash: self.last_record_hash.clone(),
+            event: event.clone(),
+            packet: packet.clone(),
+            record_hash: String::new(),
+        };
+        record.record_hash = Self::compute_record_hash(&record)?;
+        Self::verify_record(
+            &record,
+            self.next_sequence,
+            self.last_record_hash.as_str(),
+            "append",
+        )?;
+
+        let serialized =
+            serde_json::to_string(&record).map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("failed to serialize audit ledger record: {}", err),
+            })?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("failed to open audit ledger {:?}: {}", self.path, err),
+            })?;
+        file.write_all(serialized.as_bytes())
+            .and_then(|_| file.write_all(b"\n"))
+            .and_then(|_| file.flush())
+            .and_then(|_| file.sync_all())
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("failed to persist audit ledger {:?}: {}", self.path, err),
+            })?;
+
+        self.last_record_hash = record.record_hash.clone();
+        self.next_sequence += 1;
+        Ok(record)
+    }
+
+    /// Next durable ledger sequence.
+    pub fn next_sequence(&self) -> u64 {
+        self.next_sequence
+    }
+
+    /// Hash of the latest durable ledger record, or zero hash for an empty ledger.
+    pub fn last_record_hash(&self) -> &str {
+        &self.last_record_hash
+    }
+
+    fn verify_existing_records(&mut self) -> Result<(), AuditError> {
+        if !self.path.exists() {
+            return Ok(());
+        }
+
+        let contents =
+            fs::read_to_string(&self.path).map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("failed to read audit ledger {:?}: {}", self.path, err),
+            })?;
+        let mut expected_sequence = 0_u64;
+        let mut previous_hash = ZERO_RECORD_HASH.to_string();
+
+        for (line_index, line) in contents.lines().enumerate() {
+            if line.trim().is_empty() {
+                return Err(AuditError::LedgerIntegrity {
+                    reason: format!("empty audit ledger record at line {}", line_index + 1),
+                });
+            }
+            let record: AuditLedgerRecord =
+                serde_json::from_str(line).map_err(|err| AuditError::LedgerIntegrity {
+                    reason: format!(
+                        "failed to parse audit ledger record at line {}: {}",
+                        line_index + 1,
+                        err
+                    ),
+                })?;
+            Self::verify_record(&record, expected_sequence, previous_hash.as_str(), "open")?;
+            previous_hash = record.record_hash;
+            expected_sequence += 1;
+        }
+
+        self.next_sequence = expected_sequence;
+        self.last_record_hash = previous_hash;
+        Ok(())
+    }
+
+    fn assert_appendable(&self) -> Result<(), AuditError> {
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("audit ledger {:?} is not appendable: {}", self.path, err),
+            })?;
+        file.sync_all()
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("audit ledger {:?} cannot be synced: {}", self.path, err),
+            })
+    }
+
+    fn verify_record(
+        record: &AuditLedgerRecord,
+        expected_sequence: u64,
+        expected_previous_hash: &str,
+        context: &str,
+    ) -> Result<(), AuditError> {
+        if record.schema != LEDGER_SCHEMA {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit ledger schema mismatch during {}: expected {}, got {}",
+                    context, LEDGER_SCHEMA, record.schema
+                ),
+            });
+        }
+        if record.ledger_sequence != expected_sequence {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit ledger sequence mismatch during {}: expected {}, got {}",
+                    context, expected_sequence, record.ledger_sequence
+                ),
+            });
+        }
+        if record.event.sequence != record.ledger_sequence {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit ledger event sequence mismatch during {}: ledger {}, event {}",
+                    context, record.ledger_sequence, record.event.sequence
+                ),
+            });
+        }
+        if record.previous_record_hash != expected_previous_hash {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit ledger previous hash mismatch during {}: expected {}, got {}",
+                    context, expected_previous_hash, record.previous_record_hash
+                ),
+            });
+        }
+        record.event.verify_checksum()?;
+        record.packet.verify_checksum()?;
+        if record.event.decision_id != record.packet.checksum {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit ledger event decision_id does not match packet checksum during {}",
+                    context
+                ),
+            });
+        }
+        let computed = Self::compute_record_hash(record)?;
+        if computed != record.record_hash {
+            return Err(AuditError::LedgerIntegrity {
+                reason: format!(
+                    "audit ledger record hash mismatch during {}: expected {}, got {}",
+                    context, record.record_hash, computed
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    fn compute_record_hash(record: &AuditLedgerRecord) -> Result<String, AuditError> {
+        let mut input = record.clone();
+        input.record_hash = String::new();
+        let canonical = serde_json_canonicalizer::to_string(&input).map_err(|err| {
+            AuditError::LedgerIntegrity {
+                reason: format!("failed to canonicalize audit ledger record: {}", err),
+            }
+        })?;
+        let mut hasher = Sha256::new();
+        hasher.update(canonical.as_bytes());
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+}
+
+fn env_truthy(key: &str) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -561,6 +914,28 @@ mod tests {
         let policy = PolicyEnvelope::new("b".repeat(64), PolicyDecision::Allow, vec![]).unwrap();
 
         SystemState::new(100, energy, reasoning, learning, policy)
+    }
+
+    fn make_test_packet() -> DecisionPacket {
+        DecisionPacket::new(
+            "iter-hash".to_string(),
+            "scg-hash".to_string(),
+            &make_test_state(),
+            None,
+            "econ-hash".to_string(),
+            vec![],
+        )
+        .unwrap()
+    }
+
+    fn temp_ledger_path(name: &str) -> PathBuf {
+        let unique = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
+        std::env::temp_dir().join(format!(
+            "iter-audit-ledger-{}-{}-{}.jsonl",
+            name,
+            std::process::id(),
+            unique
+        ))
     }
 
     #[test]
@@ -816,6 +1191,19 @@ mod tests {
     }
 
     #[test]
+    fn audit_log_can_start_from_durable_ledger_tail() {
+        let packet = make_test_packet();
+        let mut log = AuditLog::with_starting_sequence(7);
+
+        log.append(&packet);
+
+        assert_eq!(log.len(), 1);
+        assert!(log.get(0).is_none());
+        assert_eq!(log.get(7).expect("seeded event").sequence, 7);
+        assert_eq!(log.next_sequence(), 8);
+    }
+
+    #[test]
     fn audit_event_checksum_is_deterministic() {
         let state = make_test_state();
         let packet = DecisionPacket::new(
@@ -832,5 +1220,101 @@ mod tests {
         let e2 = AuditEvent::from_packet(0, &packet);
 
         assert_eq!(e1.checksum, e2.checksum);
+    }
+
+    #[test]
+    fn persistent_audit_ledger_appends_and_reopens_verified_chain() {
+        let path = temp_ledger_path("append");
+        let packet = make_test_packet();
+        let event = AuditEvent::from_packet(0, &packet);
+
+        let mut ledger = PersistentAuditLedger::open(&path).expect("ledger opens");
+        let record = ledger.append(&event, &packet).expect("ledger append");
+
+        assert_eq!(record.ledger_sequence, 0);
+        assert_eq!(record.previous_record_hash, ZERO_RECORD_HASH);
+        assert_eq!(ledger.next_sequence(), 1);
+        assert_eq!(ledger.last_record_hash(), record.record_hash);
+
+        let reopened = PersistentAuditLedger::open(&path).expect("ledger reopens verified");
+        assert_eq!(reopened.next_sequence(), 1);
+        assert_eq!(reopened.last_record_hash(), record.record_hash);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn persistent_audit_ledger_rejects_tampered_record() {
+        let path = temp_ledger_path("tamper");
+        let packet = make_test_packet();
+        let event = AuditEvent::from_packet(0, &packet);
+        let mut ledger = PersistentAuditLedger::open(&path).expect("ledger opens");
+        ledger.append(&event, &packet).expect("ledger append");
+
+        let contents = std::fs::read_to_string(&path).expect("ledger readable");
+        let tampered = contents.replacen("\"decision\":\"ALLOW\"", "\"decision\":\"DENY\"", 1);
+        std::fs::write(&path, tampered).expect("ledger tampered");
+
+        let err = PersistentAuditLedger::open(&path).expect_err("tampered ledger rejected");
+        assert!(
+            matches!(err, AuditError::LedgerIntegrity { .. }),
+            "unexpected error: {err}"
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn persistent_audit_ledger_open_requires_appendable_file() {
+        let path = temp_ledger_path("directory-not-ledger");
+        std::fs::create_dir_all(&path).expect("test directory created");
+
+        let err = PersistentAuditLedger::open(&path).expect_err("directory path rejected");
+        assert!(
+            matches!(err, AuditError::LedgerPersistence { .. }),
+            "unexpected error: {err}"
+        );
+
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn required_persistent_audit_ledger_rejects_missing_configured_path() {
+        let path = temp_ledger_path("required-missing");
+        let err =
+            PersistentAuditLedger::from_config(Some(path.to_string_lossy().to_string()), true)
+                .expect_err("required ledger path must already exist");
+
+        assert!(matches!(err, AuditError::LedgerConfig { .. }));
+    }
+
+    #[test]
+    fn persistent_audit_ledger_rejects_restart_sequence_reset() {
+        let path = temp_ledger_path("sequence-reset");
+        let packet = make_test_packet();
+        let event = AuditEvent::from_packet(0, &packet);
+        let mut ledger = PersistentAuditLedger::open(&path).expect("ledger opens");
+        ledger.append(&event, &packet).expect("ledger append");
+
+        let mut reopened = PersistentAuditLedger::open(&path).expect("ledger reopens");
+        assert_eq!(reopened.next_sequence(), 1);
+        let reset_event = AuditEvent::from_packet(0, &packet);
+        let err = reopened
+            .append(&reset_event, &packet)
+            .expect_err("event sequence reset rejected");
+
+        assert!(
+            matches!(err, AuditError::LedgerIntegrity { .. }),
+            "unexpected error: {err}"
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn required_persistent_audit_ledger_fails_closed_without_path() {
+        let err = PersistentAuditLedger::from_config(None, true)
+            .expect_err("required ledger without path must fail");
+        assert!(matches!(err, AuditError::LedgerConfig { .. }));
     }
 }

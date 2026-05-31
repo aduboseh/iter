@@ -11,7 +11,7 @@
 //! - `packet = Some(DecisionPacket)` (for evaluate only)
 //! - Reason codes use `policy.*` namespace
 
-use crate::audit::{AuditLog, DecisionPacket};
+use crate::audit::{AuditError, AuditEvent, AuditLog, DecisionPacket, PersistentAuditLedger};
 use crate::contracts::{PolicyDecision, SystemState};
 use crate::economics::EconomicsConfig;
 use crate::policy::{PolicyConfig, PolicyEvaluator};
@@ -33,6 +33,7 @@ pub struct GovernedRuntime {
     graph: StubRuntime,
     evaluator: PolicyEvaluator,
     audit_log: AuditLog,
+    audit_ledger: Option<PersistentAuditLedger>,
     economics_config: EconomicsConfig,
     governance_hash: String,
 }
@@ -48,9 +49,34 @@ impl GovernedRuntime {
             graph,
             evaluator: PolicyEvaluator::new(policy_config),
             audit_log: AuditLog::new(),
+            audit_ledger: None,
             economics_config,
             governance_hash: GOVERNANCE_HASH.trim().to_string(),
         }
+    }
+
+    /// Create a governed runtime with optional durable audit ledger from env.
+    pub fn try_new_from_env(
+        graph: StubRuntime,
+        policy_config: PolicyConfig,
+        economics_config: EconomicsConfig,
+    ) -> Result<Self, GovernanceRuntimeError> {
+        let audit_ledger =
+            PersistentAuditLedger::from_env().map_err(Self::map_ledger_open_error)?;
+        let audit_log = AuditLog::with_starting_sequence(
+            audit_ledger
+                .as_ref()
+                .map(PersistentAuditLedger::next_sequence)
+                .unwrap_or(0),
+        );
+        Ok(Self {
+            graph,
+            evaluator: PolicyEvaluator::new(policy_config),
+            audit_log,
+            audit_ledger,
+            economics_config,
+            governance_hash: GOVERNANCE_HASH.trim().to_string(),
+        })
     }
 
     /// Mutable access to the underlying graph for node/edge operations.
@@ -66,6 +92,31 @@ impl GovernedRuntime {
     /// Read access to the audit log.
     pub fn audit_log(&self) -> &AuditLog {
         &self.audit_log
+    }
+
+    fn map_ledger_open_error(err: AuditError) -> GovernanceRuntimeError {
+        match err {
+            AuditError::LedgerConfig { reason } => GovernanceRuntimeError::ConfigMissing(reason),
+            other => GovernanceRuntimeError::ReplayIntegrityViolation(other.to_string()),
+        }
+    }
+
+    fn map_ledger_append_error(err: AuditError) -> GovernanceRuntimeError {
+        GovernanceRuntimeError::ReplayIntegrityViolation(format!(
+            "audit ledger append failed: {}",
+            err
+        ))
+    }
+
+    fn persist_decision(&mut self, packet: &DecisionPacket) -> Result<(), GovernanceRuntimeError> {
+        let event = AuditEvent::from_packet(self.audit_log.next_sequence(), packet);
+        if let Some(ledger) = &mut self.audit_ledger {
+            ledger
+                .append(&event, packet)
+                .map_err(Self::map_ledger_append_error)?;
+        }
+        self.audit_log.append_event(event);
+        Ok(())
     }
 
     /// Map PolicyDecision to GovernanceVerdict.
@@ -184,7 +235,7 @@ impl GovernanceRuntime for GovernedRuntime {
         })?;
         packet.bind_governance_context(self.governance_hash.clone(), execution_trace);
 
-        self.audit_log.append(&packet);
+        self.persist_decision(&packet)?;
         self.graph.advance_tick();
 
         let verdict = Self::map_policy_verdict(policy_result.decision);

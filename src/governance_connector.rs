@@ -8,7 +8,7 @@ use governance_bridge::contract::{
 };
 use reqwest::{blocking::Client, Url};
 
-use crate::audit::{AuditLog, DecisionPacket};
+use crate::audit::{AuditError, AuditEvent, AuditLog, DecisionPacket, PersistentAuditLedger};
 use crate::contracts::{
     EnergyEnvelope, LearningEnvelope, LearningStatus, PolicyDecision, PolicyEnvelope,
     ReasoningEnvelope, SystemState,
@@ -30,6 +30,7 @@ pub struct ScgRuntime {
     http_client: Client,
     graph: StubRuntime,
     audit_log: AuditLog,
+    audit_ledger: Option<PersistentAuditLedger>,
     replay_packets: VecDeque<DecisionPacket>,
 }
 
@@ -52,13 +53,21 @@ impl ScgRuntime {
             .build()
             .map_err(|e| GovernanceRuntimeError::ScgUnavailable(e.to_string()))?;
 
+        let audit_ledger =
+            PersistentAuditLedger::from_env().map_err(Self::map_ledger_open_error)?;
+        let audit_log = match audit_ledger.as_ref() {
+            Some(ledger) => AuditLog::with_starting_sequence(ledger.next_sequence()),
+            None => AuditLog::new(),
+        };
+
         Ok(Self {
             endpoint,
             boot_governance_hash: Arc::new(boot_hash),
             auth_token: Self::auth_token_from_env(),
             http_client,
             graph: StubRuntime::new(),
-            audit_log: AuditLog::new(),
+            audit_log,
+            audit_ledger,
             replay_packets: VecDeque::new(),
         })
     }
@@ -99,6 +108,20 @@ impl ScgRuntime {
             .map(Arc::<str>::from)
     }
 
+    fn map_ledger_open_error(err: AuditError) -> GovernanceRuntimeError {
+        match err {
+            AuditError::LedgerConfig { reason } => GovernanceRuntimeError::ConfigMissing(reason),
+            other => GovernanceRuntimeError::ReplayIntegrityViolation(other.to_string()),
+        }
+    }
+
+    fn map_ledger_append_error(err: AuditError) -> GovernanceRuntimeError {
+        GovernanceRuntimeError::ReplayIntegrityViolation(format!(
+            "audit ledger append failed: {}",
+            err
+        ))
+    }
+
     /// Read access to the local graph used for non-governance tool surfaces.
     pub fn graph(&self) -> &StubRuntime {
         &self.graph
@@ -135,6 +158,17 @@ impl ScgRuntime {
             self.replay_packets.pop_front();
         }
         self.replay_packets.push_back(packet);
+    }
+
+    fn persist_decision(&mut self, packet: &DecisionPacket) -> Result<(), GovernanceRuntimeError> {
+        let event = AuditEvent::from_packet(self.audit_log.next_sequence(), packet);
+        if let Some(ledger) = &mut self.audit_ledger {
+            ledger
+                .append(&event, packet)
+                .map_err(Self::map_ledger_append_error)?;
+        }
+        self.audit_log.append_event(event);
+        Ok(())
     }
 
     fn assert_governed_packet_integrity(
@@ -551,7 +585,7 @@ impl GovernanceRuntime for ScgRuntime {
         // Defense in depth: build_packet enforces packet integrity before returning,
         // and evaluate re-checks it at the outer boundary before audit/publish.
         Self::assert_governed_packet_integrity(&packet, "ScgBacked::evaluate")?;
-        self.audit_log.append(&packet);
+        self.persist_decision(&packet)?;
         self.record_replay_packet(packet.clone());
         Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
     }

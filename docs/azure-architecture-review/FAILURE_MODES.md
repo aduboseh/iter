@@ -192,11 +192,17 @@ HTTP 401 Unauthorized
 **Behavior:**
 - Iter cannot persist DecisionPackets or AuditEvents
 - **Critical Decision:** Iter refuses to evaluate if audit cannot be written
-- Returns error: `AUDIT_PERSISTENCE_FAILURE`
+- The runtime returns a fail-closed audit-ledger persistence error; managed deployments should map this to `AUDIT_PERSISTENCE_FAILURE`
 
 **Rationale:**
 - Governance without audit is compliance-invalid
 - Fail-closed prevents unaudited decisions
+
+**Current executable control:**
+- `ITER_AUDIT_LEDGER_PATH` enables a file-backed JSONL ledger
+- `ITER_REQUIRE_AUDIT_LEDGER=1` makes that ledger mandatory for governed and `scg-backed` runtime construction
+- Existing ledger hash chains are verified on open
+- Every governed decision append is flushed and synced before the successful outcome is returned
 
 **Recovery:**
 - Storage account health restored

@@ -242,9 +242,9 @@ Timing and scope depend on customer deployment requirements and security posture
 
 | RPO | RTO | Strategy |
 |-----|-----|----------|
-| 0 (stateless) | minutes | Redeployment from container registry (environment-dependent) |
+| 0 for configured external evidence stores | minutes | Redeployment from container registry plus existing audit ledger/blob storage |
 
-Iter is stateless; all persistent state is external (DecisionPackets, audit logs).
+Iter process state is disposable. Production evidence is externalized through configured DecisionPacket/audit storage. The executable local control is `ITER_AUDIT_LEDGER_PATH`; set `ITER_REQUIRE_AUDIT_LEDGER=1` so governed and `scg-backed` runtimes fail closed when the mounted single-writer ledger is absent, invalid, or unwritable.
 
 ---
 
