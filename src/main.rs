@@ -380,11 +380,11 @@ impl ServerRuntime {
                 iter_mcp_server::substrate::stub::StubRuntime::new(),
             )),
             RuntimeMode::GovernedLocal => Ok(Self::GovernedLocal(
-                iter_mcp_server::governed::GovernedRuntime::new(
+                iter_mcp_server::governed::GovernedRuntime::try_new_from_env(
                     iter_mcp_server::substrate::stub::StubRuntime::new(),
                     iter_mcp_server::policy::PolicyConfig::default(),
                     iter_mcp_server::economics::EconomicsConfig::default(),
-                ),
+                )?,
             )),
             RuntimeMode::ScgBacked => {
                 let endpoint = std::env::var("SCG_ENDPOINT").map_err(|_| {
