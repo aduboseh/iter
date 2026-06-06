@@ -30,6 +30,7 @@ impl McpTestClient {
 
         let mut cmd = Command::new(bin_path);
         cmd.arg("--json-only")
+            .arg("--runtime-mode=demo")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());

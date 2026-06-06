@@ -27,6 +27,8 @@ use iter_mcp_server::substrate::stub::{
 };
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
+const RESOURCE_PATH: &str = "docs/README.md";
+const VALID_HASH: &str = "sha256:8e51aaaa299f88b416976abd2a25a7d3a0db01b61b105066013f43a077408e25";
 
 fn seam_guard() -> std::sync::MutexGuard<'static, ()> {
     static SEAM_LOCK: Mutex<()> = Mutex::new(());
@@ -88,6 +90,27 @@ impl McpTestClient {
         let mut line = String::new();
         self.reader.read_line(&mut line).expect("read");
         serde_json::from_str(&line).expect("response JSON")
+    }
+
+    fn register_fixture_resource(&mut self) {
+        let response = self.call(
+            "tools/call",
+            json!({
+                "name": "register_resource",
+                "arguments": {
+                    "resource_path": RESOURCE_PATH,
+                    "expected_hash": VALID_HASH
+                }
+            }),
+        );
+        let registration = tool_payload(&response);
+        assert_eq!(
+            registration
+                .get("registered")
+                .and_then(|value| value.as_bool()),
+            Some(true),
+            "fixture resource registration must succeed"
+        );
     }
 
     fn close(mut self) {
@@ -373,10 +396,9 @@ fn assert_expected_request(
 fn proposal() -> GovernanceProposal {
     GovernanceProposal {
         proposal_id: "runtime-seam-001b".to_string(),
-        state_snapshot_hash: "abc123def456abc123def456abc123def456abc123def456abc123def456abc123"
-            .to_string(),
-        constraints: json!({}),
-        requested_action: "deploy_capsule".to_string(),
+        state_snapshot_hash: VALID_HASH.to_string(),
+        constraints: json!({ "scope": RESOURCE_PATH }),
+        requested_action: "write to docs/README.md".to_string(),
         proposal_c14n: None,
         proposal_hash: None,
     }
@@ -385,10 +407,9 @@ fn proposal() -> GovernanceProposal {
 fn expected_request() -> GovernanceRequest {
     GovernanceRequest {
         proposal_id: "runtime-seam-001b".to_string(),
-        state_snapshot_hash: "abc123def456abc123def456abc123def456abc123def456abc123def456abc123"
-            .to_string(),
-        requested_action: "deploy_capsule".to_string(),
-        constraints: BTreeMap::new(),
+        state_snapshot_hash: VALID_HASH.to_string(),
+        requested_action: "write to docs/README.md".to_string(),
+        constraints: BTreeMap::from([("scope".to_string(), RESOURCE_PATH.to_string())]),
     }
 }
 
@@ -426,14 +447,10 @@ fn trace_step<TInput: Serialize, TOutput: Serialize>(
 fn make_trace() -> ExecutionTrace {
     let hash_input = (
         "runtime-seam-001b".to_string(),
-        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
-        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
+        VALID_HASH.to_string(),
+        VALID_HASH.to_string(),
     );
-    let hash_output = (
-        true,
-        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
-        "abc123def456abc123def456abc123def456abc123def456abc123def456abc123".to_string(),
-    );
+    let hash_output = (true, VALID_HASH.to_string(), VALID_HASH.to_string());
     let policy_input = hash_output.clone();
     let policy_output = (policy_input.clone(), 0.0_f64, true);
     let state_input = policy_output.clone();
@@ -441,7 +458,7 @@ fn make_trace() -> ExecutionTrace {
     let decision_input = state_output.clone();
     let decision_output = (
         ScgDecision::Allow,
-        "deploy_capsule".to_string(),
+        "write to docs/README.md".to_string(),
         true,
         true,
         false,
@@ -842,6 +859,7 @@ fn audit_replay_returns_governed_remote_decision_history() {
     }]);
 
     let mut client = McpTestClient::spawn_governed_backed(server.endpoint());
+    client.register_fixture_resource();
     let evaluate_response = client.call(
         "tools/call",
         json!({
@@ -850,7 +868,7 @@ fn audit_replay_returns_governed_remote_decision_history() {
                 "proposal_id": proposal().proposal_id,
                 "state_snapshot_hash": proposal().state_snapshot_hash,
                 "requested_action": proposal().requested_action,
-                "constraints": {}
+                "constraints": { "scope": RESOURCE_PATH }
             }
         }),
     );

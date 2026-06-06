@@ -3,6 +3,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
+const RESOURCE_PATH: &str = "docs/README.md";
+const VALID_HASH: &str = "sha256:8e51aaaa299f88b416976abd2a25a7d3a0db01b61b105066013f43a077408e25";
 
 struct McpTestClient {
     server: Child,
@@ -74,6 +76,21 @@ impl McpTestClient {
         serde_json::from_str(text).expect("tool text JSON")
     }
 
+    fn register_fixture_resource(&mut self) {
+        let registration = self.extract_tool_json(
+            "register_resource",
+            json!({
+                "resource_path": RESOURCE_PATH,
+                "expected_hash": VALID_HASH
+            }),
+        );
+        assert_eq!(
+            registration.get("registered").and_then(|v| v.as_bool()),
+            Some(true),
+            "fixture resource registration must succeed"
+        );
+    }
+
     fn close(mut self) {
         drop(self.stdin);
         let _ = self.server.wait();
@@ -83,14 +100,39 @@ impl McpTestClient {
 fn proposal_args() -> Value {
     json!({
         "proposal_id": "runtime-seam-001a",
-        "state_snapshot_hash": "abc123def456abc123def456abc123def456abc123def456abc123def456abc123",
-        "requested_action": "deploy_capsule"
+        "state_snapshot_hash": VALID_HASH,
+        "requested_action": "write to docs/README.md",
+        "constraints": { "scope": RESOURCE_PATH }
     })
 }
 
 #[test]
-fn default_runtime_mode_remains_demo_stub() {
-    let mut client = McpTestClient::spawn(None);
+fn missing_runtime_mode_fails_closed() {
+    let bin_path = env!("CARGO_BIN_EXE_iter-server");
+    let output = Command::new(bin_path)
+        .arg("--json-only")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("spawn missing runtime mode");
+
+    assert!(
+        !output.status.success(),
+        "missing runtime mode must exit non-zero"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("WO-ITER-DEMO-MODE-001"),
+        "stderr must report missing runtime mode gate, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn explicit_demo_runtime_mode_remains_stub() {
+    let mut client = McpTestClient::spawn(Some("demo"));
+    client.register_fixture_resource();
     let outcome = client.extract_tool_json("decision.check", proposal_args());
 
     assert_eq!(outcome.get("mode").and_then(|v| v.as_str()), Some("demo"));
@@ -100,7 +142,7 @@ fn default_runtime_mode_remains_demo_stub() {
     );
     assert!(
         outcome.get("packet").is_none() || outcome.get("packet").unwrap().is_null(),
-        "default demo mode must not emit a packet"
+        "explicit demo mode must not emit a packet"
     );
 
     client.close();
@@ -109,6 +151,7 @@ fn default_runtime_mode_remains_demo_stub() {
 #[test]
 fn governed_local_decision_check_emits_packet_with_hash_and_trace() {
     let mut client = McpTestClient::spawn(Some("governed-local"));
+    client.register_fixture_resource();
     let outcome = client.extract_tool_json("decision.check", proposal_args());
     let packet = outcome.get("packet").expect("packet");
 
@@ -142,6 +185,7 @@ fn governed_local_decision_check_emits_packet_with_hash_and_trace() {
 fn governed_local_packet_and_trace_are_deterministic_across_fresh_servers() {
     let run_once = || {
         let mut client = McpTestClient::spawn(Some("governed-local"));
+        client.register_fixture_resource();
         let outcome = client.extract_tool_json("decision.check", proposal_args());
         let packet = outcome.get("packet").cloned().expect("packet");
         client.close();
@@ -167,6 +211,7 @@ fn governed_local_packet_and_trace_are_deterministic_across_fresh_servers() {
 fn governed_local_governance_evaluate_alias_matches_decision_check() {
     let run_tool = |tool_name: &str| {
         let mut client = McpTestClient::spawn(Some("governed-local"));
+        client.register_fixture_resource();
         let outcome = client.extract_tool_json(tool_name, proposal_args());
         client.close();
         outcome
@@ -206,6 +251,7 @@ fn governed_local_preview_is_authoritative_but_not_replay_sufficient() {
 #[test]
 fn governed_local_audit_search_uses_policy_decision() {
     let mut client = McpTestClient::spawn(Some("governed-local"));
+    client.register_fixture_resource();
     let outcome = client.extract_tool_json("decision.check", proposal_args());
     let expected_decision = outcome
         .get("verdict")

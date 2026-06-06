@@ -14,6 +14,7 @@ impl McpTestClient {
         let bin_path = env!("CARGO_BIN_EXE_iter-server");
         let mut server = Command::new(bin_path)
             .arg("--json-only")
+            .arg("--runtime-mode=demo")
             .arg("--profile=kernel-debug")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

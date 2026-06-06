@@ -18,7 +18,7 @@ enum ServerProfile {
 
 /// Runtime mode controlling which in-crate engine backs MCP governance calls.
 ///
-/// - `Demo`: Default public stub behavior.
+/// - `Demo`: Explicit public stub behavior.
 /// - `GovernedLocal`: Governed runtime over the local stub substrate. Emits
 ///   DecisionPackets, but is not yet SCG-backed.
 /// - `ScgBacked`: Authoritative mode backed by the live SCG governance endpoint.
@@ -173,14 +173,20 @@ fn detect_profile(args: &[String]) -> ServerProfile {
     }
 }
 
-/// Parse --runtime-mode flag from CLI args. Default: demo.
-/// Exits with code 1 on unrecognized runtime mode.
+/// Parse --runtime-mode flag from CLI args.
+/// Exits with code 1 when runtime mode is missing or unrecognized.
 fn detect_runtime_mode(args: &[String]) -> RuntimeMode {
     let runtime_arg = args.iter().find(|arg| arg.starts_with("--runtime-mode="));
     match runtime_arg.map(|s| s.as_str()) {
         Some("--runtime-mode=scg-backed") => RuntimeMode::ScgBacked,
         Some("--runtime-mode=governed-local") => RuntimeMode::GovernedLocal,
-        Some("--runtime-mode=demo") | None => RuntimeMode::Demo,
+        Some("--runtime-mode=demo") => RuntimeMode::Demo,
+        None => {
+            eprintln!(
+                "[FATAL] WO-ITER-DEMO-MODE-001: --runtime-mode is required. Silent Demo fallback has been removed. Specify: --runtime-mode=scg-backed | governed-local | demo"
+            );
+            std::process::exit(1);
+        }
         Some(other) => {
             eprintln!("FATAL: ERROR_INVALID_RUNTIME_MODE: {}", other);
             std::process::exit(1);
@@ -564,7 +570,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "governance.evaluate",
-            "description": "[DEPRECATED: use decision.check] Governance decision gate. Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate; `--runtime-mode=scg-backed` calls the live SCG governance endpoint fail-closed",
+            "description": "[DEPRECATED: use decision.check] Governance decision gate. `--runtime-mode` is required: demo uses the stub runtime, governed-local emits governed packets over the local stub substrate, and scg-backed calls the live SCG governance endpoint fail-closed",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -578,7 +584,7 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "decision.check",
-            "description": "Governance decision gate. Default runtime is demo stub mode; `--runtime-mode=governed-local` emits governed packets over the local stub substrate; `--runtime-mode=scg-backed` calls the live SCG governance endpoint fail-closed",
+            "description": "Governance decision gate. `--runtime-mode` is required: demo uses the stub runtime, governed-local emits governed packets over the local stub substrate, and scg-backed calls the live SCG governance endpoint fail-closed",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -878,7 +884,14 @@ fn validate_decision_contract(
     }
 
     let submitted_hash = submitted_hash.expect("checked above");
-    let (resource, expected_hash) = registry.find_match(args)?;
+    let Some((resource, expected_hash)) = registry.find_match(args) else {
+        return Some(contract_rejection(json!({
+            "decision": "CONTRACT_REJECTED",
+            "reason_code": "RESOURCE_NOT_REGISTERED",
+            "policy_engine_invoked": false,
+            "submitted_hash_prefix": hash_prefix(&submitted_hash),
+        })));
+    };
 
     if submitted_hash != expected_hash {
         return Some(contract_rejection(json!({

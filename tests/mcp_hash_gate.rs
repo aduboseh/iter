@@ -16,6 +16,7 @@ impl McpTestClient {
         let bin_path = env!("CARGO_BIN_EXE_iter-server");
         let mut server = Command::new(bin_path)
             .arg("--json-only")
+            .arg("--runtime-mode=demo")
             .arg("--profile=governance")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -204,7 +205,7 @@ fn missing_state_hash_rejects_before_policy() {
 }
 
 #[test]
-fn unregistered_resource_mismatch_remains_fail_open_for_compatibility() {
+fn unregistered_resource_hash_rejects_before_policy() {
     let mut client = McpTestClient::spawn();
     let response = client.extract_tool_text(
         "decision.check",
@@ -216,8 +217,24 @@ fn unregistered_resource_mismatch_remains_fail_open_for_compatibility() {
     );
 
     assert_eq!(
-        response.get("verdict").and_then(|v| v.as_str()),
-        Some("ALLOW")
+        response.get("decision").and_then(|v| v.as_str()),
+        Some("CONTRACT_REJECTED")
+    );
+    assert_eq!(
+        response.get("reason_code").and_then(|v| v.as_str()),
+        Some("RESOURCE_NOT_REGISTERED")
+    );
+    assert_eq!(
+        response
+            .get("policy_engine_invoked")
+            .and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert_eq!(
+        response
+            .get("submitted_hash_prefix")
+            .and_then(|v| v.as_str()),
+        Some("sha256:ffffffff")
     );
     client.close();
 }
