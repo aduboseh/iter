@@ -36,6 +36,10 @@ class IterClient:
     """Iter MCP client (STDIO transport, async)."""
 
     def __init__(self, max_inflight: int = 1):
+        """Create a client shell with a bounded in-flight request queue.
+
+        Use :meth:`connect` to spawn an Iter server process and attach STDIO.
+        """
         self.max_inflight: int = max_inflight
         self._state: State = State.OPEN
         self._close_lock: asyncio.Lock = asyncio.Lock()
@@ -73,7 +77,12 @@ class IterClient:
         max_inflight: int = 1,
         runtime_mode: str = "demo",
     ) -> "IterClient":
-        """Connect to an Iter server process."""
+        """Connect to an Iter server process.
+
+        Iter requires an explicit runtime mode at startup. The SDK defaults to
+        ``demo`` for local examples, while production callers should pass the
+        deployment mode they intend to exercise.
+        """
         client = IterClient(max_inflight=max_inflight)
 
         client.process = await asyncio.create_subprocess_exec(
@@ -181,7 +190,16 @@ class IterClient:
         return self._parse_tool_result(response)
 
     async def register_resource(self, resource_path: str, expected_hash: str) -> Any:
-        """Register a resource hash before governed decision checks."""
+        """Register a resource hash before governed decision checks.
+
+        The server rejects unregistered ``state_snapshot_hash`` values before
+        policy evaluation. Call this once per governed resource that a session
+        will reference. Registration binds the hash to a normalized resource
+        path; a later decision check must also identify that same resource via
+        ``constraints["resource_path"]``, ``constraints["resource"]``,
+        ``constraints["scope"]``, or by including the path in
+        ``requested_action``.
+        """
         response = await self.send("tools/call", {
             "name": "register_resource",
             "arguments": {
@@ -198,7 +216,14 @@ class IterClient:
         requested_action: str,
         constraints: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Evaluate governance proposal (canonical PDP decision gate)."""
+        """Evaluate a governance proposal through the canonical PDP gate.
+
+        ``state_snapshot_hash`` must match a hash previously registered with
+        :meth:`register_resource`, and the request must match the registered
+        resource path through ``constraints`` or ``requested_action``. A
+        registered hash alone is not sufficient; unmatched resources fail
+        closed with ``RESOURCE_NOT_REGISTERED`` before policy execution.
+        """
         args: Dict[str, Any] = {
             "proposal_id": proposal_id,
             "state_snapshot_hash": state_snapshot_hash,
@@ -235,7 +260,11 @@ class IterClient:
         requested_action: str,
         constraints: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Preview governance outcome without mutating lineage (canonical)."""
+        """Preview governance outcome without mutating lineage.
+
+        Unlike :meth:`decision_check`, preview does not enforce resource
+        registration because it does not commit a decision receipt.
+        """
         args: Dict[str, Any] = {
             "proposal_id": proposal_id,
             "state_snapshot_hash": state_snapshot_hash,

@@ -80,6 +80,7 @@ export interface RpcError {
 // SDK Error Types
 // ============================================================================
 
+/** Base class for Iter SDK errors. */
 export class SdkError extends Error {
   constructor(message: string) {
     super(message);
@@ -87,6 +88,7 @@ export class SdkError extends Error {
   }
 }
 
+/** Raised when the connected server version is outside the SDK compatibility window. */
 export class VersionMismatchError extends SdkError {
   constructor(
     public readonly clientVersion: string,
@@ -99,6 +101,7 @@ export class VersionMismatchError extends SdkError {
   }
 }
 
+/** Raised for process, STDIO, or lifecycle connection failures. */
 export class ConnectionError extends SdkError {
   constructor(message: string) {
     super(`Connection failed: ${message}`);
@@ -106,6 +109,7 @@ export class ConnectionError extends SdkError {
   }
 }
 
+/** Raised when the server returns a JSON-RPC error. */
 export class RequestError extends SdkError {
   constructor(public readonly rpcError: RpcError) {
     super(`Request failed: ${rpcError.message} (${rpcError.code})`);
@@ -113,6 +117,7 @@ export class RequestError extends SdkError {
   }
 }
 
+/** Raised when the configured max-in-flight request limit is exceeded. */
 export class BackpressureError extends SdkError {
   constructor(public readonly maxInflight: number) {
     super(`Backpressure: maxInflight=${maxInflight} exceeded`);
@@ -120,6 +125,7 @@ export class BackpressureError extends SdkError {
   }
 }
 
+/** Raised when a request does not complete before its timeout. */
 export class RequestTimeoutError extends SdkError {
   constructor(
     public readonly method: string,
@@ -130,6 +136,7 @@ export class RequestTimeoutError extends SdkError {
   }
 }
 
+/** Raised when callers attempt work after the client is closing or closed. */
 export class ConnectionClosedError extends SdkError {
   constructor(
     message: string = "Connection closed",
@@ -145,16 +152,19 @@ export class ConnectionClosedError extends SdkError {
 // Response Types (MCP-aligned)
 // ============================================================================
 
+/** Tool descriptor returned by MCP `tools/list`. */
 export interface ToolInfo {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
 }
 
+/** Response payload for MCP `tools/list`. */
 export interface ToolListResponse {
   tools: ToolInfo[];
 }
 
+/** Node state returned by node tools. */
 export interface NodeState {
   id: number;
   belief: number;
@@ -163,6 +173,7 @@ export interface NodeState {
   stability: number;
 }
 
+/** Governor/governance health snapshot returned by health tools. */
 export interface GovernorStatus {
   drift_ok: boolean;
   energy_drift: number;
@@ -172,6 +183,7 @@ export interface GovernorStatus {
   healthy: boolean;
 }
 
+/** Non-mutating governance preview response. */
 export interface DecisionPreview {
   preview_version: string;
   simulation: boolean;
@@ -189,6 +201,7 @@ export interface DecisionPreview {
   derived_from: string;
 }
 
+/** Filter accepted by the audit search tool. */
 export interface AuditSearchFilter {
   principal?: string;
   action?: string;
@@ -200,6 +213,7 @@ export interface AuditSearchFilter {
   limit?: number;
 }
 
+/** Compact audit decision record returned by audit search. */
 export interface DecisionSummary {
   decision_id: string;
   principal: string;
@@ -209,6 +223,7 @@ export interface DecisionSummary {
   timestamp: string;
 }
 
+/** Audit search result set with deterministic ordering metadata. */
 export interface AuditSearchResult {
   results: DecisionSummary[];
   count: number;
@@ -252,7 +267,13 @@ export class IterClient {
     return this._traceContext;
   }
 
-  /** Connect to an Iter server process */
+  /**
+   * Connect to an Iter server process.
+   *
+   * Iter fails closed when `--runtime-mode` is omitted. The SDK defaults to
+   * `demo` for examples and tests; production callers should pass the intended
+   * runtime mode explicitly.
+   */
   static async connect(
     binaryPath: string,
     options?: { maxInflight?: number; runtimeMode?: string }
@@ -404,7 +425,16 @@ export class IterClient {
     return this.parseToolResult<GovernorStatus>(response);
   }
 
-  /** Register a resource hash before governed decision checks. */
+  /**
+   * Register a resource hash before governed decision checks.
+   *
+   * Decision tools reject unregistered `state_snapshot_hash` values before
+   * policy evaluation, so callers should register each governed resource before
+   * calling `decisionCheck`. Registration binds the hash to a normalized
+   * resource path; a later decision check must also identify that same resource
+   * through `constraints.resource_path`, `constraints.resource`,
+   * `constraints.scope`, or by including the path in `requested_action`.
+   */
   async registerResource(args: {
     resource_path: string;
     expected_hash: string;
@@ -418,7 +448,13 @@ export class IterClient {
   }
 
   /**
-   * Evaluate governance proposal (canonical PDP decision gate).
+   * Evaluate a governance proposal through the canonical PDP decision gate.
+   *
+   * The supplied `state_snapshot_hash` must already be registered through
+   * `registerResource` and the request must match the registered resource path
+   * through `constraints.resource_path`, `constraints.resource`,
+   * `constraints.scope`, or `requested_action`. A registered hash alone is not
+   * sufficient; unmatched resources fail closed with `RESOURCE_NOT_REGISTERED`.
    */
   async decisionCheck(args: {
     proposal_id: string;
@@ -459,7 +495,10 @@ export class IterClient {
   }
 
   /**
-   * Non-authoritative governance simulation (canonical).
+   * Preview a non-authoritative governance outcome without mutating lineage.
+   *
+   * Unlike `decisionCheck`, preview does not enforce resource registration
+   * because it does not commit a decision receipt.
    */
   async decisionPreview(args: {
     proposal_id: string;
