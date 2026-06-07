@@ -430,7 +430,10 @@ export class IterClient {
    *
    * Decision tools reject unregistered `state_snapshot_hash` values before
    * policy evaluation, so callers should register each governed resource before
-   * calling `decisionCheck`.
+   * calling `decisionCheck`. Registration binds the hash to a normalized
+   * resource path; a later decision check must also identify that same resource
+   * through `constraints.resource_path`, `constraints.resource`,
+   * `constraints.scope`, or by including the path in `requested_action`.
    */
   async registerResource(args: {
     resource_path: string;
@@ -448,7 +451,10 @@ export class IterClient {
    * Evaluate a governance proposal through the canonical PDP decision gate.
    *
    * The supplied `state_snapshot_hash` must already be registered through
-   * `registerResource`.
+   * `registerResource` and the request must match the registered resource path
+   * through `constraints.resource_path`, `constraints.resource`,
+   * `constraints.scope`, or `requested_action`. A registered hash alone is not
+   * sufficient; unmatched resources fail closed with `RESOURCE_NOT_REGISTERED`.
    */
   async decisionCheck(args: {
     proposal_id: string;

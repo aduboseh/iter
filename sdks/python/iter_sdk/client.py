@@ -194,7 +194,11 @@ class IterClient:
 
         The server rejects unregistered ``state_snapshot_hash`` values before
         policy evaluation. Call this once per governed resource that a session
-        will reference.
+        will reference. Registration binds the hash to a normalized resource
+        path; a later decision check must also identify that same resource via
+        ``constraints["resource_path"]``, ``constraints["resource"]``,
+        ``constraints["scope"]``, or by including the path in
+        ``requested_action``.
         """
         response = await self.send("tools/call", {
             "name": "register_resource",
@@ -215,8 +219,10 @@ class IterClient:
         """Evaluate a governance proposal through the canonical PDP gate.
 
         ``state_snapshot_hash`` must match a hash previously registered with
-        :meth:`register_resource`; otherwise the server fails closed before
-        policy execution.
+        :meth:`register_resource`, and the request must match the registered
+        resource path through ``constraints`` or ``requested_action``. A
+        registered hash alone is not sufficient; unmatched resources fail
+        closed with ``RESOURCE_NOT_REGISTERED`` before policy execution.
         """
         args: Dict[str, Any] = {
             "proposal_id": proposal_id,
