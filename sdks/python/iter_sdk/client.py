@@ -68,12 +68,17 @@ class IterClient:
         return self
 
     @staticmethod
-    async def connect(binary_path: str, max_inflight: int = 1) -> "IterClient":
+    async def connect(
+        binary_path: str,
+        max_inflight: int = 1,
+        runtime_mode: str = "demo",
+    ) -> "IterClient":
         """Connect to an Iter server process."""
         client = IterClient(max_inflight=max_inflight)
 
         client.process = await asyncio.create_subprocess_exec(
             binary_path,
+            f"--runtime-mode={runtime_mode}",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -172,6 +177,17 @@ class IterClient:
         response = await self.send("tools/call", {
             "name": "governance.health",
             "arguments": {},
+        })
+        return self._parse_tool_result(response)
+
+    async def register_resource(self, resource_path: str, expected_hash: str) -> Any:
+        """Register a resource hash before governed decision checks."""
+        response = await self.send("tools/call", {
+            "name": "register_resource",
+            "arguments": {
+                "resource_path": resource_path,
+                "expected_hash": expected_hash,
+            },
         })
         return self._parse_tool_result(response)
 

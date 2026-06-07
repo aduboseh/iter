@@ -20,7 +20,7 @@ $serverPath = Join-Path (Split-Path -Parent $scriptDir) "target\release\iter-ser
 # Start long-lived server process
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $serverPath
-$psi.Arguments = "--json-only"
+$psi.Arguments = "--json-only --runtime-mode=demo"
 $psi.UseShellExecute = $false
 $psi.RedirectStandardInput = $true
 $psi.RedirectStandardOutput = $true

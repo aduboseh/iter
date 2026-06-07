@@ -41,12 +41,16 @@ async fn main() -> iter_sdk::Result<()> {
     let state = client.node_query(node.id).await?;
     println!("Node state: {:?}", state);
     
-    // Preview a governance decision without mutating lineage
+    // Register the governed resource before decision checks/previews.
+    let resource_hash = "sha256:8e51aaaa299f88b416976abd2a25a7d3a0db01b61b105066013f43a077408e25";
+    client.register_resource("docs/README.md", resource_hash).await?;
+
+    // Preview a governance decision without mutating lineage.
     let preview = client.decision_preview(
         "proposal-1",
-        "sha256:state",
-        "deploy_capsule",
-        None,
+        resource_hash,
+        "write to docs/README.md",
+        Some(serde_json::json!({ "scope": "docs/README.md" })),
     ).await?;
     println!("Preview: {:?}", preview);
 

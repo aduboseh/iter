@@ -52,7 +52,14 @@ fn run_demo_sequence() -> Vec<String> {
 
     // Spawn iter-server
     let mut server = Command::new("cargo")
-        .args(["run", "--release", "--bin", "iter-server"])
+        .args([
+            "run",
+            "--release",
+            "--bin",
+            "iter-server",
+            "--",
+            "--runtime-mode=demo",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
