@@ -25,7 +25,7 @@ function Invoke-MCP {
         params = $Params
     } | ConvertTo-Json -Depth 10 -Compress
     
-    $lines = $request | & $serverPath --json-only --runtime-mode=demo 2>$null
+    $lines = $request | & $serverPath --json-only --runtime-mode=demo
     $jsonLine = $lines | Where-Object { $_ -match '^\s*\{.*"jsonrpc"\s*:\s*"2\.0"' } | Select-Object -First 1
     
     if (-not $jsonLine) {
