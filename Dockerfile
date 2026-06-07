@@ -65,3 +65,4 @@ LABEL iter.version="v1.0.0-server" \
 
 # Run Iter server
 ENTRYPOINT ["/app/iter-server"]
+CMD ["--runtime-mode=demo"]

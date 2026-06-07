@@ -39,11 +39,19 @@ async function main() {
   const state = await client.nodeQuery(node.id);
   console.log("Node state:", state);
 
-  // Preview a governance decision without mutating lineage
+  // Register the governed resource before decision checks/previews.
+  const resourceHash = "sha256:8e51aaaa299f88b416976abd2a25a7d3a0db01b61b105066013f43a077408e25";
+  await client.registerResource({
+    resource_path: "docs/README.md",
+    expected_hash: resourceHash,
+  });
+
+  // Preview a governance decision without mutating lineage.
   const preview = await client.decisionPreview({
     proposal_id: "proposal-1",
-    state_snapshot_hash: "sha256:state",
-    requested_action: "deploy_capsule",
+    state_snapshot_hash: resourceHash,
+    requested_action: "write to docs/README.md",
+    constraints: { scope: "docs/README.md" },
   });
   console.log("Preview verdict:", preview.verdict);
 

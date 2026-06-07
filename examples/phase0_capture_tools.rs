@@ -36,6 +36,7 @@ impl McpClient {
             .unwrap_or_else(|| "C:\\Users\\adubo\\iter\\target\\release\\iter-server.exe".into());
 
         let mut server = Command::new(server_bin)
+            .arg("--runtime-mode=demo")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

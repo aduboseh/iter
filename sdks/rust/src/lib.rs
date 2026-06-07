@@ -191,7 +191,16 @@ pub struct IterClient {
 
 impl IterClient {
     pub async fn connect(binary_path: &str, max_inflight: usize) -> Result<Self> {
+        Self::connect_with_runtime_mode(binary_path, max_inflight, "demo").await
+    }
+
+    pub async fn connect_with_runtime_mode(
+        binary_path: &str,
+        max_inflight: usize,
+        runtime_mode: &str,
+    ) -> Result<Self> {
         let mut child = Command::new(binary_path)
+            .arg(format!("--runtime-mode={}", runtime_mode))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -497,6 +506,28 @@ impl IterClient {
             .await?;
 
         parse_tool_result(response)
+    }
+
+    pub async fn register_resource(
+        &mut self,
+        resource_path: &str,
+        expected_hash: &str,
+    ) -> Result<serde_json::Value> {
+        let response = self
+            .send(
+                "tools/call",
+                Some(serde_json::json!({
+                    "name": "register_resource",
+                    "arguments": {
+                        "resource_path": resource_path,
+                        "expected_hash": expected_hash
+                    }
+                })),
+                30000,
+            )
+            .await?;
+
+        extract_raw_result(response)
     }
 
     pub async fn decision_check(

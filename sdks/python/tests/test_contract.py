@@ -98,3 +98,24 @@ async def test_audit_search_uses_canonical_tool_name_and_filter_map():
     })
     client._parse_tool_result.assert_called_once()
     assert result["count"] == 0
+
+@pytest.mark.asyncio
+async def test_register_resource_uses_canonical_tool_name_and_args():
+    client = IterClient(max_inflight=1)
+    client.send = AsyncMock(return_value=object())
+    client._parse_tool_result = Mock(return_value={"registered": True})
+
+    result = await client.register_resource(
+        resource_path="docs/README.md",
+        expected_hash="sha256:abc",
+    )
+
+    client.send.assert_awaited_once_with("tools/call", {
+        "name": "register_resource",
+        "arguments": {
+            "resource_path": "docs/README.md",
+            "expected_hash": "sha256:abc",
+        },
+    })
+    client._parse_tool_result.assert_called_once()
+    assert result["registered"] is True

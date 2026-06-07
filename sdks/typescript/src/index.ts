@@ -255,11 +255,12 @@ export class IterClient {
   /** Connect to an Iter server process */
   static async connect(
     binaryPath: string,
-    options?: { maxInflight?: number }
+    options?: { maxInflight?: number; runtimeMode?: string }
   ): Promise<IterClient> {
     const client = new IterClient(options?.maxInflight ?? 1);
+    const runtimeMode = options?.runtimeMode ?? "demo";
 
-    client.process = spawn(binaryPath, [], {
+    client.process = spawn(binaryPath, [`--runtime-mode=${runtimeMode}`], {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -401,6 +402,19 @@ export class IterClient {
     });
 
     return this.parseToolResult<GovernorStatus>(response);
+  }
+
+  /** Register a resource hash before governed decision checks. */
+  async registerResource(args: {
+    resource_path: string;
+    expected_hash: string;
+  }): Promise<unknown> {
+    const response = await this.send("tools/call", {
+      name: "register_resource",
+      arguments: args,
+    });
+
+    return this.parseToolResult<unknown>(response);
   }
 
   /**

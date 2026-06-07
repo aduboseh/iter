@@ -263,6 +263,7 @@ impl McpClient {
             std::env::var_os("ITER_SERVER_BIN").unwrap_or_else(|| "iter-server".into());
 
         let mut server = Command::new(server_bin)
+            .arg("--runtime-mode=demo")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

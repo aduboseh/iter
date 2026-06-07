@@ -15,6 +15,9 @@ use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 
+const RESOURCE_PATH: &str = "docs/README.md";
+const VALID_HASH: &str = "sha256:8e51aaaa299f88b416976abd2a25a7d3a0db01b61b105066013f43a077408e25";
+
 struct McpTestClient {
     server: Child,
     stdin: std::process::ChildStdin,
@@ -28,6 +31,7 @@ impl McpTestClient {
 
         let mut server = Command::new(bin_path)
             .arg("--json-only")
+            .arg("--runtime-mode=demo")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -85,6 +89,21 @@ impl McpTestClient {
         serde_json::from_str(text).expect("tool text must parse as JSON")
     }
 
+    fn register_fixture_resource(&mut self) {
+        let registration = self.extract_tool_text(
+            "register_resource",
+            json!({
+                "resource_path": RESOURCE_PATH,
+                "expected_hash": VALID_HASH
+            }),
+        );
+        assert_eq!(
+            registration.get("registered").and_then(|v| v.as_bool()),
+            Some(true),
+            "fixture resource registration must succeed"
+        );
+    }
+
     fn close(mut self) {
         drop(self.stdin);
         let _ = self.server.wait();
@@ -94,8 +113,9 @@ impl McpTestClient {
 fn proposal_args() -> Value {
     json!({
         "proposal_id": "test-preview-001",
-        "state_snapshot_hash": "abc123def456abc123def456abc123def456abc123def456abc123def456abc123",
-        "requested_action": "deploy_capsule"
+        "state_snapshot_hash": VALID_HASH,
+        "requested_action": "write to docs/README.md",
+        "constraints": { "scope": RESOURCE_PATH }
     })
 }
 
@@ -242,6 +262,7 @@ fn decision_preview_verdict_matches_decision_check() {
 
     let check_verdict = {
         let mut c = McpTestClient::spawn();
+        c.register_fixture_resource();
         let evaluation = c.extract_tool_text("decision.check", args);
         let v = evaluation
             .get("verdict")
@@ -293,13 +314,15 @@ fn audit_search_empty_lineage_returns_zero_results() {
 #[test]
 fn audit_search_returns_decisions_after_governance_evaluate() {
     let mut client = McpTestClient::spawn();
+    client.register_fixture_resource();
 
     let _ = client.call_tool(
         "governance.evaluate",
         json!({
             "proposal_id": "search-test-001",
-            "state_snapshot_hash": "abc123def456abc123def456abc123def456abc123def456abc123def456abc123",
-            "requested_action": "deploy_capsule"
+            "state_snapshot_hash": VALID_HASH,
+            "requested_action": "write to docs/README.md",
+            "constraints": { "scope": RESOURCE_PATH }
         }),
     );
 
@@ -332,14 +355,16 @@ fn audit_search_returns_decisions_after_governance_evaluate() {
 #[test]
 fn audit_search_deterministic_ordering() {
     let mut client = McpTestClient::spawn();
+    client.register_fixture_resource();
 
     for i in 0..3 {
         let _ = client.call_tool(
             "governance.evaluate",
             json!({
                 "proposal_id": format!("order-test-{:03}", i),
-                "state_snapshot_hash": "abc123def456abc123def456abc123def456abc123def456abc123def456abc123",
-                "requested_action": "deploy_capsule"
+                "state_snapshot_hash": VALID_HASH,
+                "requested_action": "write to docs/README.md",
+                "constraints": { "scope": RESOURCE_PATH }
             }),
         );
     }
@@ -359,14 +384,16 @@ fn audit_search_deterministic_ordering() {
 #[test]
 fn audit_search_respects_limit() {
     let mut client = McpTestClient::spawn();
+    client.register_fixture_resource();
 
     for i in 0..5 {
         let _ = client.call_tool(
             "governance.evaluate",
             json!({
                 "proposal_id": format!("limit-test-{:03}", i),
-                "state_snapshot_hash": "abc123def456abc123def456abc123def456abc123def456abc123def456abc123",
-                "requested_action": "deploy_capsule"
+                "state_snapshot_hash": VALID_HASH,
+                "requested_action": "write to docs/README.md",
+                "constraints": { "scope": RESOURCE_PATH }
             }),
         );
     }

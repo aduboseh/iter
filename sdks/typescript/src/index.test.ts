@@ -721,5 +721,37 @@ describe("Governance Helper Methods", () => {
     expect(result.count).toBe(0);
     expect(result.results).toEqual([]);
   });
+
+  test("registerResource calls register_resource with canonical args", async () => {
+    const client = new (IterClient as any)(1);
+    const response = {
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ registered: true }),
+          },
+        ],
+      },
+    };
+
+    client.send = jest.fn().mockResolvedValue(response);
+
+    const result = await client.registerResource({
+      resource_path: "docs/README.md",
+      expected_hash: "sha256:abc",
+    });
+
+    expect(client.send).toHaveBeenCalledWith("tools/call", {
+      name: "register_resource",
+      arguments: {
+        resource_path: "docs/README.md",
+        expected_hash: "sha256:abc",
+      },
+    });
+    expect((result as any).registered).toBe(true);
+  });
 });
 

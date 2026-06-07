@@ -53,11 +53,16 @@ async def main() -> None:
     state = await client.node_query(node.id)
     print("Node state:", state)
 
-    # Preview a governance decision without mutating lineage
+    # Register the governed resource before decision checks/previews.
+    resource_hash = "sha256:8e51aaaa299f88b416976abd2a25a7d3a0db01b61b105066013f43a077408e25"
+    await client.register_resource("docs/README.md", resource_hash)
+
+    # Preview a governance decision without mutating lineage.
     preview = await client.decision_preview(
         proposal_id="proposal-1",
-        state_snapshot_hash="sha256:state",
-        requested_action="deploy_capsule",
+        state_snapshot_hash=resource_hash,
+        requested_action="write to docs/README.md",
+        constraints={"scope": "docs/README.md"},
     )
     print("Preview verdict:", preview["verdict"])
 
