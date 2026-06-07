@@ -580,7 +580,7 @@ impl IterClient {
 
     /// Register a resource hash before governed decision evaluation.
     ///
-    /// Decision tools reject unregistered resource hashes before policy
+    /// Decision checks reject unregistered resource hashes before policy
     /// evaluation, so SDK consumers should call this when establishing the
     /// resource set for a session.
     pub async fn register_resource(

@@ -430,7 +430,7 @@ export class IterClient {
    *
    * Decision tools reject unregistered `state_snapshot_hash` values before
    * policy evaluation, so callers should register each governed resource before
-   * calling `decisionCheck` or `decisionPreview`.
+   * calling `decisionCheck`.
    */
   async registerResource(args: {
     resource_path: string;
