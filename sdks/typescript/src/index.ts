@@ -491,8 +491,8 @@ export class IterClient {
   /**
    * Preview a non-authoritative governance outcome without mutating lineage.
    *
-   * The supplied `state_snapshot_hash` follows the same registration precondition
-   * as `decisionCheck`.
+   * Unlike `decisionCheck`, preview does not enforce resource registration
+   * because it does not commit a decision receipt.
    */
   async decisionPreview(args: {
     proposal_id: string;

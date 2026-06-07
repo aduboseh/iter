@@ -256,8 +256,8 @@ class IterClient:
     ) -> Any:
         """Preview governance outcome without mutating lineage.
 
-        This uses the same resource-registration precondition as
-        :meth:`decision_check` but does not commit a decision receipt.
+        Unlike :meth:`decision_check`, preview does not enforce resource
+        registration because it does not commit a decision receipt.
         """
         args: Dict[str, Any] = {
             "proposal_id": proposal_id,
