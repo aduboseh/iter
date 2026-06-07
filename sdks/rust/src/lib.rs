@@ -22,8 +22,11 @@ use tokio::time::timeout;
 // Constants
 // ==============================
 
+/// SDK protocol version implemented by this client.
 pub const SDK_PROTOCOL_VERSION: &str = "1.0.0";
+/// Minimum Iter server protocol version accepted by this client.
 pub const MIN_SERVER_VERSION: &str = "1.0.0";
+/// Maximum Iter server protocol version accepted by this client.
 pub const MAX_SERVER_VERSION: &str = "1.99.99";
 
 const STDERR_RING_MAX_BYTES: usize = 10 * 1024;
@@ -36,8 +39,11 @@ const PROTOCOL_VIOLATION_ERROR_CODE: i32 = -32000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
+    /// Client accepts new requests and dispatches JSON-RPC messages.
     Open,
+    /// Client is draining in-flight requests and refuses new work.
     Closing,
+    /// Client process and transport have been torn down.
     Closed,
 }
 
@@ -47,13 +53,17 @@ pub enum State {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceContext {
+    /// Distributed trace identifier propagated with SDK calls.
     pub trace_id: String,
+    /// Span identifier for the current SDK call chain.
     pub span_id: String,
+    /// Optional parent span identifier for nested traces.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_span_id: Option<String>,
 }
 
 impl TraceContext {
+    /// Create a root trace context whose span id matches the trace id.
     pub fn new(trace_id: impl Into<String>) -> Self {
         let id = trace_id.into();
         Self {
@@ -70,24 +80,36 @@ impl TraceContext {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RpcRequest {
+    /// JSON-RPC protocol marker. Must always be `"2.0"`.
     pub jsonrpc: String,
+    /// JSON-RPC method name.
     pub method: String,
+    /// Optional JSON-RPC params payload.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<serde_json::Value>,
+    /// Request id used to correlate the eventual response.
     pub id: serde_json::Value,
 }
 
+/// JSON-RPC response returned by the Iter server.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcResponse {
+    /// JSON-RPC protocol marker. Must always be `"2.0"`.
     pub jsonrpc: String,
+    /// Successful response payload, when present.
     pub result: Option<serde_json::Value>,
+    /// Error payload, when the request failed.
     pub error: Option<RpcError>,
+    /// Response id matching the request id.
     pub id: serde_json::Value,
 }
 
+/// JSON-RPC error object returned by the Iter server.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcError {
+    /// JSON-RPC or server-specific error code.
     pub code: i32,
+    /// Human-readable error message.
     pub message: String,
 }
 
@@ -97,72 +119,103 @@ pub struct RpcError {
 
 #[derive(Debug, Error)]
 pub enum SdkError {
+    /// Server protocol version is outside the SDK compatibility window.
     #[error("Version mismatch: client={client}, server={server}")]
     VersionMismatch { client: String, server: String },
 
+    /// Transport or process setup failed.
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),
 
+    /// Server returned a JSON-RPC error.
     #[error("Request failed: {code}: {message}")]
     RequestFailed { code: i32, message: String },
 
+    /// Client is closing or closed.
     #[error("Connection closed: {message}")]
     ConnectionClosed {
+        /// Reason the connection is no longer usable.
         message: String,
+        /// Number of in-flight requests when close was observed.
         pending_count_at_close: Option<usize>,
     },
 
+    /// Request queue exceeded the configured in-flight limit.
     #[error("Backpressure: maxInflight={0} exceeded")]
     Backpressure(usize),
 
+    /// Request did not complete before its timeout.
     #[error("Request timeout: {method} exceeded {timeout_ms}ms")]
     RequestTimeout { method: String, timeout_ms: u64 },
 
+    /// Underlying I/O failure.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// JSON serialization or deserialization failure.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    /// Child process could not be reaped after termination.
     #[error("Failed to reap process after kill()")]
     ZombieProcess,
 }
 
+/// SDK-local result type.
 pub type Result<T> = std::result::Result<T, SdkError>;
 
 // ==============================
 // Response Types (MCP-aligned)
 // ==============================
 
+/// Response wrapper for the MCP `tools/list` method.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolListResponse {
+    /// Available server tools.
     pub tools: Vec<ToolInfo>,
 }
 
+/// Tool descriptor returned by the MCP server.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolInfo {
+    /// Canonical MCP tool name.
     pub name: String,
+    /// Human-readable tool description.
     pub description: String,
+    /// JSON schema describing accepted tool arguments.
     #[serde(rename = "inputSchema")]
     pub input_schema: serde_json::Value,
 }
 
+/// Node state returned by node tools.
 #[derive(Debug, Clone, Deserialize)]
 pub struct NodeState {
+    /// Server-assigned node id.
     pub id: u64,
+    /// Node belief value.
     pub belief: f64,
+    /// Node energy value.
     pub energy: f64,
+    /// Whether the node satisfies the exposed ESV invariant.
     pub esv_valid: bool,
+    /// Deterministic stability score exposed by the server.
     pub stability: f64,
 }
 
+/// Governor/governance health snapshot.
 #[derive(Debug, Clone, Deserialize)]
 pub struct GovernorStatus {
+    /// Whether drift is within allowed bounds.
     pub drift_ok: bool,
+    /// Current energy drift value.
     pub energy_drift: f64,
+    /// Current coherence score.
     pub coherence: f64,
+    /// Number of nodes in the runtime graph.
     pub node_count: usize,
+    /// Number of edges in the runtime graph.
     pub edge_count: usize,
+    /// Aggregate health flag.
     pub healthy: bool,
 }
 
@@ -170,6 +223,7 @@ pub struct GovernorStatus {
 // Client
 // ==============================
 
+/// Async STDIO client for the Iter MCP server.
 pub struct IterClient {
     process: Arc<Mutex<Child>>,
     stdin: Arc<Mutex<ChildStdin>>,
@@ -190,10 +244,15 @@ pub struct IterClient {
 }
 
 impl IterClient {
+    /// Start an Iter server process in `demo` runtime mode.
     pub async fn connect(binary_path: &str, max_inflight: usize) -> Result<Self> {
         Self::connect_with_runtime_mode(binary_path, max_inflight, "demo").await
     }
 
+    /// Start an Iter server process with an explicit runtime mode.
+    ///
+    /// The server fails closed when `--runtime-mode` is omitted, so SDK callers
+    /// must choose the deployment mode at process launch.
     pub async fn connect_with_runtime_mode(
         binary_path: &str,
         max_inflight: usize,
@@ -358,14 +417,20 @@ impl IterClient {
         })
     }
 
+    /// Return the current client lifecycle state.
     pub async fn state(&self) -> State {
         *self.state.lock().await
     }
 
+    /// Set the trace context to attach to subsequent raw requests.
     pub async fn with_trace(&self, trace: TraceContext) {
         *self.trace_context.lock().await = Some(trace);
     }
 
+    /// Send a raw JSON-RPC request over the managed STDIO transport.
+    ///
+    /// This method enforces open-state and max-inflight preconditions before
+    /// writing to stdin, and evicts timed-out requests from the response queue.
     pub async fn send(
         &self,
         method: impl Into<String>,
@@ -432,6 +497,7 @@ impl IterClient {
         }
     }
 
+    /// List MCP tools exposed by the connected Iter server.
     pub async fn tools_list(&mut self) -> Result<Vec<ToolInfo>> {
         let response = self.send("tools/list", None, 30000).await?;
         let result = response.result.ok_or_else(|| SdkError::RequestFailed {
@@ -443,6 +509,7 @@ impl IterClient {
         Ok(tools.tools)
     }
 
+    /// Create a node with the supplied belief and energy values.
     pub async fn node_create(&mut self, belief: f64, energy: f64) -> Result<NodeState> {
         let params = serde_json::json!({
             "belief": belief,
@@ -463,6 +530,7 @@ impl IterClient {
         parse_tool_result(response)
     }
 
+    /// Query a node by id.
     pub async fn node_query(&mut self, node_id: u64) -> Result<NodeState> {
         let response = self
             .send(
@@ -478,6 +546,7 @@ impl IterClient {
         parse_tool_result(response)
     }
 
+    /// Fetch canonical governor health metrics.
     pub async fn governor_health(&mut self) -> Result<GovernorStatus> {
         let response = self
             .send(
@@ -493,6 +562,7 @@ impl IterClient {
         parse_tool_result(response)
     }
 
+    /// Fetch canonical governance subsystem health metrics.
     pub async fn governance_health(&mut self) -> Result<GovernorStatus> {
         let response = self
             .send(
@@ -508,6 +578,11 @@ impl IterClient {
         parse_tool_result(response)
     }
 
+    /// Register a resource hash before governed decision evaluation.
+    ///
+    /// Decision tools reject unregistered resource hashes before policy
+    /// evaluation, so SDK consumers should call this when establishing the
+    /// resource set for a session.
     pub async fn register_resource(
         &mut self,
         resource_path: &str,
@@ -530,6 +605,7 @@ impl IterClient {
         extract_raw_result(response)
     }
 
+    /// Evaluate a governance proposal through the canonical decision gate.
     pub async fn decision_check(
         &mut self,
         proposal_id: &str,
@@ -559,6 +635,7 @@ impl IterClient {
         extract_raw_result(response)
     }
 
+    /// Export the audit bundle associated with a node id.
     pub async fn audit_export(&mut self, node_id: u64) -> Result<serde_json::Value> {
         let response = self
             .send(
@@ -574,6 +651,7 @@ impl IterClient {
         extract_raw_result(response)
     }
 
+    /// Replay recorded decision history.
     pub async fn audit_replay(&mut self) -> Result<serde_json::Value> {
         let response = self
             .send(
@@ -589,6 +667,7 @@ impl IterClient {
         extract_raw_result(response)
     }
 
+    /// Preview a non-mutating governance outcome.
     pub async fn decision_preview(
         &mut self,
         proposal_id: &str,
@@ -618,6 +697,7 @@ impl IterClient {
         extract_raw_result(response)
     }
 
+    /// Search governance decision history.
     pub async fn audit_search(
         &mut self,
         filter: Option<serde_json::Value>,
@@ -638,6 +718,7 @@ impl IterClient {
     }
 
     #[deprecated(note = "Use governor_health() instead. Will be removed in v3.0.")]
+    /// Fetch legacy governor status.
     pub async fn governor_status(&mut self) -> Result<GovernorStatus> {
         let response = self
             .send(
@@ -653,6 +734,7 @@ impl IterClient {
         parse_tool_result(response)
     }
 
+    /// Close the client, drain pending requests, and terminate the child process.
     pub async fn close(&mut self) -> Result<()> {
         // close idempotence
         let _guard = self.close_lock.lock().await;
