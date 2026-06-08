@@ -133,6 +133,7 @@ fn valid_trace() -> ExecutionTrace {
             &finalize_output,
         ),
     ])
+    .unwrap()
 }
 
 #[test]
@@ -278,8 +279,12 @@ fn verify_replay_id_fails_on_stale_contract_version() {
 #[test]
 fn version_check_precedes_semantic_validation() {
     let mut broken = valid_trace().into_steps();
-    broken[1].input_hash = "d".repeat(64);
-    let trace = ExecutionTrace::from_steps(broken);
+    broken[1].operation_type = OperationType::StateCheck;
+    let trace: ExecutionTrace = serde_json::from_value(serde_json::json!({
+        "trace_version": "trace.v1",
+        "steps": broken,
+    }))
+    .unwrap();
     let state_envelope = test_state_envelope("snapshot-001");
     let outcome = GovernanceOutcome {
         contract_version: "scg.v99".into(),
@@ -305,7 +310,6 @@ fn version_check_precedes_semantic_validation() {
             if expected == CONTRACT_VERSION_STR && got == "scg.v99"
     ));
 }
-
 #[test]
 fn escalate_is_a_valid_decision_variant() {
     let id = GovernanceOutcome::compute_replay_id(
@@ -355,30 +359,12 @@ fn outcome_survives_serde_round_trip() {
 fn verify_replay_id_catches_chain_violation() {
     let mut broken = valid_trace().into_steps();
     broken[1].input_hash = "d".repeat(64);
-    let broken_trace = ExecutionTrace::from_steps(broken);
-    let state_envelope = test_state_envelope("snapshot-001");
-
-    let outcome = GovernanceOutcome {
-        contract_version: CONTRACT_VERSION_STR.to_string(),
-        decision: Decision::Allow,
-        governance_hash: "trace-chain-hash".into(),
-        state_snapshot_hash: state_envelope.state_snapshot_hash.clone(),
-        state_envelope_schema: state_envelope.schema.clone(),
-        state_envelope_hash: state_envelope.compute_hash(),
-        state_envelope: state_envelope.clone(),
-        replay_id: replay_id(
-            CONTRACT_VERSION_STR,
-            &Decision::Allow,
-            "trace-chain-hash",
-            &state_envelope,
-            &broken_trace,
-        ),
-        execution_trace: broken_trace,
-    };
+    let err = ExecutionTrace::from_steps(broken).unwrap_err();
 
     assert!(matches!(
-        outcome.verify_replay_id().unwrap_err(),
-        BridgeError::TraceDeterminismViolation(_)
+        err,
+        BridgeError::TraceDeterminismViolation(ref message)
+            if message.contains("input_hash mismatch")
     ));
 }
 

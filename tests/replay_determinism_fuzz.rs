@@ -89,7 +89,7 @@ fn build_trace(payload: &str) -> ExecutionTrace {
         prev_output = output_hash;
     }
 
-    ExecutionTrace::from_steps(steps)
+    ExecutionTrace::from_steps(steps).unwrap()
 }
 
 proptest! {

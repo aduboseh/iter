@@ -62,17 +62,57 @@ impl ExecutionTrace {
         }
     }
 
-    pub fn push(&mut self, step: TraceStep) {
-        self.steps.push(step);
-    }
+    fn validate_step_insertion(&self, step: &TraceStep) -> Result<(), BridgeError> {
+        step.verify_hash_binding()?;
 
-    pub fn from_steps(steps: Vec<TraceStep>) -> Self {
-        Self {
-            trace_version: TRACE_SCHEMA_VERSION.to_string(),
-            steps,
+        if self
+            .steps
+            .last()
+            .is_some_and(|prev| prev.operation_type == OperationType::TraceFinalize)
+        {
+            return Err(BridgeError::TraceDeterminismViolation(
+                "TraceFinalize must be the last step".to_string(),
+            ));
         }
+
+        if let Some(prev) = self.steps.last() {
+            if step.input_hash != prev.output_hash {
+                return Err(BridgeError::TraceDeterminismViolation(format!(
+                    "chain broken at step {}: input_hash '{}' != previous output_hash '{}'",
+                    self.steps.len(),
+                    step.input_hash,
+                    prev.output_hash
+                )));
+            }
+        }
+
+        Ok(())
     }
 
+    #[must_use = "push() errors must be handled; trace mutation must fail closed"]
+    pub fn push(&mut self, step: TraceStep) -> Result<(), BridgeError> {
+        let finalizes_trace = step.operation_type == OperationType::TraceFinalize;
+        self.validate_step_insertion(&step)?;
+        self.steps.push(step);
+
+        if finalizes_trace {
+            if let Err(err) = self.validate_semantics() {
+                self.steps.pop();
+                return Err(err);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn from_steps(steps: Vec<TraceStep>) -> Result<Self, BridgeError> {
+        let mut trace = Self::new();
+        for step in steps {
+            trace.push(step)?;
+        }
+        trace.validate_semantics()?;
+        Ok(trace)
+    }
     pub fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }

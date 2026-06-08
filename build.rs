@@ -54,6 +54,17 @@ fn rustc_version() -> String {
 }
 
 fn main() {
+    let is_stub_mode = std::env::var_os("CARGO_FEATURE_PUBLIC_STUB").is_some();
+    let is_full_substrate = std::env::var_os("CARGO_FEATURE_FULL_SUBSTRATE").is_some();
+
+    if is_full_substrate && !is_stub_mode {
+        panic!(
+            "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO: \
+             full_substrate is reserved for the private substrate workspace. \
+             This public repository must not emit ITER_BUILD_MODE=FULL_SUBSTRATE \
+             or compile a stub-backed binary under full_substrate semantics."
+        );
+    }
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=vendor/governance-bridge");
     println!("cargo:rerun-if-changed=vendor/governance-bridge/src/contract.rs");
@@ -95,7 +106,7 @@ fn main() {
         GovernanceArtifact {
             path: "vendor/governance-bridge/src/trace.rs",
             env_name: "ITER_BRIDGE_TRACE_RS_SHA256",
-            expected_sha256: "620892e1986dc22a2a5c17f60ec650e6da70dbe90b847a2862e13c1bf14bce20",
+            expected_sha256: "2e113cf84146afad3d709e4fa72dd26f5b5074613ca4aed3db1ecce2fcfcae36",
             mismatch_code: "BRIDGE_INTEGRITY_MISMATCH",
         },
         GovernanceArtifact {
@@ -107,7 +118,7 @@ fn main() {
         GovernanceArtifact {
             path: "vendor/governance-bridge/src/lib.rs",
             env_name: "ITER_BRIDGE_LIB_RS_SHA256",
-            expected_sha256: "52b4e25270e9b4b001175f9beba8bb020b6d64f9140fbc47b67789e9fa1badd8",
+            expected_sha256: "aec22a837db0d8ae98f422a120c4b75466150a4e6a734a4e49e90ba47a8fe4bb",
             mismatch_code: "BRIDGE_INTEGRITY_MISMATCH",
         },
         GovernanceArtifact {
@@ -169,35 +180,14 @@ fn main() {
         sha256_bytes(substrate_identity.as_bytes())
     );
 
-    // Only check for substrate in full mode (not when public_stub is enabled)
-    #[cfg(all(feature = "full_substrate", not(feature = "public_stub")))]
-    {
-        let scg_path = std::path::Path::new("../SCG");
-        if !scg_path.exists() {
-            eprintln!();
-            eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            eprintln!("  Error: Full substrate mode requires proprietary workspace.");
-            eprintln!();
-            eprintln!("  The substrate dependency path '../SCG' does not exist.");
-            eprintln!();
-            eprintln!("  For public builds, use:");
-            eprintln!("    cargo build --features public_stub --no-default-features");
-            eprintln!();
-            eprintln!("  This mode provides:");
-            eprintln!("    - Full MCP protocol implementation");
-            eprintln!("    - Deterministic placeholder responses");
-            eprintln!("    - Active sanitization and lineage tracing");
-            eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            eprintln!();
-            std::process::exit(1);
-        }
-    }
-
-    let is_stub_mode = std::env::var_os("CARGO_FEATURE_PUBLIC_STUB").is_some();
-    let is_full_substrate = std::env::var_os("CARGO_FEATURE_FULL_SUBSTRATE").is_some();
     match (is_stub_mode, is_full_substrate) {
         (true, false) => println!("cargo:rustc-env=ITER_BUILD_MODE=PUBLIC_STUB"),
-        (false, true) => println!("cargo:rustc-env=ITER_BUILD_MODE=FULL_SUBSTRATE"),
+        (false, true) => panic!(
+            "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO: \
+             full_substrate is reserved for the private substrate workspace. \
+             This public repository must not emit ITER_BUILD_MODE=FULL_SUBSTRATE \
+             or compile a stub-backed binary under full_substrate semantics."
+        ),
         (true, true) => {
             panic!("ITER_BUILD_MODE is ambiguous: both public_stub and full_substrate are enabled")
         }

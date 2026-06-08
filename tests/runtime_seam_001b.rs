@@ -509,6 +509,7 @@ fn make_trace() -> ExecutionTrace {
             &finalize_output,
         ),
     ])
+    .unwrap()
 }
 
 fn contract_outcome(
