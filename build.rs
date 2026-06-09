@@ -106,7 +106,7 @@ fn main() {
         GovernanceArtifact {
             path: "vendor/governance-bridge/src/trace.rs",
             env_name: "ITER_BRIDGE_TRACE_RS_SHA256",
-            expected_sha256: "2e113cf84146afad3d709e4fa72dd26f5b5074613ca4aed3db1ecce2fcfcae36",
+            expected_sha256: "bf9fcb710f709fa73cfa53d51753e21ebbbf0fe68f9d0877b39ef7e1b6dd74dc",
             mismatch_code: "BRIDGE_INTEGRITY_MISMATCH",
         },
         GovernanceArtifact {
@@ -118,7 +118,7 @@ fn main() {
         GovernanceArtifact {
             path: "vendor/governance-bridge/src/lib.rs",
             env_name: "ITER_BRIDGE_LIB_RS_SHA256",
-            expected_sha256: "aec22a837db0d8ae98f422a120c4b75466150a4e6a734a4e49e90ba47a8fe4bb",
+            expected_sha256: "3681052fa2346599a9c8e1068a219994c7ffb6c33515e251d2dc13bebf8b0a05",
             mismatch_code: "BRIDGE_INTEGRITY_MISMATCH",
         },
         GovernanceArtifact {
