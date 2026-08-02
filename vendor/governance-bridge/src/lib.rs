@@ -78,7 +78,7 @@ impl GovernanceBridge for StubBridge {
             OperationType::HashVerify,
             &hash_input,
             &hash_output,
-        ));
+        ))?;
 
         let policy_input = hash_output.clone();
         let policy_output = (
@@ -92,7 +92,7 @@ impl GovernanceBridge for StubBridge {
             OperationType::PolicyEval,
             &policy_input,
             &policy_output,
-        ));
+        ))?;
 
         let state_input = policy_output.clone();
         let state_output = (state_input.clone(), "state-ok", false);
@@ -102,7 +102,7 @@ impl GovernanceBridge for StubBridge {
             OperationType::StateCheck,
             &state_input,
             &state_output,
-        ));
+        ))?;
 
         let decision_input = state_output.clone();
         let decision_output = (
@@ -116,7 +116,7 @@ impl GovernanceBridge for StubBridge {
             OperationType::DecisionEmit,
             &decision_input,
             &decision_output,
-        ));
+        ))?;
 
         let finalize_input = decision_output.clone();
         let finalize_output = (
@@ -131,7 +131,7 @@ impl GovernanceBridge for StubBridge {
             OperationType::TraceFinalize,
             &finalize_input,
             &finalize_output,
-        ));
+        ))?;
 
         let state_envelope =
             GovernanceStateEnvelope::new(request.state_snapshot_hash.clone(), 0.0, 0.0, 0, 0);

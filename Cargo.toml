@@ -10,8 +10,9 @@ readme = "README.md"
 
 [features]
 default = ["public_stub"]
-# full_substrate: Requires proprietary workspace. Build via private CI or local dev
-# with SCG crates available. Not buildable from public repo alone.
+# full_substrate: Reserved/private substrate mode. This public repository does not ship
+# full substrate semantics and must fail early instead of compiling stub-backed
+# binaries that claim FULL_SUBSTRATE provenance.
 full_substrate = []
 public_stub = []
 # schema-gen: enables schemars derives for JSON Schema generation tooling.

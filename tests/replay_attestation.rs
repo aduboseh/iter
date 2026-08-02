@@ -204,7 +204,7 @@ fn build_governed_trace(canonical_payload: &str) -> (ExecutionTrace, String) {
         prev_output = output_hash;
     }
 
-    (ExecutionTrace::from_steps(steps), step_hash_upper)
+    (ExecutionTrace::from_steps(steps).unwrap(), step_hash_upper)
 }
 
 #[test]
