@@ -600,6 +600,8 @@ impl GovernanceRuntime for ScgRuntime {
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
         // map_or keeps this connector clear of the CI-guarded defaulting pattern in this file.
+        #[allow(unknown_lints)]
+        #[allow(clippy::map_or_identity)]
         let limit = filter.limit.map_or(100, |limit| limit).clamp(1, 1000) as usize;
 
         // main.rs rejects unsupported filters before routing audit.search here.
