@@ -183,10 +183,72 @@ jobs:
           path: iter-sbom.json
           retention-days: 90
 
+
+  # APEX-SCG-ITER-PROD-001: complete cross-repository release certification.
+  apex-productization:
+    name: APEX Productization Certification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out iter release subject
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve immutable SCG release subject
+        id: scg-ref
+        shell: bash
+        run: |
+          SCG_REF="$(tr -d '\r\n' < productization/SCG_RELEASE_REF)"
+          if [[ ! "$SCG_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::productization/SCG_RELEASE_REF must contain one lowercase 40-hex commit"
+            exit 1
+          fi
+          echo "ref=$SCG_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact SCG release subject
+        uses: actions/checkout@v4
+        with:
+          repository: aduboseh/SCG
+          ref: ${{ steps.scg-ref.outputs.ref }}
+          token: ${{ secrets.SCG_PAT || github.token }}
+          path: SCG
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            SCG -> target
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.22.1 --locked
+
+      - name: Execute all 30 productization controls
+        run: |
+          python3 scripts/verify_productization_matrix.py \
+            --iter-root . \
+            --scg-root SCG \
+            --evidence-dir productization/evidence \
+            --report apex-productization-report.json
+
+      - name: Upload productization report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-productization-report-${{ github.sha }}
+          path: apex-productization-report.json
+          if-no-files-found: error
+
   # Final gate: All checks must pass
   release-gate:
     name: Release Gate
-    needs: [governance, sdk-rust, sdk-typescript, version-check, changelog-check, boundary-check]
+    needs: [governance, sdk-rust, sdk-typescript, version-check, changelog-check, boundary-check, apex-productization]
     runs-on: ubuntu-latest
     steps:
       - name: All gates passed

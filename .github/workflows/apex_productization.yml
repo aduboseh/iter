@@ -1,0 +1,94 @@
+name: APEX Productization Matrix
+
+on:
+  pull_request:
+    paths:
+      - APEX_PRODUCTIZATION_V1.md
+      - productization/APEX_RELEASE_MATRIX_V1.json
+      - productization/SCG_RELEASE_REF
+      - productization/evidence/**
+      - scripts/verify_productization_matrix.py
+      - .github/workflows/apex_productization.yml
+  push:
+    branches: [main]
+    paths:
+      - APEX_PRODUCTIZATION_V1.md
+      - productization/APEX_RELEASE_MATRIX_V1.json
+      - productization/SCG_RELEASE_REF
+      - productization/evidence/**
+      - scripts/verify_productization_matrix.py
+      - .github/workflows/apex_productization.yml
+  workflow_dispatch:
+    inputs:
+      scg_ref:
+        description: Exact lowercase 40-hex SCG commit to certify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  matrix-definition:
+    name: Validate 30-control matrix definition
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate matrix schema and control count
+        run: python3 scripts/verify_productization_matrix.py --validate-only
+
+  release-certification:
+    name: Execute release certification
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out iter
+        uses: actions/checkout@v4
+        with:
+          path: iter
+          fetch-depth: 0
+      - name: Validate immutable SCG subject
+        id: scg-ref
+        shell: bash
+        env:
+          SCG_REF: ${{ inputs.scg_ref }}
+        run: |
+          if [[ ! "$SCG_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::scg_ref must be one lowercase 40-hex commit"
+            exit 1
+          fi
+          echo "ref=$SCG_REF" >> "$GITHUB_OUTPUT"
+      - name: Check out exact SCG subject
+        uses: actions/checkout@v4
+        with:
+          repository: aduboseh/SCG
+          ref: ${{ steps.scg-ref.outputs.ref }}
+          token: ${{ secrets.SCG_PAT || github.token }}
+          path: SCG
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            iter -> target
+            SCG -> target
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.22.1 --locked
+      - name: Execute all release controls
+        run: |
+          python3 iter/scripts/verify_productization_matrix.py \
+            --iter-root iter \
+            --scg-root SCG \
+            --evidence-dir iter/productization/evidence \
+            --report apex-productization-report.json
+      - name: Upload certification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-productization-report
+          path: apex-productization-report.json
+          if-no-files-found: error
