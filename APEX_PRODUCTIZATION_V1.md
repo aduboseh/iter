@@ -758,7 +758,8 @@ OPERATIONALIZATION
 
 This directive governs product release readiness. It does not replace the SCG
 runtime-governance authority at governance/SCG_Governance_v1.0.md, its
-integrity hash, or any stricter security control.
+integrity hash, or any stricter security control. If an APEX rule conflicts with
+that manifest, the manifest controls; every APEX rule is subordinate to it.
 
 The canonical 30-control release matrix is maintained in the customer-facing
 iter repository at productization/APEX_RELEASE_MATRIX_V1.json. The SCG copy of
