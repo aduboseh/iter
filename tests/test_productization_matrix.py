@@ -124,5 +124,44 @@ class ExternalEvidenceTests(unittest.TestCase):
             self.assertIn("does not match", detail)
 
 
+class ScgReleaseRefTests(unittest.TestCase):
+    """Prove certification cannot drift from iter's declared SCG subject."""
+
+    def test_release_ref_must_match_checked_out_scg(self) -> None:
+        """The exact pinned SCG commit passes and any other commit fails."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            iter_root = Path(temp_dir)
+            productization = iter_root / "productization"
+            productization.mkdir()
+            pinned = "d" * 40
+            (productization / "SCG_RELEASE_REF").write_text(
+                pinned + "\n", encoding="utf-8"
+            )
+
+            self.assertEqual(
+                VERIFIER.scg_release_ref_check(iter_root, pinned),
+                (True, f"SCG release pin matches checked-out subject: {pinned}"),
+            )
+            passed, detail = VERIFIER.scg_release_ref_check(iter_root, "e" * 40)
+            self.assertFalse(passed)
+            self.assertIn("mismatch", detail)
+
+    def test_release_ref_rejects_noncanonical_value(self) -> None:
+        """A moving branch name or malformed digest fails closed."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            iter_root = Path(temp_dir)
+            productization = iter_root / "productization"
+            productization.mkdir()
+            (productization / "SCG_RELEASE_REF").write_text(
+                "master\n", encoding="utf-8"
+            )
+
+            passed, detail = VERIFIER.scg_release_ref_check(iter_root, "d" * 40)
+            self.assertFalse(passed)
+            self.assertIn("invalid", detail)
+
+
 if __name__ == "__main__":
     unittest.main()

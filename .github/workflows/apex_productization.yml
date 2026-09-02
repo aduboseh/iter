@@ -68,6 +68,11 @@ jobs:
             echo "::error::scg_ref must be one lowercase 40-hex commit"
             exit 1
           fi
+          PINNED_SCG_REF="$(tr -d '\r\n' < iter/productization/SCG_RELEASE_REF)"
+          if [[ "$SCG_REF" != "$PINNED_SCG_REF" ]]; then
+            echo "::error::scg_ref ${SCG_REF} does not match pinned release subject ${PINNED_SCG_REF}"
+            exit 1
+          fi
           echo "ref=$SCG_REF" >> "$GITHUB_OUTPUT"
       - name: Validate commit-bound evidence run
         id: evidence-run

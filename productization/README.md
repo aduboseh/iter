@@ -53,7 +53,8 @@ self-reference. Placeholder or repository-tracked PASS evidence is prohibited.
 ## SCG Subject Pin
 
 productization/SCG_RELEASE_REF contains the exact 40-hex SCG commit certified with
-the iter release. Moving branch names are prohibited in the release gate.
+the iter release. The verifier and both release workflows fail if the checked-out
+SCG subject differs from this pin. Moving branch names are prohibited.
 
 ## CI
 

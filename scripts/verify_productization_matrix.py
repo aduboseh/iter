@@ -343,6 +343,23 @@ def directive_mirror_check(iter_root: Path, scg_root: Path) -> tuple[bool, str]:
     return True, f"directive mirror byte-identical: {iter_hash}"
 
 
+def scg_release_ref_check(iter_root: Path, scg_head: str | None) -> tuple[bool, str]:
+    """Require the checked-out SCG commit to equal iter's immutable release pin."""
+
+    path = iter_root / "productization" / "SCG_RELEASE_REF"
+    try:
+        pinned = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        return False, f"cannot read SCG release pin {path}: {exc}"
+    if re.fullmatch(r"[0-9a-f]{40}", pinned) is None:
+        return False, f"invalid SCG release pin in {path}: {pinned!r}"
+    if scg_head is None:
+        return False, "cannot resolve checked-out SCG commit"
+    if pinned != scg_head:
+        return False, f"SCG release pin mismatch: pinned={pinned}, checked_out={scg_head}"
+    return True, f"SCG release pin matches checked-out subject: {pinned}"
+
+
 def write_report(path: Path, report: dict[str, Any]) -> None:
     """Write one stable, sorted JSON certification report."""
 
@@ -354,11 +371,11 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
 
 
 def certification_status(
-    mirror_ok: bool, results: list[dict[str, Any]]
+    authority_ok: bool, results: list[dict[str, Any]]
 ) -> tuple[str, bool]:
     """Classify a run without allowing a subset to claim full certification."""
 
-    execution_passed = mirror_ok and all(
+    execution_passed = authority_ok and all(
         result["status"] == "PASS" for result in results
     )
     if not execution_passed:
@@ -402,6 +419,10 @@ def main() -> int:
     heads = {repo: git_head(root) for repo, root in roots.items()}
     mirror_ok, mirror_detail = directive_mirror_check(roots["iter"], roots["scg"])
     print(f"{'PASS' if mirror_ok else 'FAIL'} DIRECTIVE-MIRROR {mirror_detail}")
+    scg_pin_ok, scg_pin_detail = scg_release_ref_check(
+        roots["iter"], heads["scg"]
+    )
+    print(f"{'PASS' if scg_pin_ok else 'FAIL'} SCG-RELEASE-REF {scg_pin_detail}")
 
     results: list[dict[str, Any]] = []
     for control in controls:
@@ -445,7 +466,8 @@ def main() -> int:
 
     pass_count = sum(result["status"] == "PASS" for result in results)
     fail_count = len(results) - pass_count
-    report_status, execution_passed = certification_status(mirror_ok, results)
+    authority_ok = mirror_ok and scg_pin_ok
+    report_status, execution_passed = certification_status(authority_ok, results)
     full_matrix_run = len(results) == EXPECTED_CONTROL_COUNT
     report = {
         "schema_version": "apex-productization-report/v1",
@@ -454,6 +476,10 @@ def main() -> int:
         "directive_mirror": {
             "status": "PASS" if mirror_ok else "FAIL",
             "detail": mirror_detail,
+        },
+        "scg_release_ref": {
+            "status": "PASS" if scg_pin_ok else "FAIL",
+            "detail": scg_pin_detail,
         },
         "summary": {
             "status": report_status,
