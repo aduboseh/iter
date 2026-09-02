@@ -206,10 +206,15 @@ jobs:
   apex-productization:
     name: APEX Productization Certification
     runs-on: ubuntu-latest
+    env:
+      ITER_SUBJECT: ${{ github.event.pull_request.head.sha || github.sha }}
+      TRUSTED_EVIDENCE_WORKFLOW: .github/workflows/apex_productization_evidence.yml
     steps:
       - name: Check out iter release subject
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.ITER_SUBJECT }}
+          path: iter
           fetch-depth: 0
           persist-credentials: false
 
@@ -217,9 +222,9 @@ jobs:
         id: scg-ref
         shell: bash
         run: |
-          SCG_REF="$(tr -d '\r\n' < productization/SCG_RELEASE_REF)"
+          SCG_REF="$(tr -d '\r\n' < iter/productization/SCG_RELEASE_REF)"
           if [[ ! "$SCG_REF" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::productization/SCG_RELEASE_REF must contain one lowercase 40-hex commit"
+            echo "::error::iter/productization/SCG_RELEASE_REF must contain one lowercase 40-hex commit"
             exit 1
           fi
           echo "ref=$SCG_REF" >> "$GITHUB_OUTPUT"
@@ -232,16 +237,32 @@ jobs:
           SCG_REF: ${{ steps.scg-ref.outputs.ref }}
         run: |
           set -euo pipefail
-          ARTIFACT_NAME="apex-productization-evidence-${GITHUB_SHA}-${SCG_REF}"
+          ARTIFACT_NAME="apex-productization-evidence-${ITER_SUBJECT}-${SCG_REF}"
           mapfile -t RUN_IDS < <(
             gh api --method GET \
               "repos/${GITHUB_REPOSITORY}/actions/artifacts" \
               -f name="$ARTIFACT_NAME" \
               -f per_page=100 \
-              --jq ".artifacts[] | select(.expired == false and .workflow_run.head_sha == \"${GITHUB_SHA}\") | .workflow_run.id"
+              --jq ".artifacts[] | select(.expired == false and .workflow_run.head_sha == \"${ITER_SUBJECT}\") | .workflow_run.id"
           )
           if [[ "${#RUN_IDS[@]}" -ne 1 ]]; then
-            echo "::error::Expected exactly one active ${ARTIFACT_NAME} artifact for ${GITHUB_SHA}; found ${#RUN_IDS[@]}"
+            echo "::error::Expected exactly one active ${ARTIFACT_NAME} artifact for ${ITER_SUBJECT}; found ${#RUN_IDS[@]}"
+            exit 1
+          fi
+          EVIDENCE_RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_IDS[0]}")"
+          EVIDENCE_WORKFLOW="$(jq -r '.path' <<< "$EVIDENCE_RUN")"
+          EVIDENCE_CONCLUSION="$(jq -r '.conclusion' <<< "$EVIDENCE_RUN")"
+          EVIDENCE_EVENT="$(jq -r '.event' <<< "$EVIDENCE_RUN")"
+          if [[ "$EVIDENCE_WORKFLOW" != "$TRUSTED_EVIDENCE_WORKFLOW" ]]; then
+            echo "::error::Evidence run workflow ${EVIDENCE_WORKFLOW} is not trusted"
+            exit 1
+          fi
+          if [[ "$EVIDENCE_CONCLUSION" != "success" ]]; then
+            echo "::error::Evidence run conclusion must be success, got ${EVIDENCE_CONCLUSION}"
+            exit 1
+          fi
+          if [[ "$EVIDENCE_EVENT" != "workflow_dispatch" ]]; then
+            echo "::error::Evidence run must be independently dispatched, got ${EVIDENCE_EVENT}"
             exit 1
           fi
           echo "name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
@@ -258,7 +279,7 @@ jobs:
           persist-credentials: false
 
       - name: Download commit-bound evidence bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ${{ steps.evidence-artifact.outputs.name }}
           path: apex-evidence
@@ -275,7 +296,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            . -> target
+            iter -> target
             SCG -> target
 
       - name: Install cargo-audit
@@ -283,18 +304,19 @@ jobs:
 
       - name: Execute all 30 productization controls
         run: |
-          python3 scripts/verify_productization_matrix.py \
-            --iter-root . \
+          python3 iter/scripts/verify_productization_matrix.py \
+            --iter-root iter \
             --scg-root SCG \
             --evidence-dir apex-evidence \
-            --report apex-productization-report.json
+            --evidence-run-id "${{ steps.evidence-artifact.outputs.run-id }}" \
+            --report "$RUNNER_TEMP/apex-productization-report.json"
 
       - name: Upload productization report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apex-productization-report-${{ github.sha }}
-          path: apex-productization-report.json
+          path: ${{ runner.temp }}/apex-productization-report.json
           if-no-files-found: error
 
   # Final gate: All checks must pass

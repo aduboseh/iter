@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -22,6 +23,44 @@ def results(count: int, status: str = "PASS") -> list[dict[str, str]]:
     """Build minimal control results for certification-status tests."""
 
     return [{"status": status} for _ in range(count)]
+
+
+def producer(run_id: int = 123) -> dict[str, object]:
+    """Build the trusted producer metadata required by evidence files."""
+
+    return {
+        "repository": VERIFIER.EVIDENCE_PRODUCER_REPOSITORY,
+        "workflow": VERIFIER.TRUSTED_EVIDENCE_WORKFLOW,
+        "run_id": run_id,
+    }
+
+
+def run_git(root: Path, *args: str) -> None:
+    """Run one deterministic Git setup command for worktree-state tests."""
+
+    subprocess.run(
+        ["git", *args],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+
+class MatrixValidationTests(unittest.TestCase):
+    """Prove malformed authority metadata is rejected during validation."""
+
+    def test_missing_directive_id_is_rejected(self) -> None:
+        """Validation fails before execution when directive_id is absent."""
+
+        matrix = VERIFIER.load_json(
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        matrix.pop("directive_id")
+        with self.assertRaisesRegex(ValueError, "directive_id"):
+            VERIFIER.validate_matrix(matrix)
 
 
 class CertificationStatusTests(unittest.TestCase):
@@ -70,6 +109,7 @@ class ExternalEvidenceTests(unittest.TestCase):
                 "schema_version": VERIFIER.EVIDENCE_SCHEMA,
                 "control_id": "G1-01",
                 "result": "PASS",
+                "producer": producer(),
                 "subject_commits": heads,
                 "commands": ["cargo test --locked --workspace"],
                 "artifacts": [
@@ -84,10 +124,44 @@ class ExternalEvidenceTests(unittest.TestCase):
             )
 
             passed, detail, _ = VERIFIER.evidence_check(
-                "G1-01", {"file": "G1-01.json"}, evidence_dir, heads
+                "G1-01",
+                {"file": "G1-01.json"},
+                evidence_dir,
+                heads,
+                123,
             )
 
             self.assertTrue(passed, detail)
+
+            evidence["commands"] = [None]
+            (evidence_dir / "G1-01.json").write_text(
+                json.dumps(evidence), encoding="utf-8"
+            )
+            passed, detail, _ = VERIFIER.evidence_check(
+                "G1-01",
+                {"file": "G1-01.json"},
+                evidence_dir,
+                heads,
+                123,
+            )
+            self.assertFalse(passed)
+            self.assertIn("non-empty strings", detail)
+
+            evidence["commands"] = ["cargo test --locked --workspace"]
+            evidence["producer"] = producer()
+            evidence["producer"]["workflow"] = ".github/workflows/untrusted.yml"
+            (evidence_dir / "G1-01.json").write_text(
+                json.dumps(evidence), encoding="utf-8"
+            )
+            passed, detail, _ = VERIFIER.evidence_check(
+                "G1-01",
+                {"file": "G1-01.json"},
+                evidence_dir,
+                heads,
+                123,
+            )
+            self.assertFalse(passed)
+            self.assertIn("producer.workflow", detail)
 
     def test_stale_external_evidence_fails_closed(self) -> None:
         """A stale iter commit is rejected even when the artifact digest is valid."""
@@ -100,6 +174,7 @@ class ExternalEvidenceTests(unittest.TestCase):
                 "schema_version": VERIFIER.EVIDENCE_SCHEMA,
                 "control_id": "G1-01",
                 "result": "PASS",
+                "producer": producer(),
                 "subject_commits": {"iter": "c" * 40, "scg": "b" * 40},
                 "commands": ["certify"],
                 "artifacts": [
@@ -118,10 +193,36 @@ class ExternalEvidenceTests(unittest.TestCase):
                 {"file": "G1-01.json"},
                 evidence_dir,
                 {"iter": "a" * 40, "scg": "b" * 40},
+                123,
             )
 
             self.assertFalse(passed)
             self.assertIn("does not match", detail)
+
+
+class GitWorktreeStateTests(unittest.TestCase):
+    """Prove certification rejects source content outside the recorded commit."""
+
+    def test_clean_then_dirty_worktree(self) -> None:
+        """A committed tree passes and an untracked source file fails closed."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            run_git(root, "init")
+            run_git(root, "config", "user.name", "APEX Test")
+            run_git(root, "config", "user.email", "apex-test@example.invalid")
+            (root / "source.txt").write_text("stable\n", encoding="utf-8")
+            run_git(root, "add", "source.txt")
+            run_git(root, "commit", "-m", "fixture")
+
+            self.assertEqual(
+                VERIFIER.git_worktree_clean(root),
+                (True, "repository worktree is clean"),
+            )
+            (root / "untracked.txt").write_text("mutation\n", encoding="utf-8")
+            clean, detail = VERIFIER.git_worktree_clean(root)
+            self.assertFalse(clean)
+            self.assertIn("untracked.txt", detail)
 
 
 class ScgReleaseRefTests(unittest.TestCase):

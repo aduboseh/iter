@@ -23,6 +23,8 @@ MATRIX_SCHEMA = "apex-productization-matrix/v1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
 EXPECTED_CONTROL_COUNT = 30
 ALLOWED_CHECK_TYPES = {"command", "path_exists", "regex", "evidence"}
+EVIDENCE_PRODUCER_REPOSITORY = "aduboseh/iter"
+TRUSTED_EVIDENCE_WORKFLOW = ".github/workflows/apex_productization_evidence.yml"
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +44,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=script_root / "productization" / "evidence",
     )
+    parser.add_argument("--evidence-run-id", type=int)
     parser.add_argument("--control", action="append", default=[])
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--allow-failures", action="store_true")
@@ -78,6 +81,9 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
             f"matrix schema must be {MATRIX_SCHEMA!r}, got "
             f"{matrix.get('schema_version')!r}"
         )
+    directive_id = matrix.get("directive_id")
+    if not isinstance(directive_id, str) or not directive_id.strip():
+        raise ValueError("matrix directive_id must be a non-empty string")
     controls = matrix.get("controls")
     if not isinstance(controls, list):
         raise ValueError("matrix controls must be an array")
@@ -153,6 +159,33 @@ def git_head(root: Path) -> str | None:
         check=False,
     )
     return result.stdout.strip() if result.returncode == 0 else None
+
+
+def git_worktree_clean(root: Path) -> tuple[bool, str]:
+    """Require one repository to have no tracked or untracked source changes."""
+
+    if not root.is_dir():
+        return False, f"repository root missing: {root}"
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stdout + "\n" + result.stderr).strip()
+        return False, f"cannot inspect repository state: {detail}"
+    dirty = result.stdout.strip()
+    if dirty:
+        return False, f"repository is dirty: {dirty}"
+    return True, "repository worktree is clean"
 
 
 def command_check(
@@ -259,6 +292,7 @@ def evidence_check(
     check: dict[str, Any],
     evidence_dir: Path,
     heads: dict[str, str | None],
+    evidence_run_id: int | None,
 ) -> tuple[bool, str, float]:
     """Verify external evidence, exact subject commits, and artifact digests."""
 
@@ -275,6 +309,23 @@ def evidence_check(
         failures.append(f"control_id must be {control_id}")
     if evidence.get("result") != "PASS":
         failures.append("result must be PASS")
+
+    producer = evidence.get("producer")
+    if evidence_run_id is None:
+        failures.append("trusted evidence_run_id is required")
+    if not isinstance(producer, dict):
+        failures.append("producer must be an object")
+    else:
+        if producer.get("repository") != EVIDENCE_PRODUCER_REPOSITORY:
+            failures.append(
+                f"producer.repository must be {EVIDENCE_PRODUCER_REPOSITORY}"
+            )
+        if producer.get("workflow") != TRUSTED_EVIDENCE_WORKFLOW:
+            failures.append(
+                f"producer.workflow must be {TRUSTED_EVIDENCE_WORKFLOW}"
+            )
+        if producer.get("run_id") != evidence_run_id:
+            failures.append(f"producer.run_id must be {evidence_run_id}")
 
     subjects = evidence.get("subject_commits")
     if not isinstance(subjects, dict):
@@ -319,8 +370,12 @@ def evidence_check(
                 )
 
     commands = evidence.get("commands")
-    if not isinstance(commands, list) or not commands:
-        failures.append("commands must be a non-empty array")
+    if (
+        not isinstance(commands, list)
+        or not commands
+        or not all(isinstance(command, str) and command.strip() for command in commands)
+    ):
+        failures.append("commands must be a non-empty array of non-empty strings")
 
     if failures:
         return False, "; ".join(failures), 0.0
@@ -417,6 +472,11 @@ def main() -> int:
         "scg": args.scg_root.resolve(),
     }
     heads = {repo: git_head(root) for repo, root in roots.items()}
+    for repo, root in roots.items():
+        clean, detail = git_worktree_clean(root)
+        print(f"{'PASS' if clean else 'FAIL'} {repo.upper()}-INITIAL-STATE {detail}")
+        if not clean:
+            return 2
     mirror_ok, mirror_detail = directive_mirror_check(roots["iter"], roots["scg"])
     print(f"{'PASS' if mirror_ok else 'FAIL'} DIRECTIVE-MIRROR {mirror_detail}")
     scg_pin_ok, scg_pin_detail = scg_release_ref_check(
@@ -437,7 +497,11 @@ def main() -> int:
                 passed, detail, elapsed = regex_check(check, roots)
             else:
                 passed, detail, elapsed = evidence_check(
-                    control["id"], check, args.evidence_dir.resolve(), heads
+                    control["id"],
+                    check,
+                    args.evidence_dir.resolve(),
+                    heads,
+                    args.evidence_run_id,
                 )
             check_results.append(
                 {
@@ -466,13 +530,41 @@ def main() -> int:
 
     pass_count = sum(result["status"] == "PASS" for result in results)
     fail_count = len(results) - pass_count
-    authority_ok = mirror_ok and scg_pin_ok
+    final_heads = {repo: git_head(root) for repo, root in roots.items()}
+    repository_state: dict[str, dict[str, Any]] = {}
+    repositories_unchanged = True
+    for repo, root in roots.items():
+        clean, clean_detail = git_worktree_clean(root)
+        unchanged = clean and final_heads[repo] == heads[repo]
+        repositories_unchanged = repositories_unchanged and unchanged
+        detail = (
+            f"initial={heads[repo]}, final={final_heads[repo]}, {clean_detail}"
+        )
+        print(
+            f"{'PASS' if unchanged else 'FAIL'} "
+            f"{repo.upper()}-FINAL-STATE {detail}"
+        )
+        repository_state[repo] = {
+            "status": "PASS" if unchanged else "FAIL",
+            "initial_commit": heads[repo],
+            "final_commit": final_heads[repo],
+            "clean": clean,
+            "detail": detail,
+        }
+
+    authority_ok = mirror_ok and scg_pin_ok and repositories_unchanged
     report_status, execution_passed = certification_status(authority_ok, results)
     full_matrix_run = len(results) == EXPECTED_CONTROL_COUNT
     report = {
         "schema_version": "apex-productization-report/v1",
         "directive_id": matrix["directive_id"],
-        "subject_commits": heads,
+        "subject_commits": final_heads,
+        "repository_state": repository_state,
+        "evidence_producer": {
+            "repository": EVIDENCE_PRODUCER_REPOSITORY,
+            "workflow": TRUSTED_EVIDENCE_WORKFLOW,
+            "run_id": args.evidence_run_id,
+        },
         "directive_mirror": {
             "status": "PASS" if mirror_ok else "FAIL",
             "detail": mirror_detail,

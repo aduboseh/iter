@@ -48,7 +48,8 @@ generating a baseline report; it does not change any reported FAIL status.
 See [`evidence/README.md`](evidence/README.md). Evidence must bind both source
 commits and SHA-256-bind every referenced artifact. Evidence is supplied as an
 external GitHub Actions artifact so it can name the exact iter commit without
-self-reference. Placeholder or repository-tracked PASS evidence is prohibited.
+self-reference. Only a successful run of the declared trusted evidence workflow
+is accepted. Placeholder or repository-tracked PASS evidence is prohibited.
 
 ## SCG Subject Pin
 
@@ -62,4 +63,7 @@ Pull requests test the verifier and validate the matrix definition. Full
 certification is manually dispatched with an explicit immutable SCG commit and
 the run ID that produced the external evidence bundle. Release branches and
 tags locate exactly one non-expired evidence artifact whose name contains both
-subject commits. A moving branch is not valid release evidence.
+subject commits. Release-PR certification consistently uses the PR head commit,
+not GitHub's synthetic merge commit. Both repositories must be clean before the
+controls run and remain clean at the same commits afterward. A moving branch is
+not valid release evidence.
