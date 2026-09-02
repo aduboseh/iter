@@ -107,6 +107,29 @@ class CertificationStatusTests(unittest.TestCase):
 class ExternalEvidenceTests(unittest.TestCase):
     """Prove evidence can bind immutable commits without entering the source tree."""
 
+    def test_evidence_json_path_escape_is_rejected(self) -> None:
+        """Relative and absolute paths cannot escape the downloaded bundle."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir()
+            outside = root / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            heads = {"iter": "a" * 40, "scg": "b" * 40}
+
+            for escaped_path in ("../outside.json", str(outside.resolve())):
+                with self.subTest(path=escaped_path):
+                    passed, detail, _ = VERIFIER.evidence_check(
+                        "G1-01",
+                        {"file": escaped_path},
+                        evidence_dir,
+                        heads,
+                        123,
+                    )
+                    self.assertFalse(passed)
+                    self.assertIn("escapes evidence directory", detail)
+
     def test_external_evidence_binds_subjects_and_artifact(self) -> None:
         """A valid external bundle passes exact commit and SHA-256 checks."""
 

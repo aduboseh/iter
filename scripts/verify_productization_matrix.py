@@ -315,7 +315,12 @@ def evidence_check(
 ) -> tuple[bool, str, float]:
     """Verify external evidence, exact subject commits, and artifact digests."""
 
-    path = evidence_dir / check["file"]
+    evidence_root = evidence_dir.resolve()
+    path = (evidence_root / check["file"]).resolve()
+    try:
+        path.relative_to(evidence_root)
+    except ValueError:
+        return False, "evidence file escapes evidence directory", 0.0
     try:
         evidence = load_json(path)
     except ValueError as exc:
