@@ -22,6 +22,18 @@ from typing import Any
 MATRIX_SCHEMA = "apex-productization-matrix/v1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
 EXPECTED_CONTROL_COUNT = 30
+EXPECTED_CONTROL_IDS = frozenset(
+    {
+        *(f"G0-{index:02d}" for index in range(1, 15)),
+        *(f"G1-{index:02d}" for index in range(1, 7)),
+        *(f"G2-{index:02d}" for index in range(1, 5)),
+        *(f"G3-{index:02d}" for index in range(1, 3)),
+        "G4-01",
+        "G5-01",
+        "G6-01",
+        "G6-02",
+    }
+)
 ALLOWED_CHECK_TYPES = {"command", "path_exists", "regex", "evidence"}
 EVIDENCE_PRODUCER_REPOSITORY = "aduboseh/iter"
 TRUSTED_EVIDENCE_WORKFLOW = ".github/workflows/apex_productization_evidence.yml"
@@ -143,6 +155,13 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
             elif check_type == "evidence":
                 if not isinstance(check.get("file"), str) or not check["file"]:
                     raise ValueError(f"{control_id}: evidence requires file")
+    if ids != EXPECTED_CONTROL_IDS:
+        missing = sorted(EXPECTED_CONTROL_IDS - ids)
+        unexpected = sorted(ids - EXPECTED_CONTROL_IDS)
+        raise ValueError(
+            "matrix control IDs differ from canonical v1 set: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
     return controls
 
 

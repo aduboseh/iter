@@ -62,6 +62,19 @@ class MatrixValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "directive_id"):
             VERIFIER.validate_matrix(matrix)
 
+    def test_canonical_control_id_substitution_is_rejected(self) -> None:
+        """A syntactically valid replacement cannot hide a required control."""
+
+        matrix = VERIFIER.load_json(
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        control = next(item for item in matrix["controls"] if item["id"] == "G2-01")
+        control["id"] = "G2-99"
+        with self.assertRaisesRegex(ValueError, "canonical v1 set"):
+            VERIFIER.validate_matrix(matrix)
+
 
 class CertificationStatusTests(unittest.TestCase):
     """Prove only a complete successful matrix can report full PASS."""

@@ -35,6 +35,7 @@ python scripts/verify_productization_matrix.py \
   --iter-root /path/to/iter \
   --scg-root /path/to/SCG \
   --evidence-dir /path/to/evidence \
+  --evidence-run-id <trusted-run-id> \
   --report /path/to/apex-productization-report.json
 ```
 
