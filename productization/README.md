@@ -39,14 +39,16 @@ python scripts/verify_productization_matrix.py \
 ```
 
 The command exits nonzero unless every selected control and the byte-identical
-directive-mirror check pass. `--allow-failures` is permitted only for
+directive-mirror check pass. A successful selected subset reports `PARTIAL`,
+never full certification `PASS`. `--allow-failures` is permitted only for
 generating a baseline report; it does not change any reported FAIL status.
 
 ## Evidence
 
 See [`evidence/README.md`](evidence/README.md). Evidence must bind both source
-commits and SHA-256-bind every referenced artifact. Placeholder PASS evidence
-is prohibited.
+commits and SHA-256-bind every referenced artifact. Evidence is supplied as an
+external GitHub Actions artifact so it can name the exact iter commit without
+self-reference. Placeholder or repository-tracked PASS evidence is prohibited.
 
 ## SCG Subject Pin
 
@@ -55,6 +57,8 @@ the iter release. Moving branch names are prohibited in the release gate.
 
 ## CI
 
-Pull requests validate the matrix definition. Full certification is manually
-dispatched with an explicit immutable SCG commit or release tag. A moving
-branch is not valid release evidence.
+Pull requests test the verifier and validate the matrix definition. Full
+certification is manually dispatched with an explicit immutable SCG commit and
+the run ID that produced the external evidence bundle. Release branches and
+tags locate exactly one non-expired evidence artifact whose name contains both
+subject commits. A moving branch is not valid release evidence.

@@ -15,6 +15,10 @@ on:
     branches:
       - 'release/**'
 
+permissions:
+  contents: read
+  actions: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -25,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -50,6 +56,8 @@ jobs:
         working-directory: sdks/rust
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -67,6 +75,8 @@ jobs:
         working-directory: sdks/typescript
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,6 +99,8 @@ jobs:
     if: ${{ !startsWith(github.ref_name, 'v0.') }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Check version consistency
         run: |
@@ -119,6 +131,8 @@ jobs:
     if: ${{ !startsWith(github.ref_name, 'v0.') }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Verify changelog
         run: |
@@ -143,6 +157,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Check for substrate leaks
         run: |
@@ -166,6 +182,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -193,6 +211,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve immutable SCG release subject
         id: scg-ref
@@ -205,6 +224,29 @@ jobs:
           fi
           echo "ref=$SCG_REF" >> "$GITHUB_OUTPUT"
 
+      - name: Locate commit-bound evidence artifact
+        id: evidence-artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCG_REF: ${{ steps.scg-ref.outputs.ref }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_NAME="apex-productization-evidence-${GITHUB_SHA}-${SCG_REF}"
+          mapfile -t RUN_IDS < <(
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts" \
+              -f name="$ARTIFACT_NAME" \
+              -f per_page=100 \
+              --jq ".artifacts[] | select(.expired == false and .workflow_run.head_sha == \"${GITHUB_SHA}\") | .workflow_run.id"
+          )
+          if [[ "${#RUN_IDS[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one active ${ARTIFACT_NAME} artifact for ${GITHUB_SHA}; found ${#RUN_IDS[@]}"
+            exit 1
+          fi
+          echo "name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+          echo "run-id=${RUN_IDS[0]}" >> "$GITHUB_OUTPUT"
+
       - name: Check out exact SCG release subject
         uses: actions/checkout@v4
         with:
@@ -213,6 +255,16 @@ jobs:
           token: ${{ secrets.SCG_PAT || github.token }}
           path: SCG
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download commit-bound evidence bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.evidence-artifact.outputs.name }}
+          path: apex-evidence
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.evidence-artifact.outputs.run-id }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -234,7 +286,7 @@ jobs:
           python3 scripts/verify_productization_matrix.py \
             --iter-root . \
             --scg-root SCG \
-            --evidence-dir productization/evidence \
+            --evidence-dir apex-evidence \
             --report apex-productization-report.json
 
       - name: Upload productization report

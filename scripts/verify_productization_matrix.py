@@ -26,6 +26,8 @@ ALLOWED_CHECK_TYPES = {"command", "path_exists", "regex", "evidence"}
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse verifier paths, control selection, and reporting options."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     script_root = Path(__file__).resolve().parents[1]
     parser.add_argument(
@@ -48,6 +50,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_json(path: Path) -> dict[str, Any]:
+    """Load one JSON object or raise a diagnostic ValueError."""
+
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -60,11 +64,15 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def require_repo(control_id: str, check: dict[str, Any]) -> None:
+    """Require a check to target one of the two certified repositories."""
+
     if check.get("repo") not in {"iter", "scg"}:
         raise ValueError(f"{control_id}: check repo must be 'iter' or 'scg'")
 
 
 def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
+    """Validate the fixed 30-control schema and return its controls."""
+
     if matrix.get("schema_version") != MATRIX_SCHEMA:
         raise ValueError(
             f"matrix schema must be {MATRIX_SCHEMA!r}, got "
@@ -133,6 +141,8 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def git_head(root: Path) -> str | None:
+    """Return the exact Git commit checked out at root, if resolvable."""
+
     if not root.is_dir():
         return None
     result = subprocess.run(
@@ -148,6 +158,8 @@ def git_head(root: Path) -> str | None:
 def command_check(
     check: dict[str, Any], roots: dict[str, Path]
 ) -> tuple[bool, str, float]:
+    """Execute one declared command without a shell and verify its result."""
+
     root = roots[check["repo"]]
     if not root.is_dir():
         return False, f"repository root missing: {root}", 0.0
@@ -209,6 +221,8 @@ def command_check(
 def path_check(
     check: dict[str, Any], roots: dict[str, Path]
 ) -> tuple[bool, str, float]:
+    """Verify that a declared repository-relative path exists."""
+
     path = roots[check["repo"]] / check["path"]
     if not path.exists():
         return False, f"missing path: {path}", 0.0
@@ -218,6 +232,8 @@ def path_check(
 def regex_check(
     check: dict[str, Any], roots: dict[str, Path]
 ) -> tuple[bool, str, float]:
+    """Evaluate a declared regular-expression invariant against one file."""
+
     path = roots[check["repo"]] / check["path"]
     if not path.is_file():
         return False, f"missing file: {path}", 0.0
@@ -229,6 +245,8 @@ def regex_check(
 
 
 def sha256_file(path: Path) -> str:
+    """Return the lowercase SHA-256 digest of a file's raw bytes."""
+
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -242,6 +260,8 @@ def evidence_check(
     evidence_dir: Path,
     heads: dict[str, str | None],
 ) -> tuple[bool, str, float]:
+    """Verify external evidence, exact subject commits, and artifact digests."""
+
     path = evidence_dir / check["file"]
     try:
         evidence = load_json(path)
@@ -308,6 +328,8 @@ def evidence_check(
 
 
 def directive_mirror_check(iter_root: Path, scg_root: Path) -> tuple[bool, str]:
+    """Require the iter and SCG productization directives to be byte-identical."""
+
     iter_path = iter_root / "APEX_PRODUCTIZATION_V1.md"
     scg_path = scg_root / "APEX_PRODUCTIZATION_V1.md"
     if not iter_path.is_file():
@@ -322,6 +344,8 @@ def directive_mirror_check(iter_root: Path, scg_root: Path) -> tuple[bool, str]:
 
 
 def write_report(path: Path, report: dict[str, Any]) -> None:
+    """Write one stable, sorted JSON certification report."""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
@@ -329,7 +353,24 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
     )
 
 
+def certification_status(
+    mirror_ok: bool, results: list[dict[str, Any]]
+) -> tuple[str, bool]:
+    """Classify a run without allowing a subset to claim full certification."""
+
+    execution_passed = mirror_ok and all(
+        result["status"] == "PASS" for result in results
+    )
+    if not execution_passed:
+        return "FAIL", False
+    if len(results) == EXPECTED_CONTROL_COUNT:
+        return "PASS", True
+    return "PARTIAL", True
+
+
 def main() -> int:
+    """Validate or execute the release matrix and emit an auditable report."""
+
     args = parse_args()
     try:
         matrix = load_json(args.matrix)
@@ -404,7 +445,8 @@ def main() -> int:
 
     pass_count = sum(result["status"] == "PASS" for result in results)
     fail_count = len(results) - pass_count
-    all_passed = mirror_ok and fail_count == 0
+    report_status, execution_passed = certification_status(mirror_ok, results)
+    full_matrix_run = len(results) == EXPECTED_CONTROL_COUNT
     report = {
         "schema_version": "apex-productization-report/v1",
         "directive_id": matrix["directive_id"],
@@ -414,10 +456,12 @@ def main() -> int:
             "detail": mirror_detail,
         },
         "summary": {
-            "status": "PASS" if all_passed else "FAIL",
+            "status": report_status,
             "passed": pass_count,
             "failed": fail_count,
             "selected_controls": len(results),
+            "total_controls": EXPECTED_CONTROL_COUNT,
+            "full_matrix": full_matrix_run,
         },
         "controls": results,
     }
@@ -426,10 +470,10 @@ def main() -> int:
         print(f"REPORT {args.report.resolve()}")
 
     print(
-        f"APEX RELEASE MATRIX: {'PASS' if all_passed else 'FAIL'} "
+        f"APEX RELEASE MATRIX: {report_status} "
         f"({pass_count} passed, {fail_count} failed)"
     )
-    if all_passed or args.allow_failures:
+    if execution_passed or args.allow_failures:
         return 0
     return 1
 
