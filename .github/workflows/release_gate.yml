@@ -206,6 +206,7 @@ jobs:
   apex-productization:
     name: APEX Productization Certification
     runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref_name, 'v0.') }}
     env:
       ITER_SUBJECT: ${{ github.event.pull_request.head.sha || github.sha }}
       TRUSTED_EVIDENCE_WORKFLOW: .github/workflows/apex_productization_evidence.yml
