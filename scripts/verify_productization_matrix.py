@@ -21,6 +21,7 @@ from typing import Any
 
 MATRIX_SCHEMA = "apex-productization-matrix/v1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
+DIRECTIVE_ID = "APEX-SCG-ITER-PROD-001"
 EXPECTED_CONTROL_COUNT = 30
 EXPECTED_CONTROL_IDS = frozenset(
     {
@@ -94,8 +95,8 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
             f"{matrix.get('schema_version')!r}"
         )
     directive_id = matrix.get("directive_id")
-    if not isinstance(directive_id, str) or not directive_id.strip():
-        raise ValueError("matrix directive_id must be a non-empty string")
+    if directive_id != DIRECTIVE_ID:
+        raise ValueError(f"matrix directive_id must be {DIRECTIVE_ID!r}")
     controls = matrix.get("controls")
     if not isinstance(controls, list):
         raise ValueError("matrix controls must be an array")

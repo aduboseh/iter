@@ -62,6 +62,18 @@ class MatrixValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "directive_id"):
             VERIFIER.validate_matrix(matrix)
 
+    def test_noncanonical_directive_id_is_rejected(self) -> None:
+        """A matrix cannot substitute a different release authority."""
+
+        matrix = VERIFIER.load_json(
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        matrix["directive_id"] = "APEX-UNRELATED-001"
+        with self.assertRaisesRegex(ValueError, VERIFIER.DIRECTIVE_ID):
+            VERIFIER.validate_matrix(matrix)
+
     def test_canonical_control_id_substitution_is_rejected(self) -> None:
         """A syntactically valid replacement cannot hide a required control."""
 

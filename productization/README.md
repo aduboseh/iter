@@ -35,9 +35,11 @@ python scripts/verify_productization_matrix.py \
   --iter-root /path/to/iter \
   --scg-root /path/to/SCG \
   --evidence-dir /path/to/evidence \
-  --evidence-run-id <trusted-run-id> \
+  --evidence-run-id 123456789 \
   --report /path/to/apex-productization-report.json
 ```
+
+Replace `123456789` with the actual successful trusted evidence workflow run ID.
 
 The command exits nonzero unless every selected control and the byte-identical
 directive-mirror check pass. A successful selected subset reports `PARTIAL`,
