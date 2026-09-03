@@ -1,0 +1,779 @@
+{
+  "schema_version": "apex-productization-matrix/v1",
+  "directive_id": "APEX-SCG-ITER-PROD-001",
+  "authority_document": "APEX_PRODUCTIZATION_V1.md",
+  "control_count": 30,
+  "semantics": {
+    "pass": "Every check completed successfully against the recorded repository commits.",
+    "fail": "At least one check failed, was skipped, lacked evidence, or referenced stale evidence.",
+    "no_pending_state": true
+  },
+  "controls": [
+    {
+      "id": "G0-01",
+      "gate": 0,
+      "system": "iter",
+      "title": "iter build quality gates",
+      "invariant": "Formatting, linting, and the complete workspace test suite pass without warnings or exclusions.",
+      "remediation": "Fix correctness or quality failures; do not suppress lints or skip tests.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "timeout_seconds": 600
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "clippy",
+            "--locked",
+"--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--workspace"
+          ],
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    {
+      "id": "G0-02",
+      "gate": 0,
+      "system": "iter",
+      "title": "iter dependency audit",
+      "invariant": "The locked dependency graph has no known RustSec vulnerability.",
+      "remediation": "Update the narrowest compatible dependency set and retain Cargo.lock review evidence.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "audit"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-03",
+      "gate": 0,
+      "system": "iter",
+      "title": "Honest production substrate configuration",
+      "invariant": "The configuration advertised for production substrate execution compiles and cannot silently use stub semantics.",
+      "remediation": "Provide the private buildable substrate integration or remove production/full-substrate claims from the product contract.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "check",
+            "--locked",
+"--workspace",
+            "--all-targets",
+            "--no-default-features",
+            "--features",
+            "full_substrate"
+          ],
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    {
+      "id": "G0-04",
+      "gate": 0,
+      "system": "iter",
+      "title": "Authoritative governed runtime path",
+      "invariant": "Production-path coverage executes GovernedRuntime evaluation through the SCG-backed seam.",
+      "remediation": "Add a process-level test over the real configured runtime path; do not substitute direct helper testing.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "runtime_seam_001b",
+            "governed_backed_mode_emits_governed_packet",
+            "--",
+            "--exact"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-05",
+      "gate": 0,
+      "system": "iter",
+      "title": "Missing or corrupt replay evidence fails closed",
+      "invariant": "Missing governance provenance or replay-integrity failure cannot produce a verified decision.",
+      "remediation": "Reject before authoritative result construction and add regression coverage for every missing field.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "runtime_seam_001b",
+            "governance_hash_absent_fails_boot",
+            "--",
+            "--exact"
+          ],
+          "timeout_seconds": 1200
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "runtime_seam_001b",
+            "replay_integrity_violation_fails_closed",
+            "--",
+            "--exact"
+          ],
+          "timeout_seconds": 1200
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "cli_replay_audit",
+            "cli_replay_rejects_missing_file",
+            "--",
+            "--exact"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-06",
+      "gate": 0,
+      "system": "iter",
+      "title": "Unsupported contract rejection",
+      "invariant": "Unsupported contract versions fail deterministically before semantic acceptance.",
+      "remediation": "Enforce version precedence at ingress and preserve a stable error taxonomy.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "runtime_seam_001b",
+            "contract_version_mismatch_fails_closed",
+            "--",
+            "--exact"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-07",
+      "gate": 0,
+      "system": "SCG",
+      "title": "SCG build quality gates",
+      "invariant": "Formatting, linting, and the complete SCG workspace test suite pass without warnings or exclusions.",
+      "remediation": "Fix correctness or quality failures; do not suppress lints or skip tests.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "timeout_seconds": 600
+        },
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "clippy",
+            "--locked",
+"--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "timeout_seconds": 2400
+        },
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--workspace"
+          ],
+          "timeout_seconds": 2400
+        }
+      ]
+    },
+    {
+      "id": "G0-08",
+      "gate": 0,
+      "system": "SCG",
+      "title": "SCG dependency audit",
+      "invariant": "The locked SCG dependency graph has no known RustSec vulnerability.",
+      "remediation": "Apply minimal lockfile-reviewed updates for every active advisory.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "audit"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-09",
+      "gate": 0,
+      "system": "SCG",
+      "title": "Single governance hash authority",
+      "invariant": "The mandatory governance document read establishes one compile-time hash authority and gateway boot rejects mismatch.",
+      "remediation": "Remove independent digest literals and fail-open reads; bind runtime identity to SCG_GOVERNANCE_SHA.",
+      "checks": [
+        {
+          "type": "path_exists",
+          "repo": "scg",
+          "path": "governance/SCG_Governance_v1.0.md"
+        },
+        {
+          "type": "path_exists",
+          "repo": "scg",
+          "path": "governance/governance.hash"
+        },
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-governance"
+          ],
+          "timeout_seconds": 1200
+        },
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-gateway",
+            "--features",
+            "ci",
+            "governance_hash_binding_rejects_mismatch"
+          ],
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    {
+      "id": "G0-10",
+      "gate": 0,
+      "system": "SCG",
+      "title": "Fail-closed execution trace mutation",
+      "invariant": "Trace push and raw-vector construction reject invalid hashes, broken links, invalid ordering, and post-finalization mutation.",
+      "remediation": "Keep push and from_steps fallible and propagate every error at all callers.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-governance-bridge",
+            "--test",
+            "trace_chain_integrity"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-11",
+      "gate": 0,
+      "system": "SCG",
+      "title": "Tamper-evident gateway persistence",
+      "invariant": "Canonical records bind sequence, predecessor hash, and payload; load rejects any mutation.",
+      "remediation": "Verify the complete chain before exposing state and retain payload and predecessor tamper tests.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-gateway",
+            "--features",
+            "ci",
+            "persistence_rejects_tampered"
+          ],
+          "timeout_seconds": 1800
+        }
+      ]
+    },
+    {
+      "id": "G0-12",
+      "gate": 0,
+      "system": "SCG",
+      "title": "Deterministic connectome surfaces",
+      "invariant": "Replay and query results do not depend on unordered map iteration.",
+      "remediation": "Use ordered collections or sorted outputs and prove remaining HashMap use is outside replay/provenance.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-connectome"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G0-13",
+      "gate": 0,
+      "system": "Integration",
+      "title": "iter to SCG governed seam",
+      "invariant": "iter and SCG agree on contract, governance identity, trace semantics, and replay identity.",
+      "remediation": "Update the versioned bridge contract in both repositories and preserve cross-repo golden vectors.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "runtime_seam_001b"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-gateway",
+            "--features",
+            "ci",
+            "--test",
+            "governance_endpoint_001b"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/CANONICAL_VECTORS.json",
+          "right_repo": "scg",
+          "right_path": "CANONICAL_VECTORS.json"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/Cargo.toml",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/Cargo.toml"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/contract.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/contract.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/errors.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/errors.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/lib.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/lib.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/trace.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/trace.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/tests/contract_determinism.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/tests/contract_determinism.rs"
+        }
+      ]
+    },
+    {
+      "id": "G0-14",
+      "gate": 0,
+      "system": "Integration",
+      "title": "DecisionPacket replay and tamper rejection",
+      "invariant": "A DecisionPacket replays identically and packet, trace, policy, or replay-identity mutation invalidates verification.",
+      "remediation": "Bind every authoritative field into canonical identity and test mutation at packet, trace, and CLI boundaries.",
+      "checks": [
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "replay_contract"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "cli_replay_audit"
+          ],
+          "timeout_seconds": 1800
+        },
+        {
+          "type": "command",
+          "repo": "scg",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"-p",
+            "scg-governance-bridge",
+            "--test",
+            "trace_replay_poison_001"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G1-01",
+      "gate": 1,
+      "system": "Integration",
+      "title": "Linux x86_64 determinism certificate",
+      "invariant": "The canonical corpus produces the certified identity on clean Linux x86_64.",
+      "remediation": "Run the certification workflow and supply commit-bound evidence.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G1-01-linux-x86_64.json"
+        }
+      ]
+    },
+    {
+      "id": "G1-02",
+      "gate": 1,
+      "system": "Integration",
+      "title": "Linux ARM64 determinism certificate",
+      "invariant": "The canonical corpus produces the same certified identity on clean Linux ARM64.",
+      "remediation": "Run on native or documented ARM64 infrastructure and supply commit-bound evidence.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G1-02-linux-arm64.json"
+        }
+      ]
+    },
+    {
+      "id": "G1-03",
+      "gate": 1,
+      "system": "Integration",
+      "title": "Windows x86_64 determinism certificate",
+      "invariant": "The canonical corpus produces the same certified identity on clean Windows x86_64.",
+      "remediation": "Run the exact corpus with locked toolchain and dependencies and supply commit-bound evidence.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G1-03-windows-x86_64.json"
+        }
+      ]
+    },
+    {
+      "id": "G1-04",
+      "gate": 1,
+      "system": "Integration",
+      "title": "Azure AKS determinism certificate",
+      "invariant": "The deployed AKS runtime produces the same certified identity as certified local environments.",
+      "remediation": "Deploy immutable artifacts, execute the corpus in-cluster, and retain environment attestations.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G1-04-aks.json"
+        }
+      ]
+    },
+    {
+      "id": "G1-05",
+      "gate": 1,
+      "system": "Integration",
+      "title": "Clean-room reproducibility certificate",
+      "invariant": "An environment with no developer state can build and reproduce the canonical corpus identity.",
+      "remediation": "Provision from documented inputs only and retain build and test provenance.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G1-05-clean-room.json"
+        }
+      ]
+    },
+    {
+      "id": "G1-06",
+      "gate": 1,
+      "system": "Integration",
+      "title": "Canonical mutation certification",
+      "invariant": "Every governed input mutation changes canonical identity or invalidates verification as specified.",
+      "remediation": "Cover policy, input, evidence, SCG state, contract, trace, runtime identity, and configuration.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G1-06-mutation-suite.json"
+        }
+      ]
+    },
+    {
+      "id": "G2-01",
+      "gate": 2,
+      "system": "iter",
+      "title": "TLS enforcement",
+      "invariant": "All production ingress and iter-to-SCG transport authenticate endpoints and reject plaintext downgrade.",
+      "remediation": "Implement and test TLS policy at deployment and service boundaries.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G2-01-tls.json"
+        }
+      ]
+    },
+    {
+      "id": "G2-02",
+      "gate": 2,
+      "system": "Integration",
+      "title": "OIDC, workload identity, and tenant identity",
+      "invariant": "Every request and workload has authenticated, attributable identity with tenant binding.",
+      "remediation": "Integrate OIDC and workload identity; reject missing, invalid, stale, or cross-tenant identity.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G2-02-identity.json"
+        }
+      ]
+    },
+    {
+      "id": "G2-03",
+      "gate": 2,
+      "system": "iter",
+      "title": "RBAC, rate limiting, and network isolation",
+      "invariant": "Authorization is least-privilege, abuse is bounded, and SCG is reachable only through the private boundary.",
+      "remediation": "Implement policy-tested RBAC, per-tenant limits, and deny-by-default network controls.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G2-03-access-boundary.json"
+        }
+      ]
+    },
+    {
+      "id": "G2-04",
+      "gate": 2,
+      "system": "Integration",
+      "title": "Secrets, rotation, and privileged immutable audit",
+      "invariant": "Production secrets are externally managed and every privileged mutation is attributable in tamper-evident logs.",
+      "remediation": "Use managed secrets and rotation; add privileged-operation audit and retention evidence.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G2-04-secrets-audit.json"
+        }
+      ]
+    },
+    {
+      "id": "G3-01",
+      "gate": 3,
+      "system": "iter",
+      "title": "Versioned canonical DecisionPacket contract",
+      "invariant": "DecisionPacket has a versioned schema, canonical identity, migration policy, and schema-conformant golden evidence.",
+      "remediation": "Keep the public schema generated from code and require compatibility and golden-vector tests.",
+      "checks": [
+        {
+          "type": "path_exists",
+          "repo": "iter",
+          "path": "schemas/v1/decision_packet.schema.json"
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "schema_integrity"
+          ],
+          "timeout_seconds": 1200
+        },
+        {
+          "type": "command",
+          "repo": "iter",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+"--test",
+            "doc_examples_integrity"
+          ],
+          "timeout_seconds": 1200
+        }
+      ]
+    },
+    {
+      "id": "G3-02",
+      "gate": 3,
+      "system": "iter",
+      "title": "Signed independently verifiable DecisionPacket",
+      "invariant": "A verifier outside the runtime validates signature, canonical identity, policy, evidence, and replay binding without trusting the model.",
+      "remediation": "Define signature and key lifecycle and provide independent Rust and Python verification vectors.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G3-02-independent-signature.json"
+        }
+      ]
+    },
+    {
+      "id": "G4-01",
+      "gate": 4,
+      "system": "Integration",
+      "title": "Signed release supply chain",
+      "invariant": "Binaries, containers, SCG artifact, SDKs, schemas, SBOM, checksums, provenance, and manifests are CI-built, signed, and source-traceable.",
+      "remediation": "Implement controlled release automation with SBOM and SLSA-compatible provenance; prohibit manual assembly.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G4-01-supply-chain.json"
+        }
+      ]
+    },
+    {
+      "id": "G5-01",
+      "gate": 5,
+      "system": "Integration",
+      "title": "AKS operability and failure-injection certification",
+      "invariant": "Automated idempotent deploy, health verification, telemetry, restart, upgrade, rollback, and degradation scenarios pass in AKS.",
+      "remediation": "Build versioned deployment automation and execute the complete failure-injection runbook.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G5-01-aks-operability.json"
+        }
+      ]
+    },
+    {
+      "id": "G6-01",
+      "gate": 6,
+      "system": "iter",
+      "title": "Customer distribution completeness",
+      "invariant": "Runtime, API, MCP, Rust and Python SDKs, policy interface, CLIs, audit export, deployment, telemetry, and DOC-001 through DOC-006 are independently usable.",
+      "remediation": "Complete missing distribution artifacts and validate documented commands from a clean environment.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G6-01-distribution.json"
+        }
+      ]
+    },
+    {
+      "id": "G6-02",
+      "gate": 6,
+      "system": "Integration",
+      "title": "Independent operator acceptance",
+      "invariant": "An external operator installs, integrates, executes, verifies, replays, audits, upgrades, and rolls back without architect intervention.",
+      "remediation": "Run Private Preview acceptance with design partners and close all P0/P1 defects.",
+      "checks": [
+        {
+          "type": "evidence",
+          "file": "G6-02-operator-acceptance.json"
+        }
+      ]
+    }
+  ]
+}

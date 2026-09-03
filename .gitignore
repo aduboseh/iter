@@ -23,6 +23,8 @@ demos/governance_proof_log.json
 # Certification artifacts (generated)
 certification/v1.0/expected_results/lineage.json
 pilot_reports/day1/replay/variance_analysis.json
+productization/evidence/*.json
+productization/evidence/artifacts/
 
 # Backup directory
 .repo_cleanup_backup_2025/

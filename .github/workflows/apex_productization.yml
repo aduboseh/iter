@@ -1,0 +1,155 @@
+name: APEX Productization Matrix
+
+on:
+  pull_request:
+    paths:
+      - APEX_PRODUCTIZATION_V1.md
+      - productization/APEX_RELEASE_MATRIX_V1.json
+      - productization/SCG_RELEASE_REF
+      - productization/evidence/**
+      - scripts/verify_productization_matrix.py
+      - .github/workflows/apex_productization.yml
+  push:
+    branches: [main]
+    paths:
+      - APEX_PRODUCTIZATION_V1.md
+      - productization/APEX_RELEASE_MATRIX_V1.json
+      - productization/SCG_RELEASE_REF
+      - productization/evidence/**
+      - scripts/verify_productization_matrix.py
+      - .github/workflows/apex_productization.yml
+  workflow_dispatch:
+    inputs:
+      scg_ref:
+        description: Exact lowercase 40-hex SCG commit to certify
+        required: true
+        type: string
+      evidence_run_id:
+        description: Workflow run containing evidence for this exact iter and SCG subject
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  TRUSTED_EVIDENCE_WORKFLOW: .github/workflows/apex_productization_evidence.yml
+
+jobs:
+  matrix-definition:
+    name: Validate 30-control matrix definition
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test matrix verifier
+        run: python3 -m unittest discover -s tests -p 'test_productization_matrix.py'
+      - name: Validate matrix schema and control count
+        run: python3 scripts/verify_productization_matrix.py --validate-only
+
+  release-certification:
+    name: Execute release certification
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out iter
+        uses: actions/checkout@v4
+        with:
+          path: iter
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate immutable SCG subject
+        id: scg-ref
+        shell: bash
+        env:
+          SCG_REF: ${{ inputs.scg_ref }}
+        run: |
+          if [[ ! "$SCG_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::scg_ref must be one lowercase 40-hex commit"
+            exit 1
+          fi
+          PINNED_SCG_REF="$(tr -d '\r\n' < iter/productization/SCG_RELEASE_REF)"
+          if [[ "$SCG_REF" != "$PINNED_SCG_REF" ]]; then
+            echo "::error::scg_ref ${SCG_REF} does not match pinned release subject ${PINNED_SCG_REF}"
+            exit 1
+          fi
+          echo "ref=$SCG_REF" >> "$GITHUB_OUTPUT"
+      - name: Validate commit-bound evidence run
+        id: evidence-run
+        shell: bash
+        env:
+          EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EVIDENCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::evidence_run_id must be a positive GitHub Actions run ID"
+            exit 1
+          fi
+          EVIDENCE_RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}")"
+          EVIDENCE_HEAD="$(jq -r '.head_sha' <<< "$EVIDENCE_RUN")"
+          EVIDENCE_WORKFLOW="$(jq -r '.path' <<< "$EVIDENCE_RUN")"
+          EVIDENCE_CONCLUSION="$(jq -r '.conclusion' <<< "$EVIDENCE_RUN")"
+          EVIDENCE_EVENT="$(jq -r '.event' <<< "$EVIDENCE_RUN")"
+          if [[ "$EVIDENCE_HEAD" != "$GITHUB_SHA" ]]; then
+            echo "::error::Evidence run head ${EVIDENCE_HEAD} does not match iter subject ${GITHUB_SHA}"
+            exit 1
+          fi
+          if [[ "$EVIDENCE_WORKFLOW" != "$TRUSTED_EVIDENCE_WORKFLOW" ]]; then
+            echo "::error::Evidence run workflow ${EVIDENCE_WORKFLOW} is not trusted"
+            exit 1
+          fi
+          if [[ "$EVIDENCE_CONCLUSION" != "success" ]]; then
+            echo "::error::Evidence run conclusion must be success, got ${EVIDENCE_CONCLUSION}"
+            exit 1
+          fi
+          if [[ "$EVIDENCE_EVENT" != "workflow_dispatch" ]]; then
+            echo "::error::Evidence run must be independently dispatched, got ${EVIDENCE_EVENT}"
+            exit 1
+          fi
+          echo "run-id=$EVIDENCE_RUN_ID" >> "$GITHUB_OUTPUT"
+      - name: Check out exact SCG subject
+        uses: actions/checkout@v4
+        with:
+          repository: aduboseh/SCG
+          ref: ${{ steps.scg-ref.outputs.ref }}
+          token: ${{ secrets.SCG_PAT || github.token }}
+          path: SCG
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download commit-bound evidence bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: apex-productization-evidence-${{ github.sha }}-${{ steps.scg-ref.outputs.ref }}
+          path: apex-evidence
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.evidence-run.outputs.run-id }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            iter -> target
+            SCG -> target
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.22.1 --locked
+      - name: Execute all release controls
+        run: |
+          python3 iter/scripts/verify_productization_matrix.py \
+            --iter-root iter \
+            --scg-root SCG \
+            --evidence-dir apex-evidence \
+            --evidence-run-id "${{ steps.evidence-run.outputs.run-id }}" \
+            --report apex-productization-report.json
+      - name: Upload certification report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: apex-productization-report
+          path: apex-productization-report.json
+          if-no-files-found: error
