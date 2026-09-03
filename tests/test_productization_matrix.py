@@ -87,6 +87,21 @@ class MatrixValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "canonical v1 set"):
             VERIFIER.validate_matrix(matrix)
 
+    def test_canonical_control_checks_substitution_is_rejected(self) -> None:
+        """A valid-looking check cannot replace a canonical control definition."""
+
+        matrix = VERIFIER.load_json(
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        control = next(item for item in matrix["controls"] if item["id"] == "G0-01")
+        control["checks"] = [
+            {"type": "path_exists", "repo": "iter", "path": "Cargo.toml"}
+        ]
+        with self.assertRaisesRegex(ValueError, "canonical definition"):
+            VERIFIER.validate_matrix(matrix)
+
     def test_repository_path_escape_is_rejected_during_validation(self) -> None:
         """Repository checks cannot declare absolute or parent-traversal paths."""
 

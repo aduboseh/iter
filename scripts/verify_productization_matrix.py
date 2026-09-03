@@ -23,18 +23,39 @@ MATRIX_SCHEMA = "apex-productization-matrix/v1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
 DIRECTIVE_ID = "APEX-SCG-ITER-PROD-001"
 EXPECTED_CONTROL_COUNT = 30
-EXPECTED_CONTROL_IDS = frozenset(
-    {
-        *(f"G0-{index:02d}" for index in range(1, 15)),
-        *(f"G1-{index:02d}" for index in range(1, 7)),
-        *(f"G2-{index:02d}" for index in range(1, 5)),
-        *(f"G3-{index:02d}" for index in range(1, 3)),
-        "G4-01",
-        "G5-01",
-        "G6-01",
-        "G6-02",
-    }
-)
+EXPECTED_CONTROL_CHECK_DIGESTS = {
+    "G0-01": "4364a791a1a3e48c542c472254c417f0c6d94f6279005b706984a2b7b0cbf79d",
+    "G0-02": "e366086fad6b7cd3a9effc2ba18715e3f4bba9993cfa683d94620e596add7019",
+    "G0-03": "9414ba31ec86f3a323066dd0ea89b4073f42d1c160f94ecba797da944f3dac91",
+    "G0-04": "3173dd818e17dba46ef848c5bc3d83d46f98541ed760df91e33a4ba6ae6ee517",
+    "G0-05": "802218a091d41d636292ae7bb147e5b588655ca9f913b0727c4bc838b31c845e",
+    "G0-06": "71118f52a178f45421d9226fb3c53573b86f1c5eed86644c2395b75beb6abc1a",
+    "G0-07": "66db7d3f8aa1973c4c7e26b3aa034e37098191e3f910e2a30de6dc4366971eea",
+    "G0-08": "bcedd7adf6823474d9f4bfe3c07f4e049a53c3d6e8e26456134bea67e37ec585",
+    "G0-09": "aef272532d4e2ff74c7cd6712e52e694d2fd1b79b9e313a3b92cff9505b86e1d",
+    "G0-10": "8b5a34376c814aa901d7dc0b276cf75a5bbf0e978ba70d751e8e8b099f38e6c6",
+    "G0-11": "28657cd805d5153c12ae272c745f84679f88bbf1970045499199b345d1d463c9",
+    "G0-12": "3539a37d38ce3b44ab63fc9a4d264c208a1711240c5e4eb8fef90c8ced109fbe",
+    "G0-13": "1b38604b4ff98dab469a5fd866b20f1328c8ac8ca2c2709b0e6a26c400b81483",
+    "G0-14": "3d73bf0be6f2607983403f38a489958f27bf78c774024a927dff96f50c7ba644",
+    "G1-01": "e556dbc7e1718c34f1a4c21495d75a56d7c6ffc555bb38c817fef0e217fe7ef4",
+    "G1-02": "005d22c92bf49329b20ccec6fc4fe559a04273132a67bf460a1c763c1924fbbf",
+    "G1-03": "b61dbf78a9c6cdb1d8b1ebd6bc517737b69bdc2173e6d0c67e977c7e3cc0cfb3",
+    "G1-04": "fdacf4a7ddde912075915382c6428438f1d2f48f144d160a9379b262504a1b64",
+    "G1-05": "717fcce52b842794dc17859a6419bdbef3842c1ebfd2dfcd3c60115f85aa5720",
+    "G1-06": "a5ce10fd07b4ba9605bed78f1d05d95f42bf2e02ede79347c9a7f48f39b04428",
+    "G2-01": "acfece60a0d9b528f55a70c7dfa949e2342e83c267189217114fbb2a7c4b2ca4",
+    "G2-02": "c5a85ac0aad99822763f9c69bbccaeecbd63988c2f1cc94e818658d9db8477fd",
+    "G2-03": "9ccd0038e975a3dbfc86128f073c1c585addd902cf61373ed0956952aa15e071",
+    "G2-04": "6fbc83be145a24a4b375c152af640ee3834e213b1c62e137f3cdf492bb9c43c1",
+    "G3-01": "0d4b8b3f0464d573203594eb0d8a9518f6beeb01cb9aef2b626fd06203a5554f",
+    "G3-02": "e61b5c4da54d2b58c9b79b76e66e594bfd56294710628db45d0695d6f703f69e",
+    "G4-01": "1132b16be32ac4783c5d4d3ea9a0c2efe35c0018427697b3ef015344ad1cde1a",
+    "G5-01": "9c115a1473a49639af84b4ffaf89e071069c898f0934039192fe9826818ff755",
+    "G6-01": "f118fb677779e3d4ef4e2c61b240f95fff6d2af7ad659acebb022f953e25788e",
+    "G6-02": "f6b335e7fded84e8359274f9333b160a30ea3a8eb09412a9044d029a834b2a11",
+}
+EXPECTED_CONTROL_IDS = frozenset(EXPECTED_CONTROL_CHECK_DIGESTS)
 ALLOWED_CHECK_TYPES = {"command", "path_exists", "regex", "evidence"}
 EVIDENCE_PRODUCER_REPOSITORY = "aduboseh/iter"
 TRUSTED_EVIDENCE_WORKFLOW = ".github/workflows/apex_productization_evidence.yml"
@@ -84,6 +105,15 @@ def require_repo(control_id: str, check: dict[str, Any]) -> None:
 
     if check.get("repo") not in {"iter", "scg"}:
         raise ValueError(f"{control_id}: check repo must be 'iter' or 'scg'")
+
+
+def canonical_json_sha256(value: Any) -> str:
+    """Hash a JSON value with fixed key ordering and separators."""
+
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
@@ -161,6 +191,12 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
             elif check_type == "evidence":
                 if not isinstance(check.get("file"), str) or not check["file"]:
                     raise ValueError(f"{control_id}: evidence requires file")
+        expected_checks_digest = EXPECTED_CONTROL_CHECK_DIGESTS.get(control_id)
+        if (
+            expected_checks_digest is not None
+            and canonical_json_sha256(checks) != expected_checks_digest
+        ):
+            raise ValueError(f"{control_id}: checks differ from canonical definition")
     if ids != EXPECTED_CONTROL_IDS:
         missing = sorted(EXPECTED_CONTROL_IDS - ids)
         unexpected = sorted(ids - EXPECTED_CONTROL_IDS)
