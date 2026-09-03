@@ -123,6 +123,29 @@ class MatrixValidationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "repository-relative"):
                     VERIFIER.validate_matrix(matrix)
 
+    def test_cross_repository_path_escape_is_rejected_during_validation(self) -> None:
+        """Cross-repository checks cannot escape either declared authority root."""
+
+        matrix_path = (
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        for field in ("left_path", "right_path"):
+            with self.subTest(field=field):
+                matrix = VERIFIER.load_json(matrix_path)
+                control = next(
+                    item for item in matrix["controls"] if item["id"] == "G0-13"
+                )
+                check = next(
+                    item
+                    for item in control["checks"]
+                    if item["type"] == "cross_repo_equal"
+                )
+                check[field] = "../outside"
+                with self.assertRaisesRegex(ValueError, "repository-relative"):
+                    VERIFIER.validate_matrix(matrix)
+
 
 class CertificationStatusTests(unittest.TestCase):
     """Prove only a complete successful matrix can report full PASS."""
@@ -316,6 +339,65 @@ class RepositoryPathTests(unittest.TestCase):
                         )
                         self.assertFalse(passed)
                         self.assertIn("escapes declared repository", detail)
+
+
+class CrossRepositoryContractTests(unittest.TestCase):
+    """Prove the pinned SCG contract is compared to Iter's vendored contract."""
+
+    def test_equal_files_pass_and_byte_divergence_fails(self) -> None:
+        """Raw-byte equality passes, while any mutation fails with both digests."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            iter_root = root / "iter"
+            scg_root = root / "scg"
+            iter_root.mkdir()
+            scg_root.mkdir()
+            (iter_root / "contract.rs").write_bytes(b"canonical\n")
+            (scg_root / "contract.rs").write_bytes(b"canonical\n")
+            check = {
+                "type": "cross_repo_equal",
+                "left_repo": "iter",
+                "left_path": "contract.rs",
+                "right_repo": "scg",
+                "right_path": "contract.rs",
+            }
+            roots = {"iter": iter_root, "scg": scg_root}
+
+            passed, detail, _ = VERIFIER.cross_repo_equal_check(check, roots)
+            self.assertTrue(passed, detail)
+
+            (scg_root / "contract.rs").write_bytes(b"mutated\n")
+            passed, detail, _ = VERIFIER.cross_repo_equal_check(check, roots)
+            self.assertFalse(passed)
+            self.assertIn("cross-repository mismatch", detail)
+            self.assertIn(hashlib.sha256(b"canonical\n").hexdigest(), detail)
+            self.assertIn(hashlib.sha256(b"mutated\n").hexdigest(), detail)
+
+    def test_escaped_path_fails_closed(self) -> None:
+        """Runtime containment rejects a path outside either repository root."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            iter_root = root / "iter"
+            scg_root = root / "scg"
+            iter_root.mkdir()
+            scg_root.mkdir()
+            (root / "outside.rs").write_bytes(b"canonical\n")
+            (scg_root / "contract.rs").write_bytes(b"canonical\n")
+            check = {
+                "type": "cross_repo_equal",
+                "left_repo": "iter",
+                "left_path": "../outside.rs",
+                "right_repo": "scg",
+                "right_path": "contract.rs",
+            }
+
+            passed, detail, _ = VERIFIER.cross_repo_equal_check(
+                check, {"iter": iter_root, "scg": scg_root}
+            )
+            self.assertFalse(passed)
+            self.assertIn("escapes declared repository", detail)
 
 
 class GitWorktreeStateTests(unittest.TestCase):

@@ -426,6 +426,55 @@
             "governance_endpoint_001b"
           ],
           "timeout_seconds": 1800
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/CANONICAL_VECTORS.json",
+          "right_repo": "scg",
+          "right_path": "CANONICAL_VECTORS.json"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/Cargo.toml",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/Cargo.toml"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/contract.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/contract.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/errors.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/errors.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/lib.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/lib.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/src/trace.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/src/trace.rs"
+        },
+        {
+          "type": "cross_repo_equal",
+          "left_repo": "iter",
+          "left_path": "vendor/governance-bridge/tests/contract_determinism.rs",
+          "right_repo": "scg",
+          "right_path": "crates/scg-governance-bridge/tests/contract_determinism.rs"
         }
       ]
     },

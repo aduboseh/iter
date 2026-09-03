@@ -36,7 +36,7 @@ EXPECTED_CONTROL_CHECK_DIGESTS = {
     "G0-10": "8b5a34376c814aa901d7dc0b276cf75a5bbf0e978ba70d751e8e8b099f38e6c6",
     "G0-11": "28657cd805d5153c12ae272c745f84679f88bbf1970045499199b345d1d463c9",
     "G0-12": "3539a37d38ce3b44ab63fc9a4d264c208a1711240c5e4eb8fef90c8ced109fbe",
-    "G0-13": "1b38604b4ff98dab469a5fd866b20f1328c8ac8ca2c2709b0e6a26c400b81483",
+    "G0-13": "27601335bb9bb41ed2d3d975d5b527227348b25f25871945be2335d99bf04f0a",
     "G0-14": "3d73bf0be6f2607983403f38a489958f27bf78c774024a927dff96f50c7ba644",
     "G1-01": "e556dbc7e1718c34f1a4c21495d75a56d7c6ffc555bb38c817fef0e217fe7ef4",
     "G1-02": "005d22c92bf49329b20ccec6fc4fe559a04273132a67bf460a1c763c1924fbbf",
@@ -56,7 +56,13 @@ EXPECTED_CONTROL_CHECK_DIGESTS = {
     "G6-02": "f6b335e7fded84e8359274f9333b160a30ea3a8eb09412a9044d029a834b2a11",
 }
 EXPECTED_CONTROL_IDS = frozenset(EXPECTED_CONTROL_CHECK_DIGESTS)
-ALLOWED_CHECK_TYPES = {"command", "path_exists", "regex", "evidence"}
+ALLOWED_CHECK_TYPES = {
+    "command",
+    "path_exists",
+    "regex",
+    "cross_repo_equal",
+    "evidence",
+}
 EVIDENCE_PRODUCER_REPOSITORY = "aduboseh/iter"
 TRUSTED_EVIDENCE_WORKFLOW = ".github/workflows/apex_productization_evidence.yml"
 
@@ -188,6 +194,24 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
                     )
                 if check_type == "regex" and not isinstance(check.get("pattern"), str):
                     raise ValueError(f"{control_id}: regex requires pattern")
+            elif check_type == "cross_repo_equal":
+                for side in ("left", "right"):
+                    repo_field = f"{side}_repo"
+                    path_field = f"{side}_path"
+                    if check.get(repo_field) not in {"iter", "scg"}:
+                        raise ValueError(
+                            f"{control_id}: {repo_field} must be 'iter' or 'scg'"
+                        )
+                    declared = check.get(path_field)
+                    if not isinstance(declared, str) or not declared:
+                        raise ValueError(
+                            f"{control_id}: cross_repo_equal requires {path_field}"
+                        )
+                    declared_path = Path(declared)
+                    if declared_path.is_absolute() or ".." in declared_path.parts:
+                        raise ValueError(
+                            f"{control_id}: {path_field} must be repository-relative"
+                        )
             elif check_type == "evidence":
                 if not isinstance(check.get("file"), str) or not check["file"]:
                     raise ValueError(f"{control_id}: evidence requires file")
@@ -362,6 +386,31 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def cross_repo_equal_check(
+    check: dict[str, Any], roots: dict[str, Path]
+) -> tuple[bool, str, float]:
+    """Require two contained repository files to have identical raw bytes."""
+
+    left = resolve_contained_path(roots[check["left_repo"]], check["left_path"])
+    right = resolve_contained_path(roots[check["right_repo"]], check["right_path"])
+    if left is None or right is None:
+        return False, "cross-repository path escapes declared repository", 0.0
+    if not left.is_file():
+        return False, f"missing cross-repository file: {left}", 0.0
+    if not right.is_file():
+        return False, f"missing cross-repository file: {right}", 0.0
+
+    left_hash = sha256_file(left)
+    right_hash = sha256_file(right)
+    if left_hash != right_hash:
+        return (
+            False,
+            f"cross-repository mismatch: {left}={left_hash}, {right}={right_hash}",
+            0.0,
+        )
+    return True, f"cross-repository files match: {left_hash}: {left} == {right}", 0.0
 
 
 def evidence_check(
@@ -574,6 +623,8 @@ def main() -> int:
                 passed, detail, elapsed = path_check(check, roots)
             elif check_type == "regex":
                 passed, detail, elapsed = regex_check(check, roots)
+            elif check_type == "cross_repo_equal":
+                passed, detail, elapsed = cross_repo_equal_check(check, roots)
             else:
                 passed, detail, elapsed = evidence_check(
                     control["id"],
