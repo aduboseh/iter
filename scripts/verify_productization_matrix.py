@@ -150,6 +150,11 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
                 require_repo(control_id, check)
                 if not isinstance(check.get("path"), str) or not check["path"]:
                     raise ValueError(f"{control_id}: {check_type} requires path")
+                declared_path = Path(check["path"])
+                if declared_path.is_absolute() or ".." in declared_path.parts:
+                    raise ValueError(
+                        f"{control_id}: {check_type} path must be repository-relative"
+                    )
                 if check_type == "regex" and not isinstance(check.get("pattern"), str):
                     raise ValueError(f"{control_id}: regex requires pattern")
             elif check_type == "evidence":
@@ -270,12 +275,26 @@ def command_check(
     return True, f"exit {result.returncode}: {' '.join(argv)}", elapsed
 
 
+def resolve_contained_path(root: Path, declared_path: str) -> Path | None:
+    """Resolve a declared path only when it remains inside its authority root."""
+
+    resolved_root = root.resolve()
+    target = (resolved_root / declared_path).resolve()
+    try:
+        target.relative_to(resolved_root)
+    except ValueError:
+        return None
+    return target
+
+
 def path_check(
     check: dict[str, Any], roots: dict[str, Path]
 ) -> tuple[bool, str, float]:
     """Verify that a declared repository-relative path exists."""
 
-    path = roots[check["repo"]] / check["path"]
+    path = resolve_contained_path(roots[check["repo"]], check["path"])
+    if path is None:
+        return False, "path escapes declared repository", 0.0
     if not path.exists():
         return False, f"missing path: {path}", 0.0
     return True, f"path exists: {path}", 0.0
@@ -286,7 +305,9 @@ def regex_check(
 ) -> tuple[bool, str, float]:
     """Evaluate a declared regular-expression invariant against one file."""
 
-    path = roots[check["repo"]] / check["path"]
+    path = resolve_contained_path(roots[check["repo"]], check["path"])
+    if path is None:
+        return False, "regex path escapes declared repository", 0.0
     if not path.is_file():
         return False, f"missing file: {path}", 0.0
     text = path.read_text(encoding="utf-8")
@@ -315,11 +336,8 @@ def evidence_check(
 ) -> tuple[bool, str, float]:
     """Verify external evidence, exact subject commits, and artifact digests."""
 
-    evidence_root = evidence_dir.resolve()
-    path = (evidence_root / check["file"]).resolve()
-    try:
-        path.relative_to(evidence_root)
-    except ValueError:
+    path = resolve_contained_path(evidence_dir, check["file"])
+    if path is None:
         return False, "evidence file escapes evidence directory", 0.0
     try:
         evidence = load_json(path)

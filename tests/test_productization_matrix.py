@@ -75,6 +75,27 @@ class MatrixValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "canonical v1 set"):
             VERIFIER.validate_matrix(matrix)
 
+    def test_repository_path_escape_is_rejected_during_validation(self) -> None:
+        """Repository checks cannot declare absolute or parent-traversal paths."""
+
+        matrix_path = (
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        for escaped_path in ("../outside", str(Path.cwd().anchor + "outside")):
+            with self.subTest(path=escaped_path):
+                matrix = VERIFIER.load_json(matrix_path)
+                check = next(
+                    check
+                    for control in matrix["controls"]
+                    for check in control["checks"]
+                    if check["type"] == "path_exists"
+                )
+                check["path"] = escaped_path
+                with self.assertRaisesRegex(ValueError, "repository-relative"):
+                    VERIFIER.validate_matrix(matrix)
+
 
 class CertificationStatusTests(unittest.TestCase):
     """Prove only a complete successful matrix can report full PASS."""
@@ -234,6 +255,40 @@ class ExternalEvidenceTests(unittest.TestCase):
 
             self.assertFalse(passed)
             self.assertIn("does not match", detail)
+
+
+class RepositoryPathTests(unittest.TestCase):
+    """Prove repository checks cannot consume sibling or host files."""
+
+    def test_runtime_path_escape_is_rejected_for_path_and_regex(self) -> None:
+        """Both repository-path executors fail closed on escaped targets."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            repo = root / "iter"
+            repo.mkdir()
+            outside = root / "outside.txt"
+            outside.write_text("trusted-looking content", encoding="utf-8")
+            roots = {"iter": repo}
+
+            checks = (
+                (
+                    VERIFIER.path_check,
+                    {"type": "path_exists", "repo": "iter"},
+                ),
+                (
+                    VERIFIER.regex_check,
+                    {"type": "regex", "repo": "iter", "pattern": "trusted"},
+                ),
+            )
+            for runner, check in checks:
+                for escaped_path in ("../outside.txt", str(outside.resolve())):
+                    with self.subTest(check=check["type"], path=escaped_path):
+                        passed, detail, _ = runner(
+                            {**check, "path": escaped_path}, roots
+                        )
+                        self.assertFalse(passed)
+                        self.assertIn("escapes declared repository", detail)
 
 
 class GitWorktreeStateTests(unittest.TestCase):
