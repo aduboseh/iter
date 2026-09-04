@@ -1,91 +1,56 @@
-# Architecture Boundary
+# Iter Product Boundary
 
-This document defines what the public Iter repository certifies versus what is validated in private infrastructure.
+This document records the current, certifiable Iter product boundary. It is subordinate to `APEX_PRODUCTIZATION_V1.md` and `APEX_PRODUCTIZATION_GAP_CLOSURE_001.md`.
 
-## Certification Scopes
+## Current Classification
 
-### Public CI Certifies (this repository)
-Domain	What's Tested	Guarantee
-Protocol	Wire format, JSON-RPC 2.0 compliance, MCP tool interface	Stable 1.0.0 contract
-Type Shapes	Schema stability for all public types	Breaking changes require major version bump
-Error Taxonomy	Error codes are exhaustive and documented	New codes are additive only
-Versioning	Protocol version negotiation, N/N-1 compatibility	SDKs fail fast on incompatible versions
-Telemetry	Audit event structure, redaction guarantees	Allowlist and denylist enforced
-SDKs	Rust and TypeScript clients compile and pass tests	Thin clients work against any compliant server
-Release Discipline	Version consistency, changelog, boundary integrity	Unsafe changes cannot ship
+Iter and SCG are release-candidate infrastructure, not Enterprise GA. Enterprise release requires all 30 canonical APEX controls to pass against exact Iter and SCG commits.
 
-Build mode: public_stub (default)
+## Supported Build
 
-The public stub is a deterministic reference implementation for protocol behavior, not a production or performance runtime.
+The supported public build is `public_stub`.
 
-Test count: 71 governance invariants plus SDK unit tests
+The `full_substrate` feature name is reserved to prevent semantic reuse. It is not a supported build or a current product configuration. Enabling it in this repository must fail with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`; a stub-backed binary must never claim full-substrate provenance.
 
-Audience: Protocol consumers, SDK users, auditors, integrators
+## Runtime Boundary
 
-### Private CI Certifies (licensed deployments)
-Domain	What's Tested	Guarantee
-Execution	Node, edge, and governor behavior	Correct substrate semantics
-Integration	End-to-end MCP request flows	Real operations work
-Performance	Latency, throughput, resource usage	SLA compliance
-Security	Penetration testing, threat modeling	Customer-specific validation
+The public Iter distribution contains the governed verifier/runtime surface:
 
-Build mode: full_substrate (requires proprietary execution crates)
+| Runtime mode | Backing system | Authority |
+|---|---|---|
+| `demo` | Local stub | Non-authoritative protocol demonstration |
+| `governed-local` | Governed local stub | Packet-emitting and replay-capable, but not SCG-backed |
+| `scg-backed` | Live SCG gateway over the pinned `scg.v1` contract | Authoritative only when all boot and response attestations pass |
 
-Test count: Additional integration and property-based tests
+SCG is a separately deployed system. Iter consumes SCG through the narrow, versioned contract and does not embed SCG implementation crates.
 
-Audience: Licensed customers, deployment engineers, security auditors
+## What Public CI Proves
 
-## Why This Separation Exists
+- Rust formatting, linting, tests, and dependency audit gates
+- Protocol and schema invariants
+- Fail-closed build provenance and governance integrity
+- Explicit rejection of unavailable `full_substrate` semantics
+- Iter-to-SCG contract parity and the tested `scg-backed` seam
+- SDK checks that are present in required workflows
 
-**IP Protection**
-Execution semantics are proprietary, protocol surface is open
+These checks do not by themselves prove production performance, deployment security, cross-platform determinism, AKS operability, artifact signing, or independent operator acceptance. Those remain FAIL until the canonical matrix consumes commit-bound evidence from the trusted evidence workflow.
 
-**Independent Auditability**
-Public contract can be verified without access to internals
+## Distribution Exclusions
 
-**Clean Dependency Graph**
-SDKs never depend on substrate, substrate implements the protocol
+The current public product contract does not include:
 
-**Appropriate Trust Boundaries**
-Different guarantees for different audiences
+- an embedded private substrate build,
+- SCG source code as part of the Iter package,
+- deployment-specific performance guarantees,
+- Enterprise GA certification before a 30/0 matrix result.
 
-## What Each Audience Should Trust
-If you are	Trust this	Validated by
-Building a client	Protocol types, SDK behavior	Public CI
-Integrating telemetry	Audit event schema, redaction rules	Public CI
-Auditing the contract	Type shapes, versioning rules, error taxonomy	Public CI
-Deploying Iter	Execution correctness, performance	Private CI
-Evaluating security	Boundary integrity (public) plus threat model (private)	Both
+## Verification
 
-## How to Verify
-
-### Public guarantees (anyone can run)
-# Clone the public repo
-git clone https://github.com/aduboseh/iter.git
-cd iter
-
-# Run governance tests
-cargo test --features public_stub --test governance_invariants
-
-# Build and test Rust SDK
-cd sdks/rust && cargo test
-
-# Build and test TypeScript SDK
-cd sdks/typescript && npm ci && npm test
+```bash
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+cargo check --locked --workspace --all-targets --no-default-features --features full_substrate
 ```
 
-### Private guarantees (licensed access required)
-
-Contact the Iter team under licensed access for:
-
-Access to private CI dashboards
-
-Deployment-specific test results
-
-Security audit reports
-
-## Summary
-
-Iter v1.0.0 certifies the public protocol, SDK surface, telemetry contract, and release guarantees.
-
-Execution correctness is validated separately within licensed deployments. This separation is the architecture, not missing work.
+The final command is expected to exit `101` and include `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`.

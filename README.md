@@ -3,8 +3,10 @@
 Iter is an auditable MCP decision layer for governed AI agents.
 
 > **Release classification:** Release-candidate infrastructure, not Enterprise GA.
-> [APEX-SCG-ITER-PROD-001](APEX_PRODUCTIZATION_V1.md) is the binding productization
-> authority. Enterprise release requires all 30 machine-verifiable controls to pass.
+> [APEX-SCG-ITER-PROD-001](APEX_PRODUCTIZATION_V1.md), as amended by
+> [APEX-PRODUCTIZATION-GAP-CLOSURE-001](APEX_PRODUCTIZATION_GAP_CLOSURE_001.md),
+> is the binding productization authority. Enterprise release requires all 30
+> machine-verifiable controls to pass.
 
 It lets an agent request a decision, routes that request through SCG-backed deterministic governance, and emits a proof packet that can be replayed under the active `scg.v1` contract.
 

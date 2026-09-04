@@ -51,12 +51,12 @@ Iter is a deterministic governance control plane that evaluates policy condition
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐   │
-│                                    │          SEALED IP BOUNDARY            │
+│                                    │          SCG SERVICE BOUNDARY          │
 │  │     ┌───────────────────────────┴───────────────────────────┐     │   │
-│        │              Execution Substrate (Private)             │           │
-│  │     │  • Proprietary governance execution                   │     │   │
-│        │  • Internal state management                           │           │
-│  │     │  • Licensed deployment only                           │     │   │
+│        │               SCG (Separately Deployed)                │           │
+│  │     │  • Pinned, versioned scg.v1 contract                  │     │   │
+│        │  • Independent state and provenance                    │           │
+│  │     │  • Not embedded by public Iter                        │     │   │
 │        └───────────────────────────────────────────────────────┘           │
 │  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘   │
 │                                    │                                        │
@@ -186,7 +186,7 @@ This diagram does NOT show:
 - Proprietary invariant logic
 - Performance/optimization details
 
-These are validated in private CI and available under NDA to partners and auditors.
+SCG implementation evidence is produced in the SCG repository. Iter does not claim private-CI certification for an unavailable embedded substrate.
 
 ---
 

@@ -57,10 +57,10 @@ fn main() {
     let is_stub_mode = std::env::var_os("CARGO_FEATURE_PUBLIC_STUB").is_some();
     let is_full_substrate = std::env::var_os("CARGO_FEATURE_FULL_SUBSTRATE").is_some();
 
-    if is_full_substrate && !is_stub_mode {
+    if is_full_substrate {
         panic!(
             "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO: \
-             full_substrate is reserved for the private substrate workspace. \
+             full_substrate has no approved, provenance-bound implementation. \
              This public repository must not emit ITER_BUILD_MODE=FULL_SUBSTRATE \
              or compile a stub-backed binary under full_substrate semantics."
         );
@@ -180,19 +180,9 @@ fn main() {
         sha256_bytes(substrate_identity.as_bytes())
     );
 
-    match (is_stub_mode, is_full_substrate) {
-        (true, false) => println!("cargo:rustc-env=ITER_BUILD_MODE=PUBLIC_STUB"),
-        (false, true) => panic!(
-            "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO: \
-             full_substrate is reserved for the private substrate workspace. \
-             This public repository must not emit ITER_BUILD_MODE=FULL_SUBSTRATE \
-             or compile a stub-backed binary under full_substrate semantics."
-        ),
-        (true, true) => {
-            panic!("ITER_BUILD_MODE is ambiguous: both public_stub and full_substrate are enabled")
-        }
-        (false, false) => panic!(
-            "ITER_BUILD_MODE is undefined: neither public_stub nor full_substrate is enabled"
-        ),
+    if is_stub_mode {
+        println!("cargo:rustc-env=ITER_BUILD_MODE=PUBLIC_STUB");
+    } else {
+        panic!("ITER_BUILD_MODE is undefined: public_stub is not enabled");
     }
 }
