@@ -38,6 +38,8 @@ iter evaluates that proposal against governed state and policy.
 
 SCG provides the deterministic substrate required for canonical state, provenance, execution lineage, and replay.
 
+For the current release boundary, public Iter is the complete governed verifier/runtime product. SCG is a separately deployed system consumed only through the pinned, versioned `scg.v1` contract. Iter does not embed SCG through the reserved `full_substrate` feature.
+
 The system returns a cryptographically bound DecisionPacket establishing what was decided, why it was decided, what evidence and policy governed the decision, and whether the decision can be independently verified and reproduced.
 
 Commercial abstraction
@@ -111,6 +113,10 @@ execution trace integrity
 replay substrate
 Trust boundary
 
+Path B product-boundary decision
+
+The active product boundary is public Iter. The `full_substrate` feature name is reserved to prevent semantic reuse, but the public repository MUST reject it with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`. No release claim, package, acceptance criterion, or certification control may require unavailable embedded substrate semantics.
+
 The AI model SHALL remain outside the trusted computing boundary.
 
 MODEL
@@ -166,8 +172,8 @@ Priority: BLOCKING
 No production claim shall precede correctness closure.
 
 iter requirements
-full_substrate production configuration compiles cleanly.
-SCG-backed runtime is authoritative where configured.
+The public build rejects `full_substrate` with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO` and cannot emit full-substrate provenance.
+SCG-backed runtime is authoritative only when configured through the pinned, versioned SCG contract.
 Production tests exercise the actual GovernedRuntime::evaluate execution path.
 Replay fails closed when required evidence is absent.
 Missing provenance cannot produce Match.
@@ -763,8 +769,12 @@ that manifest, the manifest controls; every APEX rule is subordinate to it.
 
 The canonical 30-control release matrix is maintained in the customer-facing
 iter repository at productization/APEX_RELEASE_MATRIX_V1.json. The SCG copy of
-this directive is a controlled mirror and must remain byte-identical to the
-iter copy.
+this directive and the SCG copy of APEX_PRODUCTIZATION_GAP_CLOSURE_001.md are
+controlled mirrors and must remain byte-identical to the iter copies.
+
+APEX-PRODUCTIZATION-GAP-CLOSURE-001 amends this directive and records the
+Path B decision for the current product boundary. The canonical matrix schema
+is `apex-productization-matrix/v1.1`; the fixed control count remains 30.
 
 Existing production-ready, enterprise-ready, acquisition-grade, or general
 availability statements are subordinate to this directive. Until all 30

@@ -19,14 +19,17 @@ import sys
 import time
 from typing import Any
 
-MATRIX_SCHEMA = "apex-productization-matrix/v1"
+MATRIX_SCHEMA = "apex-productization-matrix/v1.1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
 DIRECTIVE_ID = "APEX-SCG-ITER-PROD-001"
+AUTHORITY_DOCUMENT = "APEX_PRODUCTIZATION_V1.md"
+AUTHORITY_AMENDMENT = "APEX_PRODUCTIZATION_GAP_CLOSURE_001.md"
+DIRECTIVE_MIRRORS = (AUTHORITY_DOCUMENT, AUTHORITY_AMENDMENT)
 EXPECTED_CONTROL_COUNT = 30
 EXPECTED_CONTROL_CHECK_DIGESTS = {
     "G0-01": "4364a791a1a3e48c542c472254c417f0c6d94f6279005b706984a2b7b0cbf79d",
     "G0-02": "e366086fad6b7cd3a9effc2ba18715e3f4bba9993cfa683d94620e596add7019",
-    "G0-03": "9414ba31ec86f3a323066dd0ea89b4073f42d1c160f94ecba797da944f3dac91",
+    "G0-03": "fb9199d2e024d7db94b7f34594d91f513234c401f6fb53b14a497cf324468266",
     "G0-04": "3173dd818e17dba46ef848c5bc3d83d46f98541ed760df91e33a4ba6ae6ee517",
     "G0-05": "802218a091d41d636292ae7bb147e5b588655ca9f913b0727c4bc838b31c845e",
     "G0-06": "71118f52a178f45421d9226fb3c53573b86f1c5eed86644c2395b75beb6abc1a",
@@ -133,6 +136,14 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
     directive_id = matrix.get("directive_id")
     if directive_id != DIRECTIVE_ID:
         raise ValueError(f"matrix directive_id must be {DIRECTIVE_ID!r}")
+    if matrix.get("authority_document") != AUTHORITY_DOCUMENT:
+        raise ValueError(
+            f"matrix authority_document must be {AUTHORITY_DOCUMENT!r}"
+        )
+    if matrix.get("authority_amendment") != AUTHORITY_AMENDMENT:
+        raise ValueError(
+            f"matrix authority_amendment must be {AUTHORITY_AMENDMENT!r}"
+        )
     controls = matrix.get("controls")
     if not isinstance(controls, list):
         raise ValueError("matrix controls must be an array")
@@ -225,7 +236,7 @@ def validate_matrix(matrix: dict[str, Any]) -> list[dict[str, Any]]:
         missing = sorted(EXPECTED_CONTROL_IDS - ids)
         unexpected = sorted(ids - EXPECTED_CONTROL_IDS)
         raise ValueError(
-            "matrix control IDs differ from canonical v1 set: "
+            "matrix control IDs differ from canonical v1.1 set: "
             f"missing={missing}, unexpected={unexpected}"
         )
     return controls
@@ -511,19 +522,26 @@ def evidence_check(
 
 
 def directive_mirror_check(iter_root: Path, scg_root: Path) -> tuple[bool, str]:
-    """Require the iter and SCG productization directives to be byte-identical."""
+    """Require every Iter/SCG productization authority to be byte-identical."""
 
-    iter_path = iter_root / "APEX_PRODUCTIZATION_V1.md"
-    scg_path = scg_root / "APEX_PRODUCTIZATION_V1.md"
-    if not iter_path.is_file():
-        return False, f"missing iter directive: {iter_path}"
-    if not scg_path.is_file():
-        return False, f"missing SCG directive mirror: {scg_path}"
-    iter_hash = sha256_file(iter_path)
-    scg_hash = sha256_file(scg_path)
-    if iter_hash != scg_hash:
-        return False, f"directive mirror mismatch: iter={iter_hash}, scg={scg_hash}"
-    return True, f"directive mirror byte-identical: {iter_hash}"
+    verified: list[str] = []
+    for relative_path in DIRECTIVE_MIRRORS:
+        iter_path = iter_root / relative_path
+        scg_path = scg_root / relative_path
+        if not iter_path.is_file():
+            return False, f"missing iter directive: {iter_path}"
+        if not scg_path.is_file():
+            return False, f"missing SCG directive mirror: {scg_path}"
+        iter_hash = sha256_file(iter_path)
+        scg_hash = sha256_file(scg_path)
+        if iter_hash != scg_hash:
+            return (
+                False,
+                f"directive mirror mismatch for {relative_path}: "
+                f"iter={iter_hash}, scg={scg_hash}",
+            )
+        verified.append(f"{relative_path}={iter_hash}")
+    return True, "directive mirrors byte-identical: " + ", ".join(verified)
 
 
 def scg_release_ref_check(iter_root: Path, scg_head: str | None) -> tuple[bool, str]:

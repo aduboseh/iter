@@ -2,6 +2,8 @@
 
 This document defines how Iter ships: channels, versioning, compatibility, EOL policy, and release gates.
 
+> **Current classification:** Release-candidate infrastructure. Enterprise GA is prohibited until all 30 controls in the canonical APEX productization matrix pass against exact Iter and SCG commits.
+
 > **Surface Freeze (v1.0.2):** Protocol and SDK surface are stable for 12 months (through January 2027) barring security issues. Any breaking change requires major version bump, migration documentation, and 3-month deprecation notice.
 
 ## Release Channels
@@ -76,7 +78,8 @@ All gates must pass before any release:
 - [ ] Protocol version unchanged OR migration documented
 - [ ] Changelog generated and reviewed
 - [ ] No known security vulnerabilities
-- [ ] Sanitizer checks pass (private, full_substrate only)
+- [ ] Reserved `full_substrate` build fails with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`
+- [ ] All 30 APEX productization controls pass against exact Iter and SCG commits
 
 ### Release Steps
 
@@ -103,7 +106,7 @@ For critical security fixes:
 
 ### Signing
 
-All release artifacts are signed:
+Production release artifacts must be signed:
 
 - Git tags: GPG/SSH signed
 - Checksums: SHA-256 for all binaries

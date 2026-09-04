@@ -50,17 +50,24 @@ jobs:
       - name: Verify unsupported full_substrate fails intentionally
         run: |
           set -euo pipefail
-          LOG_FILE=$(mktemp)
-          if cargo check --all-targets --no-default-features --features full_substrate >"$LOG_FILE" 2>&1; then
-            cat "$LOG_FILE"
-            echo "::error::full_substrate unexpectedly built in public repo"
-            exit 1
-          fi
-          cat "$LOG_FILE"
-          if ! grep -q "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO" "$LOG_FILE"; then
-            echo "::error::full_substrate failed without explicit unsupported diagnostic"
-            exit 1
-          fi
+          assert_unsupported() {
+            local label="$1"
+            shift
+            local log_file
+            log_file=$(mktemp)
+            if cargo check --locked --workspace --all-targets "$@" >"$log_file" 2>&1; then
+              cat "$log_file"
+              echo "::error::full_substrate unexpectedly built in public repo ($label)"
+              exit 1
+            fi
+            cat "$log_file"
+            if ! grep -q "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO" "$log_file"; then
+              echo "::error::full_substrate failed without explicit unsupported diagnostic ($label)"
+              exit 1
+            fi
+          }
+          assert_unsupported "without defaults" --no-default-features --features full_substrate
+          assert_unsupported "with defaults" --features full_substrate
           echo "FULL_SUBSTRATE_UNSUPPORTED_CHECK_PASS"
 
       - name: Verify build halts on simulated governance drift
