@@ -11,7 +11,7 @@ Public API and operational documentation only.
 
 ## Build Modes
 
-Public CI validates protocol contracts via stub runtime; substrate execution is private.
+Public CI validates the governed verifier/runtime product. SCG is separately deployed through the pinned `scg.v1` contract; no private Iter substrate build is advertised.
 
 ## Internal Documentation
 
