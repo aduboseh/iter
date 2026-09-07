@@ -3,7 +3,7 @@
 #
 # Build Modes:
 # - Public CI (default): Uses public_stub feature, no proprietary dependencies
-# - Full substrate: Requires SCG_PAT secret and private repo access
+# - full_substrate: Reserved and intentionally unsupported in the public repo
 
 name: MCP Integration Tests
 
@@ -12,6 +12,9 @@ on:
     branches: [main, develop]
   push:
     branches: [main]
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -26,6 +29,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -50,17 +55,28 @@ jobs:
       - name: Verify unsupported full_substrate fails intentionally
         run: |
           set -euo pipefail
-          LOG_FILE=$(mktemp)
-          if cargo check --all-targets --no-default-features --features full_substrate >"$LOG_FILE" 2>&1; then
-            cat "$LOG_FILE"
-            echo "::error::full_substrate unexpectedly built in public repo"
-            exit 1
-          fi
-          cat "$LOG_FILE"
-          if ! grep -q "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO" "$LOG_FILE"; then
-            echo "::error::full_substrate failed without explicit unsupported diagnostic"
-            exit 1
-          fi
+          assert_unsupported() {
+            local label="$1"
+            shift
+            local log_file status
+            log_file=$(mktemp)
+            if cargo check --locked --workspace --all-targets "$@" >"$log_file" 2>&1; then
+              status=0
+            else
+              status=$?
+            fi
+            cat "$log_file"
+            if [ "$status" -ne 101 ]; then
+              echo "::error::full_substrate must exit 101, got $status ($label)"
+              exit 1
+            fi
+            if ! grep -q "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO" "$log_file"; then
+              echo "::error::full_substrate failed without explicit unsupported diagnostic ($label)"
+              exit 1
+            fi
+          }
+          assert_unsupported "without defaults" --no-default-features --features full_substrate
+          assert_unsupported "with defaults" --features full_substrate
           echo "FULL_SUBSTRATE_UNSUPPORTED_CHECK_PASS"
 
       - name: Verify build halts on simulated governance drift
@@ -101,7 +117,7 @@ jobs:
           cargo test --test governance_invariants --release $CARGO_FEATURES
           echo "✅ Governance invariants passed"
 
-      # NOTE: Sanitizer/integration tests require full_substrate and run locally only
+      # Legacy full_substrate-only code is not supported or certified by this workflow.
 
       - name: Verify build produces valid binary
         run: |
@@ -158,6 +174,8 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Audit forbidden patterns in codebase
         run: |
@@ -189,11 +207,11 @@ jobs:
       - name: Check sanitizer module exists
         run: |
           echo "📊 Verifying sanitizer module structure..."
-          # Sanitizer module exists (full_substrate only, but structure is present)
+          # Structural inventory only; this is not evidence of an embedded substrate build.
           if [ -d "src/services/sanitizer" ]; then
             echo "✅ Sanitizer module present"
           else
-            echo "::warning::Sanitizer module not found (expected for full_substrate)"
+            echo "::warning::Legacy sanitizer module not found (full_substrate is unsupported)"
           fi
 
   stability-verification:
@@ -202,6 +220,8 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Verify no CRLF line endings
         run: |
@@ -231,6 +251,8 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

@@ -1,105 +1,46 @@
-# Iter — Buyer Summary
+# Iter Buyer Summary
 
-**Version:** 1.0.1  
-**License:** MIT  
-**Status:** Stable, frozen surface
+**Version:** 1.0.2
 
----
+**License:** Apache-2.0
 
-## What Iter Is
+**Status:** Release-candidate infrastructure, not Enterprise GA
 
-Iter is a governed Model Context Protocol (MCP) server that exposes a deterministic, auditable tool surface over JSON-RPC 2.0 (STDIO transport).
+## Product Surface
 
-It provides:
-- A stable protocol contract (v1.0.0) with semantic versioning
-- 71 governance invariant tests enforcing schema stability
-- Rust and TypeScript SDKs for client integration
-- Release discipline with 6-month N/N-1 support window
-- Signed releases and CI-enforced gates
+Iter is a governed MCP/JSON-RPC runtime and independent verification surface for AI decisions. The public distribution provides protocol types, governance enforcement, DecisionPacket generation and verification, replay checks, audit interfaces, and Rust and TypeScript SDKs.
 
----
+SCG is a separately deployed cognitive graph system. Authoritative `scg-backed` operation uses the pinned `scg.v1` contract and fails closed when endpoint configuration, governance identity, contract identity, state envelopes, or replay evidence are invalid.
 
-## What Iter Guarantees
+## Current Guarantees
 
 | Guarantee | Enforcement |
-|-----------|-------------|
-| Protocol stability | Schema tests fail on breaking changes |
-| Error taxonomy | Error codes are exhaustive and additive-only |
-| Version compatibility | SDKs reject incompatible server versions at init |
-| Audit event structure | Telemetry schema is frozen with redaction guarantees |
-| Release integrity | All tags are signed; CI gates block non-compliant releases |
+|---|---|
+| Public build identity | Compile-time `ITER_BUILD_MODE=PUBLIC_STUB` attestation |
+| Unavailable substrate rejection | `full_substrate` exits with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO` |
+| Governance integrity | Build-time and runtime governance hash checks |
+| Contract stability | Schema and governance invariant tests |
+| Replay integrity | Canonical packet and trace verification |
+| Cross-system boundary | Pinned SCG commit plus byte-equal contract checks |
 
----
+## Current Exclusions
 
-## What Iter Does NOT Include
+Iter does not currently claim:
 
-| Exclusion | Reason |
-|-----------|--------|
-| Execution semantics | Proprietary; validated in private CI only |
-| Performance guarantees | SLA-dependent; per-deployment validation |
-| End-to-end integration tests | Require `full_substrate` (not in public repo) |
-| Substrate internals | IP-protected; available under license |
+- an embedded or licensed `full_substrate` build,
+- Enterprise GA status,
+- deployment-independent performance guarantees,
+- completed cross-platform, AKS, security, signing, supply-chain, or external-operator certification.
 
-See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md) for certification scope details.
+Those claims remain unavailable until their canonical APEX controls pass using commit-bound evidence from the trusted evidence workflow.
 
----
-
-## Governance Enforcement
-
-**Tests:** 71 invariant tests run on every PR and release.
-
-**CI Workflows:**
-- `mcp_integration.yml` — Protocol and boundary validation
-- `sdk_ci.yml` — Isolated SDK builds
-- `release_gate.yml` — Version, changelog, and boundary checks
-- `sdk_publish_check.yml` — Packaging dry-run
-
-**Branch Protection:**
-- `main` requires passing CI
-- CODEOWNERS review for security-critical paths
-- Signed commits and tags
-
-**Artifacts:**
-- `audits/stability_v1.0.0/` — SHA-256 manifest baseline
-- `CREDIBILITY_CLOSURE.md` — Audit trail for v1.0.1
-
----
-
-## Surface Freeze
-
-Protocol and SDK surface are stable for 12 months (through December 2025) barring security issues.
-
-Any breaking change requires:
-1. Major version bump
-2. Migration documentation
-3. 3-month deprecation notice
-
----
-
-## Evaluation Checklist
+## Evaluation
 
 ```bash
-# Clone and verify
-git clone https://github.com/aduboseh/iter.git
-cd iter
-git checkout v1.0.1
-
-# Run governance tests
-cargo test --test governance_invariants
-
-# Verify SDK builds
-cd sdks/rust && cargo test
-cd ../typescript && npm ci && npm test
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+python scripts/verify_productization_matrix.py --validate-only
 ```
 
----
-
-## Contact
-
-For technical, licensing, or security inquiries:
-
-Armonti Du-Bose-Hill <armontidubosehill@gmail.com>
-
----
-
-*Only SG Solutions © 2025*
+See [ARCHITECTURE_BOUNDARY.md](ARCHITECTURE_BOUNDARY.md) and [APEX_PRODUCTIZATION_V1.md](APEX_PRODUCTIZATION_V1.md) for the binding boundary and release criteria.

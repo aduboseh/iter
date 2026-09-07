@@ -3,7 +3,9 @@
 The canonical release definition is
 [`APEX_RELEASE_MATRIX_V1.json`](APEX_RELEASE_MATRIX_V1.json). It contains
 exactly 30 release controls derived from
-[`APEX-SCG-ITER-PROD-001`](../APEX_PRODUCTIZATION_V1.md).
+[`APEX-SCG-ITER-PROD-001`](../APEX_PRODUCTIZATION_V1.md), as amended by
+[`APEX-PRODUCTIZATION-GAP-CLOSURE-001`](../APEX_PRODUCTIZATION_GAP_CLOSURE_001.md).
+The active matrix schema is `apex-productization-matrix/v1.1`.
 
 ## Semantics
 

@@ -192,7 +192,7 @@ Write-Host "`n[OK] All proposals evaluated through governance path" -ForegroundC
 Write-Host "[OK] Governance rejected $($denied.Count) unsafe proposal(s)" -ForegroundColor Green
 
 # Note: In public_stub mode, drift detection is simplified.
-# Full monotonic governance property requires full_substrate build.
+# This demo does not certify full monotonic governance; SCG-backed evidence is required.
 
 Write-Host "`nPROOF COMPLETE" -ForegroundColor Cyan
 Write-Host "Artifacts: $outputPath (checksum: $checksum)" -ForegroundColor Green

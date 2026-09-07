@@ -39,7 +39,7 @@ def run_git(root: Path, *args: str) -> None:
     """Run one deterministic Git setup command for worktree-state tests."""
 
     subprocess.run(
-        ["git", *args],
+        ["git", "-c", "commit.gpgsign=false", *args],
         cwd=root,
         text=True,
         capture_output=True,
@@ -74,6 +74,35 @@ class MatrixValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, VERIFIER.DIRECTIVE_ID):
             VERIFIER.validate_matrix(matrix)
 
+    def test_missing_authority_amendment_is_rejected(self) -> None:
+        """The Path B authority amendment cannot be omitted from the matrix."""
+
+        matrix = VERIFIER.load_json(
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        matrix.pop("authority_amendment")
+        with self.assertRaisesRegex(ValueError, "authority_amendment"):
+            VERIFIER.validate_matrix(matrix)
+
+    def test_full_substrate_control_requires_explicit_rejection(self) -> None:
+        """G0-03 proves Path B rejection rather than requiring a false build claim."""
+
+        matrix = VERIFIER.load_json(
+            Path(__file__).resolve().parents[1]
+            / "productization"
+            / "APEX_RELEASE_MATRIX_V1.json"
+        )
+        control = next(item for item in matrix["controls"] if item["id"] == "G0-03")
+        self.assertEqual(len(control["checks"]), 2)
+        for check in control["checks"]:
+            self.assertEqual(check["expected_exit"], 101)
+            self.assertEqual(
+                check["output_pattern"],
+                "FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO",
+            )
+
     def test_canonical_control_id_substitution_is_rejected(self) -> None:
         """A syntactically valid replacement cannot hide a required control."""
 
@@ -84,7 +113,7 @@ class MatrixValidationTests(unittest.TestCase):
         )
         control = next(item for item in matrix["controls"] if item["id"] == "G2-01")
         control["id"] = "G2-99"
-        with self.assertRaisesRegex(ValueError, "canonical v1 set"):
+        with self.assertRaisesRegex(ValueError, r"canonical v1\.1 set"):
             VERIFIER.validate_matrix(matrix)
 
     def test_canonical_control_checks_substitution_is_rejected(self) -> None:
@@ -398,6 +427,32 @@ class CrossRepositoryContractTests(unittest.TestCase):
             )
             self.assertFalse(passed)
             self.assertIn("escapes declared repository", detail)
+
+
+class DirectiveMirrorTests(unittest.TestCase):
+    """Prove both authority documents are required and byte-identical."""
+
+    def test_both_directives_are_verified(self) -> None:
+        """A missing or divergent amendment fails the authority check."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            iter_root = root / "iter"
+            scg_root = root / "scg"
+            iter_root.mkdir()
+            scg_root.mkdir()
+            for name in VERIFIER.DIRECTIVE_MIRRORS:
+                (iter_root / name).write_bytes(b"authority\n")
+                (scg_root / name).write_bytes(b"authority\n")
+
+            passed, detail = VERIFIER.directive_mirror_check(iter_root, scg_root)
+            self.assertTrue(passed, detail)
+            self.assertIn(VERIFIER.AUTHORITY_AMENDMENT, detail)
+
+            (scg_root / VERIFIER.AUTHORITY_AMENDMENT).write_bytes(b"mutated\n")
+            passed, detail = VERIFIER.directive_mirror_check(iter_root, scg_root)
+            self.assertFalse(passed)
+            self.assertIn(VERIFIER.AUTHORITY_AMENDMENT, detail)
 
 
 class GitWorktreeStateTests(unittest.TestCase):

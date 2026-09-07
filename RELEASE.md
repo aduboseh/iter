@@ -2,6 +2,8 @@
 
 This document defines how Iter ships: channels, versioning, compatibility, EOL policy, and release gates.
 
+> **Current classification:** Release-candidate infrastructure. Enterprise GA is prohibited until all 30 controls in the canonical APEX productization matrix pass against exact Iter and SCG commits.
+
 > **Surface Freeze (v1.0.2):** Protocol and SDK surface are stable for 12 months (through January 2027) barring security issues. Any breaking change requires major version bump, migration documentation, and 3-month deprecation notice.
 
 ## Release Channels
@@ -69,14 +71,21 @@ SDKs support protocol versions N and N-1:
 
 ### Pre-Release Checklist
 
-All gates must pass before any release:
+The following engineering checks apply to release candidates and production releases:
 
 - [ ] Governance tests pass (`cargo test --test governance_invariants`)
 - [ ] SDK CI passes (Rust + TypeScript)
 - [ ] Protocol version unchanged OR migration documented
 - [ ] Changelog generated and reviewed
 - [ ] No known security vulnerabilities
-- [ ] Sanitizer checks pass (private, full_substrate only)
+- [ ] Reserved `full_substrate` build fails with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`
+- [ ] RC baseline reports disclose every FAIL and missing evidence item; an RC is not certified for production
+- [ ] Enterprise GA / production only: all 30 APEX controls pass against exact Iter and SCG commits, without `--allow-failures`
+
+**Automation remains fail-closed:** `release_gate.yml` currently requires 30/0 for all
+`release/**` branches and `v*` tags, including RC tags. An RC baseline can record
+outstanding FAILs for review, but cannot pass this publishing gate. RC classification
+is not a release-gate exemption; no workflow is weakened by this checklist.
 
 ### Release Steps
 
@@ -103,7 +112,7 @@ For critical security fixes:
 
 ### Signing
 
-All release artifacts are signed:
+Production release artifacts must be signed:
 
 - Git tags: GPG/SSH signed
 - Checksums: SHA-256 for all binaries

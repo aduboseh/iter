@@ -1,16 +1,17 @@
 # Architecture
 
-Iter uses a dual-build architecture:
+Iter has one supported public build mode: `public_stub`. This build contains the governed verifier/runtime and the versioned SCG gateway contract.
 
-- **`public_stub`** (default): Compiles without proprietary dependencies. Validates protocol types, governance invariants, and SDK surface.
-- **`full_substrate`**: Requires proprietary SCG crates. Enables execution semantics, integration tests, and full MCP handler behavior.
+`full_substrate` is a reserved feature name, not a supported or advertised product configuration. The public build script rejects it with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO` so stub semantics cannot be mislabeled as full-substrate provenance.
 
-## Certification Boundaries
+## Runtime Modes
 
-See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md) for what public vs. private CI certifies.
+- `demo`: explicit, non-authoritative local stub behavior.
+- `governed-local`: governed local evaluation with DecisionPackets and replay checks, but no live SCG authority.
+- `scg-backed`: live SCG gateway evaluation through the pinned `scg.v1` contract, with fail-closed boot and response validation.
 
-## Detailed Architecture
+SCG remains a separate deployment and implementation boundary. Iter depends on the versioned contract, not SCG implementation crates.
 
-Execution architecture, substrate internals, and performance characteristics are documented privately. Available to partners, auditors, and acquirers under NDA.
+## Certification Boundary
 
-Contact: Armonti Du-Bose-Hill <armontidubosehill@gmail.com>
+The repositories remain release-candidate infrastructure until the canonical 30-control APEX matrix reports 30 PASS / 0 FAIL for exact Iter and SCG commits. See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md).

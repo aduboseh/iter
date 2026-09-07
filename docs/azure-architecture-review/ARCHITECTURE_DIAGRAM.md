@@ -2,7 +2,7 @@
 
 **Classification:** External-Safe  
 **Version:** 1.0  
-**Last Updated:** January 2026
+**Last Updated:** September 2026
 
 ---
 
@@ -10,72 +10,29 @@
 
 Iter is a deterministic governance control plane that evaluates policy conditions, enforces constraints, and emits cryptographically verifiable DecisionPackets as governance evidence.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CONSUMERS                                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │   AI Agent   │  │  Workflow    │  │   CLI Tool   │  │  Vertical    │    │
-│  │   Runtime    │  │  Orchestrator│  │              │  │  Application │    │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘    │
-│         │                 │                 │                 │             │
-│         └─────────────────┴────────┬────────┴─────────────────┘             │
-│                                    │                                        │
-│                          JSON-RPC 2.0 / MCP                                 │
-│                                    │                                        │
-└────────────────────────────────────┼────────────────────────────────────────┘
-                                     │
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           ITER CONTROL PLANE                                 │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                        MCP Protocol Layer                            │   │
-│  │  • JSON-RPC 2.0 request/response                                     │   │
-│  │  • Tool discovery and invocation                                     │   │
-│  │  • Input validation and sanitization                                 │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                     Governance Evaluation Engine                     │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │   │
-│  │  │   Policy    │  │  Economic   │  │  Learning   │                  │   │
-│  │  │   Gates     │  │  Controls   │  │  Permits    │                  │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                  │   │
-│  │                           │                                          │   │
-│  │              ┌────────────┴────────────┐                            │   │
-│  │              ▼                         ▼                            │   │
-│  │  ┌─────────────────────┐  ┌─────────────────────┐                   │   │
-│  │  │  Deterministic      │  │  Fail-Closed        │                   │   │
-│  │  │  Decision Logic     │  │  Enforcement        │                   │   │
-│  │  └─────────────────────┘  └─────────────────────┘                   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐   │
-│                                    │          SEALED IP BOUNDARY            │
-│  │     ┌───────────────────────────┴───────────────────────────┐     │   │
-│        │              Execution Substrate (Private)             │           │
-│  │     │  • Proprietary governance execution                   │     │   │
-│        │  • Internal state management                           │           │
-│  │     │  • Licensed deployment only                           │     │   │
-│        └───────────────────────────────────────────────────────┘           │
-│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘   │
-│                                    │                                        │
-└────────────────────────────────────┼────────────────────────────────────────┘
-                                     │
-                    ┌────────────────┼────────────────┐
-                    │                │                │
-                    ▼                ▼                ▼
-┌──────────────────────┐ ┌──────────────────┐ ┌──────────────────────────────┐
-│   DECISION OUTPUT    │ │   AUDIT STREAM   │ │      TELEMETRY               │
-│  ┌────────────────┐  │ │  ┌────────────┐  │ │  ┌─────────────────────────┐ │
-│  │ DecisionPacket │  │ │  │AuditEvent  │  │ │  │ TraceContext propagation│ │
-│  │ • State hash   │  │ │  │• Phase     │  │ │  │ Metrics (latency, etc.) │ │
-│  │ • Policy hash  │  │ │  │• Outcome   │  │ │  │ Structured logs         │ │
-│  │ • Reason codes │  │ │  │• Timestamp │  │ │  └─────────────────────────┘ │
-│  │ • SHA-256 sum  │  │ │  └────────────┘  │ │                              │
-│  └────────────────┘  │ │  JSON Lines      │ │                              │
-│  Canonical JSON      │ │  (append-only)   │ │                              │
-└──────────────────────┘ └──────────────────┘ └──────────────────────────────┘
+```text
+Consumers (agents, orchestrators, CLI tools, applications)
+                         |
+                  JSON-RPC 2.0 / MCP
+                         |
++------------------------v--------------------------------------+
+| Iter public distribution                                     |
+| MCP input validation -> explicitly selected runtime mode     |
+|                                                              |
+| demo: local stub, non-authoritative                           |
+| governed-local: governed local stub, not SCG-backed           |
+| scg-backed: connector -> response attestation -> decision     |
++-------------------|--------------^---------------------------+
+                    |              |
+              pinned scg.v1 proposals / responses
+                    |              |
++-------------------v--------------|---------------------------+
+| SCG: separate deployment, independent state and provenance   |
+| Not embedded in the Iter binary                             |
++--------------------------------------------------------------+
+
+Iter emits mode-specific decisions, audit events, and telemetry.
+Only scg-backed uses the SCG service. Invalid attestations fail closed.
 ```
 
 ---
@@ -114,47 +71,29 @@ Iter is a deterministic governance control plane that evaluates policy condition
 
 ```mermaid
 flowchart TB
-    subgraph Consumers["Consumers"]
-        Agent["AI Agent Runtime"]
-        Orch["Workflow Orchestrator"]
-        CLI["CLI Tool"]
-        App["Vertical Application"]
-    end
+    Consumers["Consumers: agents, orchestrators, CLI, applications"]
 
-    subgraph IterControlPlane["Iter Control Plane"]
+    subgraph IterControlPlane["Iter Public Distribution"]
         MCP["MCP Protocol Layer<br/>JSON-RPC 2.0"]
-        
-        subgraph Governance["Governance Evaluation"]
-            Policy["Policy Gates"]
-            Econ["Economic Controls"]
-            Learn["Learning Permits"]
-        end
-        
-        Decision["Deterministic Decision Logic"]
-        Failsafe["Fail-Closed Enforcement"]
-        
-        subgraph Sealed["Sealed IP Boundary"]
-            Substrate["Execution Substrate<br/>(Private/Licensed)"]
-        end
+        Mode{"Explicit runtime mode"}
+        Demo["demo<br/>Non-authoritative local stub"]
+        Local["governed-local<br/>Governed local stub, not SCG-backed"]
+        Connector["scg-backed connector"]
+        Verify["Fail-closed response attestation"]
+        Output["Mode-specific decisions, audit events, telemetry"]
     end
 
-    subgraph Outputs["Outputs"]
-        DP["DecisionPacket<br/>Canonical JSON + SHA-256"]
-        Audit["AuditEvent Stream<br/>JSON Lines"]
-        Telem["Telemetry<br/>TraceContext + Metrics"]
+    subgraph ScgService["SCG: Separate Deployment"]
+        Gateway["SCG gateway<br/>Independent state and provenance"]
     end
 
-    Consumers --> MCP
-    MCP --> Governance
-    Governance --> Decision
-    Decision --> Failsafe
-    Failsafe --> Substrate
-    
-    Substrate --> DP
-    Substrate --> Audit
-    Substrate --> Telem
-
-    style Sealed fill:#f9f,stroke:#333,stroke-dasharray: 5 5
+    Consumers --> MCP --> Mode
+    Mode --> Demo --> Output
+    Mode --> Local --> Output
+    Mode --> Connector
+    Connector -->|"Pinned scg.v1 proposal"| Gateway
+    Gateway -->|"scg.v1 response"| Verify
+    Verify -->|"Verified response only"| Output
 ```
 
 ---
@@ -165,7 +104,7 @@ flowchart TB
 |----------|--------------|---------------------|
 | MCP Protocol | JSON-RPC requests/responses, tool invocations | Internal state, raw policy inputs |
 | Governance Output | DecisionPackets, AuditEvents, reason codes | Reasoning math, heuristics, weights |
-| Sealed IP | Nothing (isolated) | Substrate internals, SCG logic |
+| SCG service | Canonical proposals and attested responses over pinned `scg.v1` | SCG implementation crates and private internals |
 
 ---
 
@@ -186,7 +125,7 @@ This diagram does NOT show:
 - Proprietary invariant logic
 - Performance/optimization details
 
-These are validated in private CI and available under NDA to partners and auditors.
+SCG implementation evidence is produced in the SCG repository. Iter does not claim private-CI certification for an unavailable embedded substrate.
 
 ---
 

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - APEX_PRODUCTIZATION_V1.md
+      - APEX_PRODUCTIZATION_GAP_CLOSURE_001.md
       - productization/APEX_RELEASE_MATRIX_V1.json
       - productization/SCG_RELEASE_REF
       - productization/evidence/**
@@ -13,6 +14,7 @@ on:
     branches: [main]
     paths:
       - APEX_PRODUCTIZATION_V1.md
+      - APEX_PRODUCTIZATION_GAP_CLOSURE_001.md
       - productization/APEX_RELEASE_MATRIX_V1.json
       - productization/SCG_RELEASE_REF
       - productization/evidence/**

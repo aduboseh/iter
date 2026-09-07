@@ -195,10 +195,11 @@ fn detect_runtime_mode(args: &[String]) -> RuntimeMode {
 }
 
 fn assert_build_mode() {
-    match ITER_BUILD_MODE {
-        "PUBLIC_STUB" | "FULL_SUBSTRATE" => {}
-        other => panic!("ITER_BUILD_MODE is invalid or tampered: {:?}", other),
-    }
+    assert!(
+        ITER_BUILD_MODE == "PUBLIC_STUB",
+        "ITER_BUILD_MODE is invalid for the public product boundary: {:?}",
+        ITER_BUILD_MODE
+    );
 }
 
 fn main() {
@@ -233,11 +234,7 @@ fn print_mode_banner(runtime_mode: RuntimeMode) {
     eprintln!("┌────────────────────────────────────────────────────────────┐");
     match runtime_mode {
         RuntimeMode::Demo => {
-            if ITER_BUILD_MODE == "PUBLIC_STUB" {
-                eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
-            } else {
-                eprintln!("│ ITER: DEMO MODE (FULL SUBSTRATE BUILD)                     │");
-            }
+            eprintln!("│ ITER: PUBLIC STUB MODE                                     │");
             eprintln!("│ Proprietary substrate DISABLED                             │");
             eprintln!("│ Responses are deterministic placeholders                   │");
             eprintln!("└────────────────────────────────────────────────────────────┘");

@@ -34,7 +34,7 @@ See [RELEASE.md](../RELEASE.md) for:
 
 ## Certification Scope
 
-See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md) for what public CI certifies vs. private CI.
+See [ARCHITECTURE_BOUNDARY.md](../ARCHITECTURE_BOUNDARY.md) for what Iter CI certifies and what remains outside the public product boundary.
 
 ## Contact
 
