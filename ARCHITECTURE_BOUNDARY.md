@@ -51,6 +51,7 @@ cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 cargo check --locked --workspace --all-targets --no-default-features --features full_substrate
+cargo check --locked --workspace --all-targets --features full_substrate
 ```
 
-The final command is expected to exit `101` and include `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`.
+Both `full_substrate` commands must exit `101` and include `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`.

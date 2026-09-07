@@ -71,7 +71,7 @@ SDKs support protocol versions N and N-1:
 
 ### Pre-Release Checklist
 
-All gates must pass before any release:
+The following engineering checks apply to release candidates and production releases:
 
 - [ ] Governance tests pass (`cargo test --test governance_invariants`)
 - [ ] SDK CI passes (Rust + TypeScript)
@@ -79,7 +79,13 @@ All gates must pass before any release:
 - [ ] Changelog generated and reviewed
 - [ ] No known security vulnerabilities
 - [ ] Reserved `full_substrate` build fails with `FULL_SUBSTRATE_UNSUPPORTED_IN_PUBLIC_REPO`
-- [ ] All 30 APEX productization controls pass against exact Iter and SCG commits
+- [ ] RC baseline reports disclose every FAIL and missing evidence item; an RC is not certified for production
+- [ ] Enterprise GA / production only: all 30 APEX controls pass against exact Iter and SCG commits, without `--allow-failures`
+
+**Automation remains fail-closed:** `release_gate.yml` currently requires 30/0 for all
+`release/**` branches and `v*` tags, including RC tags. An RC baseline can record
+outstanding FAILs for review, but cannot pass this publishing gate. RC classification
+is not a release-gate exemption; no workflow is weakened by this checklist.
 
 ### Release Steps
 
