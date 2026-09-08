@@ -32,3 +32,16 @@ Thumbs.db
 
 # Test artifacts
 *.profraw
+
+# Mandatory build-time governance authority; do not normalize or omit it.
+!governance/SCG_Governance_v1.0.md
+
+# Never send local credentials to a container builder.
+.env
+.env.*
+**/.env
+**/.env.*
+*.key
+*.pem
+**/*.key
+**/*.pem
