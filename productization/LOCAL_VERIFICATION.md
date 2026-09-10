@@ -8,8 +8,11 @@ must stay within verified included usage; otherwise run locally.
 ## Real-Process Smoke Test
 
 Prerequisites: Python 3.11+, Git, Rust 1.93.0 with the host compiler/linker, and
-local Iter and SCG checkouts. The verifier runs locked builds before testing; it
-does not trust an arbitrary pre-existing binary. Package downloads may be needed.
+local Iter and SCG checkouts. The verifier runs locked builds in fresh per-run
+`<output>/build/iter` and `<output>/build/scg` directories and executes only those
+artifacts; checkout `target/` caches are never trusted. Git environment overrides
+are excluded from child processes. Package downloads may be needed. Choose an
+output drive with sufficient free space for both fresh builds.
 
 From Iter, with SCG as a sibling:
 

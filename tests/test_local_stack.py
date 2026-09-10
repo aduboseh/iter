@@ -80,6 +80,48 @@ class LocalStackTests(unittest.TestCase):
         for key in ("SCG_AUTH_TOKEN", "ITER_AUDIT_LEDGER_PATH", "CARGO_TARGET_DIR", "HTTPS_PROXY"):
             self.assertNotIn(key, env)
 
+    def test_git_overrides_are_removed(self):
+        overrides = {key: "untrusted" for key in (
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+            "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0",
+        )}
+        with patch.dict(os.environ, overrides):
+            env = LOCAL.runtime_env()
+        self.assertFalse(any(key.upper().startswith("GIT_") for key in env))
+
+    def test_builds_ignore_existing_checkout_binaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            roots = {repo: root / repo for repo in ("iter", "scg")}
+            output = root / "evidence"
+            suffix = ".exe" if os.name == "nt" else ""
+            cached = roots["iter"] / "target" / "debug" / ("iter-server" + suffix)
+            cached.parent.mkdir(parents=True)
+            cached.write_bytes(b"replaced cached executable")
+            calls = []
+            binaries = LOCAL.build_binaries(
+                roots, output, "1.93.0", lambda *args: calls.append(args))
+            self.assertEqual(len(calls), 2)
+            for (argv, cwd, name), repo in zip(calls, ("iter", "scg")):
+                target = output / "build" / repo
+                self.assertTrue(target.is_dir())
+                self.assertEqual(argv[argv.index("--target-dir") + 1], target)
+                self.assertIn("--locked", argv)
+                self.assertEqual(cwd, roots[repo])
+                self.assertEqual(name, repo + "-build")
+            for name, repo in (("iter-server", "iter"), ("iter-cli", "iter"), ("scg-gateway", "scg")):
+                self.assertEqual(binaries[name], output / "build" / repo / "debug" / (name + suffix))
+                self.assertFalse(binaries[name].exists())
+            self.assertEqual(cached.read_bytes(), b"replaced cached executable")
+
+    def test_build_refuses_a_preexisting_run_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build" / "iter").mkdir(parents=True)
+            with self.assertRaises(FileExistsError):
+                LOCAL.build_binaries({"iter": root / "repo", "scg": root / "scg"},
+                                     root, "1.93.0", lambda *args: self.fail("must not build"))
+
     def test_output_cannot_overwrite_source_or_previous_run(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -89,6 +131,10 @@ class LocalStackTests(unittest.TestCase):
                 LOCAL.verify_output_directory(repo / "evidence", (repo,))
             with self.assertRaises(RuntimeError):
                 LOCAL.verify_output_directory(root, (repo,))
+            previous = root / "previous"
+            previous.mkdir()
+            with self.assertRaises(RuntimeError):
+                LOCAL.verify_output_directory(previous, (repo,))
             self.assertEqual(LOCAL.verify_output_directory(root / "new", (repo,)), root / "new")
 
     def test_child_is_stopped_on_failure(self):

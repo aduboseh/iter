@@ -31,9 +31,9 @@ def sha256(path):
 
 
 def runtime_env():
-    """Do not inherit developer runtime identities, ledgers, or HTTP proxies."""
+    """Do not inherit runtime identities, Git overrides, ledgers, or proxies."""
     return {k: v for k, v in os.environ.items()
-            if not k.upper().startswith(("ITER_", "SCG_", "CARGO_", "RUST"))
+            if not k.upper().startswith(("ITER_", "SCG_", "CARGO_", "RUST", "GIT_"))
             and k.upper() not in {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"}}
 
 
@@ -73,6 +73,20 @@ def verify_output_directory(output, roots):
         require(not output.is_relative_to(root.resolve()), "output must be outside source repos")
     require(not output.exists(), "output directory already exists; choose a fresh run directory")
     return output
+
+
+def build_binaries(roots, output, toolchain, run):
+    """Build and execute only run-owned artifacts, never checkout target caches."""
+    targets = {repo: output / "build" / repo for repo in roots}
+    for target in targets.values():
+        target.mkdir(parents=True, exist_ok=False)
+    run(["cargo", f"+{toolchain}", "build", "--locked", "--target-dir", targets["iter"],
+         "--bin", "iter-server", "--bin", "iter-cli"], roots["iter"], "iter-build")
+    run(["cargo", f"+{toolchain}", "build", "--locked", "--target-dir", targets["scg"],
+         "-p", "scg-gateway", "--no-default-features", "--features", "ci"], roots["scg"], "scg-build")
+    suffix = ".exe" if os.name == "nt" else ""
+    return {name: targets[repo] / "debug" / (name + suffix)
+            for name, repo in (("iter-server", "iter"), ("iter-cli", "iter"), ("scg-gateway", "scg"))}
 
 
 @contextlib.contextmanager
@@ -165,13 +179,7 @@ def execute(args, output, report):
         report["subjects"][name] = {"commit": head, "clean": not status.strip(),
                                      "lockfile_sha256": sha256(root / "Cargo.lock")}
     report["rustc"] = run(["rustc", f"+{args.toolchain}", "-vV"], roots["iter"], "rustc")
-    run(["cargo", f"+{args.toolchain}", "build", "--locked", "--bin", "iter-server",
-         "--bin", "iter-cli"], roots["iter"], "iter-build")
-    run(["cargo", f"+{args.toolchain}", "build", "--locked", "-p", "scg-gateway",
-         "--no-default-features", "--features", "ci"], roots["scg"], "scg-build")
-    suffix = ".exe" if os.name == "nt" else ""
-    binaries = {name: roots[repo] / "target/debug" / (name + suffix)
-                for name, repo in (("iter-server", "iter"), ("iter-cli", "iter"), ("scg-gateway", "scg"))}
+    binaries = build_binaries(roots, output, args.toolchain, run)
     report["binary_sha256"] = {name: sha256(path) for name, path in binaries.items()}
     governance_file = roots["scg"] / "governance/governance.hash"
     governance_hash = governance_file.read_text(encoding="utf-8").strip()
