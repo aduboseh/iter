@@ -80,6 +80,15 @@ class LocalStackTests(unittest.TestCase):
         for key in ("SCG_AUTH_TOKEN", "ITER_AUDIT_LEDGER_PATH", "CARGO_TARGET_DIR", "HTTPS_PROXY"):
             self.assertNotIn(key, env)
 
+    def test_custom_toolchain_homes_survive_without_behavioral_overrides(self):
+        homes = {"CARGO_HOME": "custom-cargo", "RUSTUP_HOME": "custom-rustup"}
+        overrides = {key: "untrusted" for key in (
+            "RUSTFLAGS", "RUSTUP_TOOLCHAIN", "RUSTC_WRAPPER", "CARGO_TARGET_DIR",
+            "CARGO_ENCODED_RUSTFLAGS", "CARGO_REGISTRIES_PRIVATE_TOKEN",
+        )}
+        with patch.dict(os.environ, {**homes, **overrides, "PATH": "tools"}, clear=True):
+            self.assertEqual(LOCAL.runtime_env(), {**homes, "PATH": "tools"})
+
     def test_git_overrides_are_removed(self):
         overrides = {key: "untrusted" for key in (
             "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",

@@ -31,10 +31,11 @@ def sha256(path):
 
 
 def runtime_env():
-    """Do not inherit runtime identities, Git overrides, ledgers, or proxies."""
+    """Preserve toolchain homes, not runtime identities or behavioral overrides."""
     return {k: v for k, v in os.environ.items()
-            if not k.upper().startswith(("ITER_", "SCG_", "CARGO_", "RUST", "GIT_"))
-            and k.upper() not in {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"}}
+            if k.upper() in {"CARGO_HOME", "RUSTUP_HOME"}
+            or (not k.upper().startswith(("ITER_", "SCG_", "CARGO_", "RUST", "GIT_"))
+                and k.upper() not in {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"})}
 
 
 def decode_response(line, request_id):
