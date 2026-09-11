@@ -32,6 +32,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Python for verifier regression tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test local verification safeguards
+        run: |
+          python -B tests/test_local_stack.py
+          python -BO tests/test_local_stack.py
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
