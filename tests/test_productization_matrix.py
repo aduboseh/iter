@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import copy
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "verify_productization_matrix.py"
@@ -202,6 +206,317 @@ class CertificationStatusTests(unittest.TestCase):
         self.assertEqual(
             VERIFIER.certification_status(False, results(30)), ("FAIL", False)
         )
+
+
+class EvidenceRunTests(unittest.TestCase):
+    """Exercise GitHub metadata policy with fixtures, never certification records."""
+
+    def setUp(self) -> None:
+        self.commit = "a" * 40
+        self.run = {
+            "id": 123,
+            "head_sha": self.commit,
+            "head_branch": "main",
+            "path": VERIFIER.TRUSTED_EVIDENCE_WORKFLOW,
+            "event": "workflow_dispatch",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1,
+            "repository": {"full_name": "aduboseh/iter", "fork": False},
+            "head_repository": {"full_name": "aduboseh/iter", "fork": False},
+            "actor": {"id": 10},
+            "triggering_actor": {"id": 11},
+        }
+        self.environment = {
+            "id": 5,
+            "name": VERIFIER.CERTIFICATION_ENVIRONMENT,
+            "deployment_branch_policy": {
+                "protected_branches": True,
+                "custom_branch_policies": False,
+            },
+            "protection_rules": [
+                {
+                    "type": "required_reviewers",
+                    "prevent_self_review": True,
+                    "reviewers": [{"type": "User", "reviewer": {"id": 20}}],
+                }
+            ],
+        }
+        self.reviews = [
+            {
+                "state": "approved",
+                "user": {"id": 20, "type": "User"},
+                "environments": [{"id": 5, "name": VERIFIER.CERTIFICATION_ENVIRONMENT}],
+            }
+        ]
+
+    def check(self) -> tuple[bool, str]:
+        with mock.patch.object(
+            VERIFIER,
+            "github_json",
+            side_effect=[
+                self.run,
+                {"protected": True},
+                self.environment,
+                self.reviews,
+            ],
+        ):
+            return VERIFIER.evidence_run_check(123, self.commit)
+
+    def test_first_attempt_with_authorized_environment_approval(self) -> None:
+        passed, detail = self.check()
+        self.assertTrue(passed, detail)
+
+    def test_run_metadata_mutations_are_rejected(self) -> None:
+        for field, value in (
+            ("id", 124),
+            ("id", True),
+            ("head_sha", "b" * 40),
+            ("head_branch", "unprotected"),
+            ("path", ".github/workflows/other.yml"),
+            ("event", "push"),
+            ("status", "in_progress"),
+            ("conclusion", "failure"),
+            ("run_attempt", 2),
+            ("run_attempt", True),
+            ("repository", None),
+            ("head_repository", {"full_name": "fork/iter", "fork": True}),
+            ("actor", {}),
+            ("triggering_actor", {"id": True}),
+        ):
+            with self.subTest(field=field, value=value):
+                original = self.run[field]
+                self.run[field] = value
+                self.assertFalse(self.check()[0])
+                self.run[field] = original
+
+    def test_missing_run_fields_are_rejected(self) -> None:
+        for field in list(self.run):
+            with self.subTest(field=field):
+                value = self.run.pop(field)
+                self.assertFalse(self.check()[0])
+                self.run[field] = value
+
+    def test_environment_policy_mutations_are_rejected(self) -> None:
+        original = copy.deepcopy(self.environment)
+        cases = [
+            ("id", None),
+            ("name", "other"),
+            ("deployment_branch_policy", None),
+            (
+                "deployment_branch_policy",
+                {"protected_branches": False, "custom_branch_policies": False},
+            ),
+            ("protection_rules", []),
+            ("protection_rules", [{"type": "wait_timer"}]),
+            (
+                "protection_rules",
+                [dict(original["protection_rules"][0], prevent_self_review=False)],
+            ),
+            ("protection_rules", [dict(original["protection_rules"][0], reviewers=[])]),
+            (
+                "protection_rules",
+                [
+                    dict(
+                        original["protection_rules"][0],
+                        reviewers=[{"type": "Team", "reviewer": {"id": 20}}],
+                    )
+                ],
+            ),
+        ]
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                self.environment = dict(original, **{field: value})
+                self.assertFalse(self.check()[0])
+
+    def test_missing_rejected_wrong_environment_and_self_reviews_fail(self) -> None:
+        original = copy.deepcopy(self.reviews[0])
+        cases = [
+            [],
+            [{}],
+            [dict(original, state="rejected")],
+            [
+                dict(
+                    original,
+                    environments=[
+                        {"id": 6, "name": VERIFIER.CERTIFICATION_ENVIRONMENT}
+                    ],
+                )
+            ],
+            [dict(original, environments=[{"id": 5, "name": "other"}])],
+            [dict(original, user={"id": 20, "type": "Bot"})],
+            [dict(original, user={"id": 30, "type": "User"})],
+            [original, dict(original, state="rejected")],
+        ]
+        for actor_id in (10, 11):
+            self.environment["protection_rules"][0]["reviewers"].append(
+                {"type": "User", "reviewer": {"id": actor_id}}
+            )
+            cases.append([dict(original, user={"id": actor_id, "type": "User"})])
+        for reviews in cases:
+            with self.subTest(reviews=reviews):
+                self.reviews = reviews
+                self.assertFalse(self.check()[0])
+
+    def test_api_error_at_every_query_fails_closed(self) -> None:
+        responses = [self.run, {"protected": True}, self.environment, self.reviews]
+        for index in range(len(responses)):
+            with self.subTest(query=index):
+                with mock.patch.object(
+                    VERIFIER,
+                    "github_json",
+                    side_effect=responses[:index] + [ValueError("API denied")],
+                ):
+                    passed, detail = VERIFIER.evidence_run_check(123, self.commit)
+                self.assertFalse(passed)
+                self.assertIn("API denied", detail)
+
+    def test_unprotected_branch_fails(self) -> None:
+        with mock.patch.object(
+            VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
+        ):
+            self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+
+    def test_invalid_subjects_do_not_query_api(self) -> None:
+        for run_id, commit in (
+            (None, self.commit),
+            (0, self.commit),
+            (True, self.commit),
+            ("123", self.commit),
+            (123, "main"),
+            (123, None),
+            (123, "A" * 40),
+        ):
+            with self.subTest(run_id=run_id, commit=commit):
+                with mock.patch.object(VERIFIER, "github_json") as api:
+                    self.assertFalse(VERIFIER.evidence_run_check(run_id, commit)[0])
+                api.assert_not_called()
+
+    def test_cli_errors_and_timeout_are_not_success_or_secret_disclosure(self) -> None:
+        failures = [
+            FileNotFoundError("TOKEN-SENTINEL"),
+            subprocess.TimeoutExpired("gh", 30, stderr="TOKEN-SENTINEL"),
+            subprocess.CompletedProcess([], 1, "", "TOKEN-SENTINEL"),
+            subprocess.CompletedProcess([], 0, "not json", ""),
+        ]
+        for failure in failures:
+            with self.subTest(failure=type(failure).__name__):
+                options = (
+                    {"side_effect": failure}
+                    if isinstance(failure, Exception)
+                    else {"return_value": failure}
+                )
+                with mock.patch.object(VERIFIER.subprocess, "run", **options):
+                    passed, detail = VERIFIER.evidence_run_check(123, self.commit)
+                self.assertFalse(passed)
+                self.assertNotIn("TOKEN-SENTINEL", detail)
+
+    def test_api_uses_fixed_host_read_only_and_timeout(self) -> None:
+        with mock.patch.object(
+            VERIFIER.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], 0, "{}", ""),
+        ) as command:
+            self.assertEqual(VERIFIER.github_json("actions/runs/123"), {})
+        argv = command.call_args.args[0]
+        self.assertEqual(
+            argv,
+            [
+                "gh",
+                "api",
+                "--hostname",
+                "github.com",
+                "--method",
+                "GET",
+                "repos/aduboseh/iter/actions/runs/123",
+            ],
+        )
+        self.assertEqual(command.call_args.kwargs["timeout"], 30)
+        self.assertFalse(command.call_args.kwargs.get("shell", False))
+
+    def test_subject_commands_do_not_inherit_api_credentials(self) -> None:
+        check = {
+            "argv": ["cargo", "test"],
+            "repo": "iter",
+            "env": {"GH_TOKEN": "override"},
+        }
+        with (
+            mock.patch.dict(
+                VERIFIER.os.environ, {"GH_TOKEN": "secret", "GITHUB_TOKEN": "secret"}
+            ),
+            mock.patch.object(
+                VERIFIER.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, "test result: ok. 1 passed", ""
+                ),
+            ) as command,
+        ):
+            self.assertTrue(VERIFIER.command_check(check, {"iter": SCRIPT.parent})[0])
+        environment = command.call_args.kwargs["env"]
+        self.assertNotIn("GH_TOKEN", environment)
+        self.assertNotIn("GITHUB_TOKEN", environment)
+
+    def test_matrix_cannot_consume_evidence_or_allow_failure_after_auth_rejection(
+        self,
+    ) -> None:
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    str(SCRIPT),
+                    "--control",
+                    "G1-01",
+                    "--evidence-run-id",
+                    "123",
+                    "--allow-failures",
+                ],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value=self.commit),
+            mock.patch.object(
+                VERIFIER, "git_worktree_clean", return_value=(True, "clean")
+            ),
+            mock.patch.object(
+                VERIFIER, "directive_mirror_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "scg_release_ref_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(False, "not approved")
+            ) as authenticate,
+            mock.patch.object(VERIFIER, "evidence_check") as consume,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        authenticate.assert_called_once_with(123, self.commit)
+        consume.assert_not_called()
+
+    def test_preflight_and_both_workflows_share_authentication(self) -> None:
+        with (
+            mock.patch(
+                "sys.argv",
+                [str(SCRIPT), "--verify-evidence-run", "--evidence-run-id", "123"],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value=self.commit),
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(False, "not approved")
+            ) as authenticate,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        authenticate.assert_called_once_with(123, self.commit)
+        workflows = SCRIPT.parents[1] / ".github" / "workflows"
+        for name in ("apex_productization.yml", "release_gate.yml"):
+            workflow = (workflows / name).read_text(encoding="utf-8")
+            self.assertEqual(workflow.count("--verify-evidence-run"), 1)
+            self.assertLess(
+                workflow.index("--verify-evidence-run"),
+                workflow.index("uses: actions/download-artifact"),
+            )
+        required = (workflows / "mcp_integration.yml").read_text(encoding="utf-8")
+        self.assertIn("python -B tests/test_productization_matrix.py", required)
+        self.assertIn("python -BO tests/test_productization_matrix.py", required)
 
 
 class ExternalEvidenceTests(unittest.TestCase):

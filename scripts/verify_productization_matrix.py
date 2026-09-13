@@ -68,6 +68,7 @@ ALLOWED_CHECK_TYPES = {
 }
 EVIDENCE_PRODUCER_REPOSITORY = "aduboseh/iter"
 TRUSTED_EVIDENCE_WORKFLOW = ".github/workflows/apex_productization_evidence.yml"
+CERTIFICATION_ENVIRONMENT = "production-certification"
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,7 +90,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--evidence-run-id", type=int)
     parser.add_argument("--control", action="append", default=[])
-    parser.add_argument("--validate-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--validate-only", action="store_true")
+    mode.add_argument("--verify-evidence-run", action="store_true")
     parser.add_argument("--allow-failures", action="store_true")
     parser.add_argument("--report", type=Path)
     return parser.parse_args()
@@ -302,6 +305,9 @@ def command_check(
     ):
         return False, "command env must contain string keys and values", 0.0
     env.update(extra_env)
+    # The API credential authenticates evidence; it must not reach subject code.
+    env.pop("GH_TOKEN", None)
+    env.pop("GITHUB_TOKEN", None)
 
     started = time.monotonic()
     try:
@@ -424,6 +430,179 @@ def cross_repo_equal_check(
     return True, f"cross-repository files match: {left_hash}: {left} == {right}", 0.0
 
 
+def github_json(endpoint: str) -> Any:
+    """Read GitHub-owned metadata without exposing CLI diagnostics or credentials."""
+
+    result = subprocess.run(
+        [
+            "gh",
+            "api",
+            "--hostname",
+            "github.com",
+            "--method",
+            "GET",
+            f"repos/{EVIDENCE_PRODUCER_REPOSITORY}/{endpoint}",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError(
+            "GitHub metadata unavailable; check read permissions and connectivity"
+        )
+    return json.loads(result.stdout)
+
+
+def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[bool, str]:
+    """Authenticate a first-attempt producer run and its environment approval.
+
+    This is account-level approval verification, not independent human acceptance
+    or validation of the control-specific claims inside an artifact.
+    """
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+            raise ValueError(message)
+
+    def positive_id(value: Any) -> bool:
+        return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+    try:
+        require(positive_id(run_id), "positive evidence run ID required")
+        require(
+            isinstance(iter_commit, str)
+            and re.fullmatch(r"[0-9a-f]{40}", iter_commit) is not None,
+            "exact lowercase Iter commit required",
+        )
+        run = github_json(f"actions/runs/{run_id}")
+        require(isinstance(run, dict), "invalid workflow run response")
+        for key, expected in {
+            "id": run_id,
+            "head_sha": iter_commit,
+            "head_branch": "main",
+            "path": TRUSTED_EVIDENCE_WORKFLOW,
+            "event": "workflow_dispatch",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1,
+        }.items():
+            require(
+                type(run.get(key)) is type(expected) and run[key] == expected,
+                f"invalid run.{key}",
+            )
+        for key in ("repository", "head_repository"):
+            repo = run.get(key)
+            require(
+                isinstance(repo, dict)
+                and repo.get("full_name") == EVIDENCE_PRODUCER_REPOSITORY
+                and repo.get("fork") is False,
+                f"invalid run.{key}",
+            )
+        actors = []
+        for key in ("actor", "triggering_actor"):
+            actor = run.get(key)
+            require(
+                isinstance(actor, dict) and positive_id(actor.get("id")),
+                f"invalid run.{key}",
+            )
+            actors.append(actor["id"])
+
+        branch = github_json("branches/main")
+        require(
+            isinstance(branch, dict) and branch.get("protected") is True,
+            "producer main must be protected",
+        )
+        environment = github_json(f"environments/{CERTIFICATION_ENVIRONMENT}")
+        require(
+            isinstance(environment, dict), "invalid certification environment response"
+        )
+        require(
+            environment.get("name") == CERTIFICATION_ENVIRONMENT
+            and positive_id(environment.get("id")),
+            "invalid certification environment identity",
+        )
+        policy = environment.get("deployment_branch_policy")
+        require(
+            isinstance(policy, dict)
+            and policy.get("protected_branches") is True
+            and policy.get("custom_branch_policies") is False,
+            "certification environment must require protected branches",
+        )
+        rules = environment.get("protection_rules")
+        require(isinstance(rules, list), "missing environment protection rules")
+        review_rules = [
+            rule
+            for rule in rules
+            if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
+        ]
+        require(len(review_rules) == 1, "one required-reviewers rule required")
+        rule = review_rules[0]
+        require(
+            rule.get("prevent_self_review") is True,
+            "environment must prevent self-review",
+        )
+        reviewers = rule.get("reviewers")
+        require(isinstance(reviewers, list), "missing required reviewers")
+        reviewer_ids = {
+            item["reviewer"]["id"]
+            for item in reviewers
+            if isinstance(item, dict)
+            and item.get("type") == "User"
+            and isinstance(item.get("reviewer"), dict)
+            and positive_id(item["reviewer"].get("id"))
+        }
+        require(
+            bool(reviewer_ids),
+            "at least one individually named required reviewer required",
+        )
+
+        reviews = github_json(f"actions/runs/{run_id}/approvals")
+        require(isinstance(reviews, list), "invalid run approval response")
+        approved = False
+        for review in reviews:
+            require(isinstance(review, dict), "invalid run review")
+            environments = review.get("environments")
+            require(isinstance(environments, list), "invalid reviewed environments")
+            if not any(
+                isinstance(item, dict)
+                and positive_id(item.get("id"))
+                and item["id"] == environment["id"]
+                and item.get("name") == CERTIFICATION_ENVIRONMENT
+                for item in environments
+            ):
+                continue
+            require(
+                review.get("state") == "approved",
+                "certification environment review is not approved",
+            )
+            reviewer = review.get("user")
+            require(
+                isinstance(reviewer, dict)
+                and reviewer.get("type") == "User"
+                and positive_id(reviewer.get("id"))
+                and reviewer["id"] in reviewer_ids
+                and reviewer["id"] not in actors,
+                "approval must be from an authorized non-triggering user",
+            )
+            approved = True
+        require(approved, "missing recorded certification environment approval")
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        # Do not echo subprocess output: it may contain token-bearing diagnostics.
+        detail = (
+            str(exc)
+            if isinstance(exc, ValueError)
+            else "GitHub metadata query failed or timed out"
+        )
+        return False, detail
+    return (
+        True,
+        f"producer run {run_id} authenticated for {iter_commit}; environment approval verified",
+    )
+
+
 def evidence_check(
     control_id: str,
     check: dict[str, Any],
@@ -431,7 +610,7 @@ def evidence_check(
     heads: dict[str, str | None],
     evidence_run_id: int | None,
 ) -> tuple[bool, str, float]:
-    """Verify external evidence, exact subject commits, and artifact digests."""
+    """Check bundle structure and binding after main authenticates the run."""
 
     path = resolve_contained_path(evidence_dir, check["file"])
     if path is None:
@@ -590,6 +769,10 @@ def main() -> int:
     """Validate or execute the release matrix and emit an auditable report."""
 
     args = parse_args()
+    if args.verify_evidence_run:
+        passed, detail = evidence_run_check(args.evidence_run_id, git_head(args.iter_root))
+        print(f"{'PASS' if passed else 'FAIL'} EVIDENCE-RUN {detail}")
+        return 0 if passed else 1
     try:
         matrix = load_json(args.matrix)
         controls = validate_matrix(matrix)
@@ -629,6 +812,16 @@ def main() -> int:
         roots["iter"], heads["scg"]
     )
     print(f"{'PASS' if scg_pin_ok else 'FAIL'} SCG-RELEASE-REF {scg_pin_detail}")
+
+    if any(
+        check["type"] == "evidence"
+        for control in controls
+        for check in control["checks"]
+    ):
+        trusted, detail = evidence_run_check(args.evidence_run_id, heads["iter"])
+        print(f"{'PASS' if trusted else 'FAIL'} EVIDENCE-RUN {detail}")
+        if not trusted:
+            return 1
 
     results: list[dict[str, Any]] = []
     for control in controls:

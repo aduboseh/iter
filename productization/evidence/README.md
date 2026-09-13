@@ -15,7 +15,9 @@ Evidence is transported as a GitHub Actions artifact named
 must have the exact iter commit as its `head_sha`, conclude successfully, and
 come from the trusted workflow
 `.github/workflows/apex_productization_evidence.yml` through an independent
-`workflow_dispatch` run. Manual certification requires that run ID; release
+`workflow_dispatch` run on protected `main`. Only the first run attempt is
+accepted: v1 does not bind artifacts or approvals to a rerun attempt. Dispatch a
+new run instead. Manual certification requires that run ID; release
 certification requires exactly one active artifact with that name. The artifact
 is downloaded outside both source trees before the verifier runs.
 
@@ -23,6 +25,28 @@ The trusted producer workflow is a GA prerequisite and is intentionally absent
 while the external certification controls remain incomplete. Until it is added
 with protected-environment approval and control-specific collectors, evidence
 controls fail closed. An artifact from any other workflow is never accepted.
+
+Both evidence-consuming workflows and direct matrix execution authenticate the
+run against GitHub's read-only API, not fields in the evidence JSON. They require
+the `production-certification` environment to restrict deployments to protected
+branches, prevent self-review, and name individual required reviewers. The run's
+review history must contain approval for that exact environment ID by a configured
+human account other than either initiating actor. Rejected reviews, missing
+metadata, and API failures fail closed. Team-only reviewer policies are not yet
+supported. GitHub CLI and read access to Actions and contents are
+required. The preflight can be exercised separately:
+
+```text
+python -B scripts/verify_productization_matrix.py --verify-evidence-run --evidence-run-id <run-id>
+```
+
+This authenticates account-level approval, not independent human acceptance or
+the scientific validity of a control claim. An alternate account owned by the
+same person is not an independent operator. The v1 bundle checks remain structural;
+behavioral collectors, complete execution identity, protected producer jobs,
+short-lived cross-repository authentication and private artifact transport must
+be implemented before producer activation. Do not add a producer that simply
+copies PASS declarations or repackages local smoke reports as certification.
 
 Missing or ambiguous evidence, stale commit binding, missing artifacts, and
 digest mismatch are all FAIL. Do not commit placeholder or completed PASS
