@@ -465,10 +465,14 @@ def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[boo
     """
 
     def require(condition: bool, message: str) -> None:
+        """Raise rather than assert so optimization cannot remove policy checks."""
+
         if not condition:
             raise ValueError(message)
 
     def positive_id(value: Any) -> bool:
+        """Reject booleans, which Python otherwise treats as integer IDs."""
+
         return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
     try:

@@ -212,6 +212,8 @@ class EvidenceRunTests(unittest.TestCase):
     """Exercise GitHub metadata policy with fixtures, never certification records."""
 
     def setUp(self) -> None:
+        """Build API fixtures without writing reusable certification evidence."""
+
         self.commit = "a" * 40
         self.branch = {"protected": True, "commit": {"sha": self.commit}}
         self.run = {
@@ -252,6 +254,8 @@ class EvidenceRunTests(unittest.TestCase):
         ]
 
     def check(self) -> tuple[bool, str]:
+        """Exercise the complete policy with only GitHub transport substituted."""
+
         with mock.patch.object(
             VERIFIER,
             "github_json",
@@ -265,10 +269,14 @@ class EvidenceRunTests(unittest.TestCase):
             return VERIFIER.evidence_run_check(123, self.commit)
 
     def test_first_attempt_with_authorized_environment_approval(self) -> None:
+        """One authorized non-triggering account satisfies the approval policy."""
+
         passed, detail = self.check()
         self.assertTrue(passed, detail)
 
     def test_run_metadata_mutations_are_rejected(self) -> None:
+        """Valid neighboring fields cannot compensate for an invalid identity."""
+
         for field, value in (
             ("id", 124),
             ("id", True),
@@ -293,6 +301,8 @@ class EvidenceRunTests(unittest.TestCase):
                 self.run[field] = original
 
     def test_missing_run_fields_are_rejected(self) -> None:
+        """Sparse metadata never inherits defaults from the expected policy."""
+
         for field in list(self.run):
             with self.subTest(field=field):
                 value = self.run.pop(field)
@@ -300,6 +310,8 @@ class EvidenceRunTests(unittest.TestCase):
                 self.run[field] = value
 
     def test_environment_policy_mutations_are_rejected(self) -> None:
+        """Branch protection cannot substitute for environment review rules."""
+
         original = copy.deepcopy(self.environment)
         cases = [
             ("id", None),
@@ -332,6 +344,8 @@ class EvidenceRunTests(unittest.TestCase):
                 self.assertFalse(self.check()[0])
 
     def test_missing_rejected_wrong_environment_and_self_reviews_fail(self) -> None:
+        """Policy configuration alone is not attributable run-specific approval."""
+
         original = copy.deepcopy(self.reviews[0])
         cases = [
             [],
@@ -361,6 +375,8 @@ class EvidenceRunTests(unittest.TestCase):
                 self.assertFalse(self.check()[0])
 
     def test_api_error_at_every_query_fails_closed(self) -> None:
+        """No failed metadata hop may be omitted from the trust chain."""
+
         responses = [self.run, self.branch, self.environment, self.reviews]
         for index in range(len(responses)):
             with self.subTest(query=index):
@@ -374,12 +390,16 @@ class EvidenceRunTests(unittest.TestCase):
                 self.assertIn("API denied", detail)
 
     def test_unprotected_branch_fails(self) -> None:
+        """Approval cannot bless code from an unprotected source branch."""
+
         with mock.patch.object(
             VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
         ):
             self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
 
     def test_protected_release_branches_are_supported_and_url_encoded(self) -> None:
+        """Release sources follow the same policy without being forced onto main."""
+
         self.run["head_branch"] = "release/v1.0"
         with mock.patch.object(
             VERIFIER,
@@ -400,6 +420,8 @@ class EvidenceRunTests(unittest.TestCase):
             self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
 
     def test_protected_main_ancestry_is_required_not_just_ref_name(self) -> None:
+        """The ref label must correspond to the subject's actual ancestry."""
+
         tip = "b" * 40
         for comparison, expected in (
             ({"status": "ahead", "merge_base_commit": {"sha": self.commit}}, True),
@@ -430,6 +452,8 @@ class EvidenceRunTests(unittest.TestCase):
                 )
 
     def test_missing_main_commit_and_ancestry_api_failure_fail_closed(self) -> None:
+        """Unknown branch state cannot be treated as a matching source."""
+
         for tip in (None, {}, {"sha": "main"}):
             with (
                 self.subTest(tip=tip),
@@ -452,6 +476,8 @@ class EvidenceRunTests(unittest.TestCase):
             self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
 
     def test_invalid_subjects_do_not_query_api(self) -> None:
+        """Reject ambiguous IDs before forming authenticated API requests."""
+
         for run_id, commit in (
             (None, self.commit),
             (0, self.commit),
@@ -467,6 +493,8 @@ class EvidenceRunTests(unittest.TestCase):
                 api.assert_not_called()
 
     def test_cli_errors_and_timeout_are_not_success_or_secret_disclosure(self) -> None:
+        """Errors stay fail-closed without exposing token-bearing CLI stderr."""
+
         failures = [
             FileNotFoundError("TOKEN-SENTINEL"),
             subprocess.TimeoutExpired("gh", 30, stderr="TOKEN-SENTINEL"),
@@ -486,6 +514,8 @@ class EvidenceRunTests(unittest.TestCase):
                 self.assertNotIn("TOKEN-SENTINEL", detail)
 
     def test_api_uses_fixed_host_read_only_and_timeout(self) -> None:
+        """Pin the authority host and prohibit shell or indefinite execution."""
+
         with mock.patch.object(
             VERIFIER.subprocess,
             "run",
@@ -509,6 +539,8 @@ class EvidenceRunTests(unittest.TestCase):
         self.assertFalse(command.call_args.kwargs.get("shell", False))
 
     def test_subject_commands_do_not_inherit_api_credentials(self) -> None:
+        """Neither inherited nor declared environment gives code an API token."""
+
         check = {
             "argv": ["cargo", "test"],
             "repo": "iter",
@@ -534,6 +566,8 @@ class EvidenceRunTests(unittest.TestCase):
     def test_matrix_cannot_consume_evidence_or_allow_failure_after_auth_rejection(
         self,
     ) -> None:
+        """Advisory mode cannot turn failed authentication into accepted evidence."""
+
         with (
             mock.patch(
                 "sys.argv",
@@ -567,6 +601,8 @@ class EvidenceRunTests(unittest.TestCase):
         consume.assert_not_called()
 
     def test_preflight_and_both_workflows_share_authentication(self) -> None:
+        """Both workflows authenticate before downloading any evidence bundle."""
+
         with (
             mock.patch(
                 "sys.argv",
