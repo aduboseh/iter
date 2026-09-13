@@ -515,6 +515,22 @@ def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[boo
             isinstance(branch, dict) and branch.get("protected") is True,
             "producer main must be protected",
         )
+        tip = branch.get("commit")
+        require(
+            isinstance(tip, dict)
+            and isinstance(tip.get("sha"), str)
+            and re.fullmatch(r"[0-9a-f]{40}", tip["sha"]) is not None,
+            "protected main commit unavailable",
+        )
+        if tip["sha"] != iter_commit:
+            comparison = github_json(f"compare/{iter_commit}...{tip['sha']}")
+            require(
+                isinstance(comparison, dict)
+                and comparison.get("status") == "ahead"
+                and isinstance(comparison.get("merge_base_commit"), dict)
+                and comparison["merge_base_commit"].get("sha") == iter_commit,
+                "evidence commit is not an ancestor of protected main",
+            )
         environment = github_json(f"environments/{CERTIFICATION_ENVIRONMENT}")
         require(
             isinstance(environment, dict), "invalid certification environment response"

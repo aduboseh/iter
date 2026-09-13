@@ -213,6 +213,7 @@ class EvidenceRunTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.commit = "a" * 40
+        self.branch = {"protected": True, "commit": {"sha": self.commit}}
         self.run = {
             "id": 123,
             "head_sha": self.commit,
@@ -256,7 +257,7 @@ class EvidenceRunTests(unittest.TestCase):
             "github_json",
             side_effect=[
                 self.run,
-                {"protected": True},
+                self.branch,
                 self.environment,
                 self.reviews,
             ],
@@ -359,7 +360,7 @@ class EvidenceRunTests(unittest.TestCase):
                 self.assertFalse(self.check()[0])
 
     def test_api_error_at_every_query_fails_closed(self) -> None:
-        responses = [self.run, {"protected": True}, self.environment, self.reviews]
+        responses = [self.run, self.branch, self.environment, self.reviews]
         for index in range(len(responses)):
             with self.subTest(query=index):
                 with mock.patch.object(
@@ -374,6 +375,58 @@ class EvidenceRunTests(unittest.TestCase):
     def test_unprotected_branch_fails(self) -> None:
         with mock.patch.object(
             VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
+        ):
+            self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+
+    def test_protected_main_ancestry_is_required_not_just_ref_name(self) -> None:
+        tip = "b" * 40
+        for comparison, expected in (
+            ({"status": "ahead", "merge_base_commit": {"sha": self.commit}}, True),
+            ({"status": "diverged", "merge_base_commit": {"sha": "c" * 40}}, False),
+            ({"status": "behind", "merge_base_commit": {"sha": tip}}, False),
+            ({"status": "ahead", "merge_base_commit": {"sha": "c" * 40}}, False),
+            ({}, False),
+        ):
+            with (
+                self.subTest(comparison=comparison),
+                mock.patch.object(
+                    VERIFIER,
+                    "github_json",
+                    side_effect=[
+                        self.run,
+                        {"protected": True, "commit": {"sha": tip}},
+                        comparison,
+                        self.environment,
+                        self.reviews,
+                    ],
+                ) as api,
+            ):
+                self.assertEqual(
+                    VERIFIER.evidence_run_check(123, self.commit)[0], expected
+                )
+                self.assertEqual(
+                    api.call_args_list[2].args, (f"compare/{self.commit}...{tip}",)
+                )
+
+    def test_missing_main_commit_and_ancestry_api_failure_fail_closed(self) -> None:
+        for tip in (None, {}, {"sha": "main"}):
+            with (
+                self.subTest(tip=tip),
+                mock.patch.object(
+                    VERIFIER,
+                    "github_json",
+                    side_effect=[self.run, {"protected": True, "commit": tip}],
+                ),
+            ):
+                self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+        with mock.patch.object(
+            VERIFIER,
+            "github_json",
+            side_effect=[
+                self.run,
+                {"protected": True, "commit": {"sha": "b" * 40}},
+                ValueError("API denied"),
+            ],
         ):
             self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
 
