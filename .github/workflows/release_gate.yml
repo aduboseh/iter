@@ -325,7 +325,7 @@ jobs:
   # Final gate: All checks must pass
   release-gate:
     name: Release Gate
-    needs: [governance, sdk-rust, sdk-typescript, version-check, changelog-check, boundary-check, apex-productization]
+    needs: [governance, sdk-rust, sdk-typescript, version-check, changelog-check, boundary-check, sbom, apex-productization]
     runs-on: ubuntu-latest
     if: ${{ always() && !startsWith(github.ref_name, 'v0.') }}
     steps:
@@ -334,6 +334,7 @@ jobs:
         env:
           GATE_RESULTS: ${{ toJSON(needs) }}
           EVENT_NAME: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           python3 -I - <<'PY'
@@ -346,6 +347,10 @@ jobs:
                   raise SystemExit(f"::error::Required gate {gate} did not succeed")
           certification = results.get("apex-productization", {}).get("result")
           event = os.environ["EVENT_NAME"]
+          tagged_release = event == "push" and os.environ["RELEASE_REF"].startswith("refs/tags/v")
+          expected_sbom = "success" if tagged_release else "skipped"
+          if results.get("sbom", {}).get("result") != expected_sbom:
+              raise SystemExit(f"::error::SBOM gate must report {expected_sbom}")
           if event == "pull_request" and certification == "skipped":
               print("PR readiness checks passed. Release certification is NOT executed on PRs.")
           elif event == "push" and certification == "success":

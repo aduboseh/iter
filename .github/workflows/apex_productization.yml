@@ -53,9 +53,18 @@ jobs:
 
   release-certification:
     name: Execute release certification
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
+      - name: Reject non-main certification dispatch
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          if os.environ.get("DISPATCH_REF") != "refs/heads/main":
+              raise SystemExit("::error::Certification dispatch must originate on main")
+          PY
       - name: Check out verifier authority
         uses: actions/checkout@v4
         with:

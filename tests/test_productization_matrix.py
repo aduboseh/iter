@@ -699,10 +699,44 @@ class EvidenceRunTests(unittest.TestCase):
         )[0]
         self.assertIn("github.event_name == 'push'", certification)
         manual = (workflows / "apex_productization.yml").read_text(encoding="utf-8")
-        certification = manual.split("  release-certification:", 1)[1].split(
-            "    steps:", 1
-        )[0]
-        self.assertIn("github.ref == 'refs/heads/main'", certification)
+        certification = manual.split("  release-certification:", 1)[1]
+        condition = certification.split("    steps:", 1)[0]
+        self.assertIn("if: github.event_name == 'workflow_dispatch'", condition)
+        self.assertNotIn("github.ref", condition)
+        self.assertLess(
+            certification.index("name: Reject non-main certification dispatch"),
+            certification.index("name: Check out verifier authority"),
+        )
+
+    def test_non_main_dispatch_fails_instead_of_skipping_certification(self) -> None:
+        """A selected non-main ref produces failure, not a green skipped job."""
+
+        workflow = (
+            SCRIPT.parents[1] / ".github/workflows/apex_productization.yml"
+        ).read_text(encoding="utf-8")
+        guard = workflow.split("name: Reject non-main certification dispatch", 1)[
+            1
+        ].split("\n      - ", 1)[0]
+        self.assertIn("DISPATCH_REF: ${{ github.ref }}", guard)
+        self.assertNotIn("\n        if:", guard)
+        source = textwrap.dedent(
+            guard.split("python3 -I - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        )
+        for ref in ("refs/heads/main", "refs/heads/release/v1.0", "refs/tags/v1.0", ""):
+            with self.subTest(ref=ref):
+                environment = os.environ.copy()
+                environment["DISPATCH_REF"] = ref
+                result = subprocess.run(
+                    [sys.executable, "-I", "-c", source],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(result.returncode == 0, ref == "refs/heads/main")
+                if ref != "refs/heads/main":
+                    self.assertIn("::error::Certification dispatch", result.stderr)
 
     def test_workflow_preflight_cannot_execute_candidate_or_import_shadow(self) -> None:
         """Actual workflow argv rejects a run despite candidate scripts that exit 0."""
@@ -765,6 +799,12 @@ class EvidenceRunTests(unittest.TestCase):
             "boundary-check",
         )
         passing = {gate: {"result": "success"} for gate in gates}
+        passing["sbom"] = {"result": "skipped"}
+        needs = final_gate.split("needs: [", 1)[1].split("]", 1)[0]
+        self.assertEqual(
+            {name.strip() for name in needs.split(",")},
+            set(gates) | {"sbom", "apex-productization"},
+        )
         cases = []
         for event in ("push", "pull_request", "workflow_dispatch"):
             for status in ("success", "failure", "cancelled", "skipped", None):
@@ -775,7 +815,7 @@ class EvidenceRunTests(unittest.TestCase):
                     ("push", "success"),
                     ("pull_request", "skipped"),
                 )
-                cases.append((event, values, expected))
+                cases.append((event, "refs/heads/release/v1.0", values, expected))
         for event, certification in (("push", "success"), ("pull_request", "skipped")):
             for gate in gates:
                 for status in ("failure", "cancelled", "skipped", None):
@@ -785,11 +825,31 @@ class EvidenceRunTests(unittest.TestCase):
                         del values[gate]
                     else:
                         values[gate] = {"result": status}
-                    cases.append((event, values, False))
-        for event, values, expected in cases:
-            with self.subTest(event=event, results=values):
+                    cases.append((event, "refs/heads/release/v1.0", values, False))
+        for event, ref in (
+            ("push", "refs/tags/v1.0"),
+            ("push", "refs/heads/release/v1.0"),
+            ("pull_request", "refs/pull/72/merge"),
+        ):
+            for status in ("success", "failure", "cancelled", "skipped", None):
+                values = copy.deepcopy(passing)
+                values["apex-productization"] = {
+                    "result": "skipped" if event == "pull_request" else "success"
+                }
+                if status is None:
+                    del values["sbom"]
+                else:
+                    values["sbom"] = {"result": status}
+                expected = status == (
+                    "success" if ref.startswith("refs/tags/v") else "skipped"
+                )
+                cases.append((event, ref, values, expected))
+        for event, ref, values, expected in cases:
+            with self.subTest(event=event, ref=ref, results=values):
                 environment = os.environ.copy()
-                environment.update(EVENT_NAME=event, GATE_RESULTS=json.dumps(values))
+                environment.update(
+                    EVENT_NAME=event, RELEASE_REF=ref, GATE_RESULTS=json.dumps(values)
+                )
                 result = subprocess.run(
                     [sys.executable, "-I", "-c", source],
                     env=environment,
