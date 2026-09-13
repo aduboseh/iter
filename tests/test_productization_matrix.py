@@ -273,7 +273,8 @@ class EvidenceRunTests(unittest.TestCase):
             ("id", 124),
             ("id", True),
             ("head_sha", "b" * 40),
-            ("head_branch", "unprotected"),
+            ("head_branch", None),
+            ("head_branch", ""),
             ("path", ".github/workflows/other.yml"),
             ("event", "push"),
             ("status", "in_progress"),
@@ -373,6 +374,26 @@ class EvidenceRunTests(unittest.TestCase):
                 self.assertIn("API denied", detail)
 
     def test_unprotected_branch_fails(self) -> None:
+        with mock.patch.object(
+            VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
+        ):
+            self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+
+    def test_protected_release_branches_are_supported_and_url_encoded(self) -> None:
+        self.run["head_branch"] = "release/v1.0"
+        with mock.patch.object(
+            VERIFIER,
+            "github_json",
+            side_effect=[
+                self.run,
+                self.branch,
+                self.environment,
+                self.reviews,
+            ],
+        ) as api:
+            passed, detail = VERIFIER.evidence_run_check(123, self.commit)
+        self.assertTrue(passed, detail)
+        self.assertEqual(api.call_args_list[1].args, ("branches/release%2Fv1.0",))
         with mock.patch.object(
             VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
         ):

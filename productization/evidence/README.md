@@ -15,7 +15,9 @@ Evidence is transported as a GitHub Actions artifact named
 must have the exact iter commit as its `head_sha`, conclude successfully, and
 come from the trusted workflow
 `.github/workflows/apex_productization_evidence.yml` through an independent
-`workflow_dispatch` run on protected `main`. Only the first run attempt is
+`workflow_dispatch` run on a protected source branch (including protected release
+branches). The subject must be that branch's current tip or its verified ancestor;
+an unprotected PR head or a matching ref name alone is insufficient. Only the first run attempt is
 accepted: v1 does not bind artifacts or approvals to a rerun attempt. Dispatch a
 new run instead. Manual certification requires that run ID; release
 certification requires exactly one active artifact with that name. The artifact

@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 from typing import Any
+from urllib.parse import quote
 
 MATRIX_SCHEMA = "apex-productization-matrix/v1.1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
@@ -482,7 +483,6 @@ def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[boo
         for key, expected in {
             "id": run_id,
             "head_sha": iter_commit,
-            "head_branch": "main",
             "path": TRUSTED_EVIDENCE_WORKFLOW,
             "event": "workflow_dispatch",
             "status": "completed",
@@ -510,17 +510,22 @@ def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[boo
             )
             actors.append(actor["id"])
 
-        branch = github_json("branches/main")
+        branch_name = run.get("head_branch")
+        require(
+            isinstance(branch_name, str) and bool(branch_name),
+            "invalid run.head_branch",
+        )
+        branch = github_json(f"branches/{quote(branch_name, safe='')}")
         require(
             isinstance(branch, dict) and branch.get("protected") is True,
-            "producer main must be protected",
+            "producer source branch must be protected",
         )
         tip = branch.get("commit")
         require(
             isinstance(tip, dict)
             and isinstance(tip.get("sha"), str)
             and re.fullmatch(r"[0-9a-f]{40}", tip["sha"]) is not None,
-            "protected main commit unavailable",
+            "protected source branch commit unavailable",
         )
         if tip["sha"] != iter_commit:
             comparison = github_json(f"compare/{iter_commit}...{tip['sha']}")
@@ -529,7 +534,7 @@ def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[boo
                 and comparison.get("status") == "ahead"
                 and isinstance(comparison.get("merge_base_commit"), dict)
                 and comparison["merge_base_commit"].get("sha") == iter_commit,
-                "evidence commit is not an ancestor of protected main",
+                "evidence commit is not an ancestor of its protected source branch",
             )
         environment = github_json(f"environments/{CERTIFICATION_ENVIRONMENT}")
         require(
