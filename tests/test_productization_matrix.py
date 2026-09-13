@@ -8,14 +8,20 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import shlex
 import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
 from unittest import mock
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "verify_productization_matrix.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[1] / "scripts" / "verify_productization_matrix.py"
+)
 SPEC = importlib.util.spec_from_file_location("verify_productization_matrix", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"cannot load verifier: {SCRIPT}")
@@ -627,6 +633,176 @@ class EvidenceRunTests(unittest.TestCase):
         required = (workflows / "mcp_integration.yml").read_text(encoding="utf-8")
         self.assertIn("python -B tests/test_productization_matrix.py", required)
         self.assertIn("python -BO tests/test_productization_matrix.py", required)
+
+    def test_preflight_uses_explicit_subject_not_authority_commit(self) -> None:
+        """A separate verifier checkout must authenticate the candidate's HEAD."""
+
+        subject = Path("candidate")
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    str(SCRIPT),
+                    "--iter-root",
+                    str(subject),
+                    "--verify-evidence-run",
+                    "--evidence-run-id",
+                    "123",
+                ],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value=self.commit) as head,
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(False, "not approved")
+            ) as authenticate,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        head.assert_called_once_with(subject)
+        authenticate.assert_called_once_with(123, self.commit)
+
+    def test_hosted_verifiers_are_separate_from_candidate_code(self) -> None:
+        """Preflight and controls use isolated, main-sourced authority in both jobs."""
+
+        workflows = SCRIPT.parents[1] / ".github" / "workflows"
+        for name in ("apex_productization.yml", "release_gate.yml"):
+            with self.subTest(workflow=name):
+                workflow = (workflows / name).read_text(encoding="utf-8")
+                authority = workflow.split("name: Check out verifier authority", 1)[1]
+                authority = authority.split("\n  release-gate:", 1)[0]
+                checkout = authority.split("\n      - ", 1)[0]
+                self.assertIn("repository: aduboseh/iter", checkout)
+                self.assertIn("ref: refs/heads/main", checkout)
+                self.assertIn("path: authority", checkout)
+                self.assertIn("persist-credentials: false", checkout)
+                commands = [
+                    shlex.split(line.strip())
+                    for line in authority.replace("\\\n", " ").splitlines()
+                    if line.strip().startswith("python3 ")
+                ]
+                self.assertEqual(len(commands), 2)
+                for command in commands:
+                    self.assertEqual(
+                        command[:4],
+                        [
+                            "python3",
+                            "-I",
+                            "-B",
+                            "authority/scripts/verify_productization_matrix.py",
+                        ],
+                    )
+                    index = command.index("--iter-root")
+                    self.assertEqual(command[index + 1], "iter")
+                    self.assertNotIn("--matrix", command)
+        release = (workflows / "release_gate.yml").read_text(encoding="utf-8")
+        certification = release.split("  apex-productization:", 1)[1].split(
+            "    steps:", 1
+        )[0]
+        self.assertIn("github.event_name == 'push'", certification)
+        manual = (workflows / "apex_productization.yml").read_text(encoding="utf-8")
+        certification = manual.split("  release-certification:", 1)[1].split(
+            "    steps:", 1
+        )[0]
+        self.assertIn("github.ref == 'refs/heads/main'", certification)
+
+    def test_workflow_preflight_cannot_execute_candidate_or_import_shadow(self) -> None:
+        """Actual workflow argv rejects a run despite candidate scripts that exit 0."""
+
+        workflows = SCRIPT.parents[1] / ".github" / "workflows"
+        for name in ("apex_productization.yml", "release_gate.yml"):
+            with self.subTest(workflow=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                authority = root / "authority" / "scripts"
+                candidate = root / "iter" / "scripts"
+                authority.mkdir(parents=True)
+                candidate.mkdir(parents=True)
+                (authority / SCRIPT.name).write_bytes(SCRIPT.read_bytes())
+                attack = "from pathlib import Path\nPath('candidate-executed').touch()\nraise SystemExit(0)\n"
+                (candidate / SCRIPT.name).write_text(attack, encoding="utf-8")
+                (candidate / "sitecustomize.py").write_text(attack, encoding="utf-8")
+                workflow = (workflows / name).read_text(encoding="utf-8")
+                line = next(
+                    line
+                    for line in workflow.replace("\\\n", " ").splitlines()
+                    if "--verify-evidence-run" in line
+                )
+                command = shlex.split(line.strip())
+                command[0] = sys.executable
+                command[command.index("--evidence-run-id") + 1] = "0"
+                environment = os.environ.copy()
+                environment["PYTHONPATH"] = str(candidate)
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("FAIL EVIDENCE-RUN", result.stdout)
+                self.assertFalse((root / "candidate-executed").exists())
+
+    def test_final_release_gate_distinguishes_readiness_from_certification(
+        self,
+    ) -> None:
+        """Execute the workflow decision code against every non-success outcome."""
+
+        workflow = (SCRIPT.parents[1] / ".github/workflows/release_gate.yml").read_text(
+            encoding="utf-8"
+        )
+        final_gate = workflow.split("  release-gate:", 1)[1]
+        self.assertIn("always()", final_gate)
+        source = textwrap.dedent(
+            final_gate.split("python3 -I - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        )
+        gates = (
+            "governance",
+            "sdk-rust",
+            "sdk-typescript",
+            "version-check",
+            "changelog-check",
+            "boundary-check",
+        )
+        passing = {gate: {"result": "success"} for gate in gates}
+        cases = []
+        for event in ("push", "pull_request", "workflow_dispatch"):
+            for status in ("success", "failure", "cancelled", "skipped", None):
+                values = copy.deepcopy(passing)
+                if status is not None:
+                    values["apex-productization"] = {"result": status}
+                expected = (event, status) in (
+                    ("push", "success"),
+                    ("pull_request", "skipped"),
+                )
+                cases.append((event, values, expected))
+        for event, certification in (("push", "success"), ("pull_request", "skipped")):
+            for gate in gates:
+                for status in ("failure", "cancelled", "skipped", None):
+                    values = copy.deepcopy(passing)
+                    values["apex-productization"] = {"result": certification}
+                    if status is None:
+                        del values[gate]
+                    else:
+                        values[gate] = {"result": status}
+                    cases.append((event, values, False))
+        for event, values, expected in cases:
+            with self.subTest(event=event, results=values):
+                environment = os.environ.copy()
+                environment.update(EVENT_NAME=event, GATE_RESULTS=json.dumps(values))
+                result = subprocess.run(
+                    [sys.executable, "-I", "-c", source],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode == 0, expected, result.stdout + result.stderr
+                )
+                if event == "pull_request" and expected:
+                    self.assertIn("certification is NOT executed", result.stdout)
 
 
 class ExternalEvidenceTests(unittest.TestCase):

@@ -53,9 +53,16 @@ jobs:
 
   release-certification:
     name: Execute release certification
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Check out verifier authority
+        uses: actions/checkout@v4
+        with:
+          repository: aduboseh/iter
+          ref: refs/heads/main
+          path: authority
+          persist-credentials: false
       - name: Check out iter
         uses: actions/checkout@v4
         with:
@@ -90,7 +97,9 @@ jobs:
             echo "::error::evidence_run_id must be a positive GitHub Actions run ID"
             exit 1
           fi
-          python3 -B iter/scripts/verify_productization_matrix.py \
+          echo "Verifier authority: $(git -C authority rev-parse HEAD)"
+          python3 -I -B authority/scripts/verify_productization_matrix.py \
+            --iter-root iter \
             --verify-evidence-run --evidence-run-id "$EVIDENCE_RUN_ID"
           echo "run-id=$EVIDENCE_RUN_ID" >> "$GITHUB_OUTPUT"
       - name: Check out exact SCG subject
@@ -124,7 +133,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 iter/scripts/verify_productization_matrix.py \
+          python3 -I -B authority/scripts/verify_productization_matrix.py \
             --iter-root iter \
             --scg-root SCG \
             --evidence-dir apex-evidence \

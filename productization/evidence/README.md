@@ -42,6 +42,20 @@ required. The preflight can be exercised separately:
 python -B scripts/verify_productization_matrix.py --verify-evidence-run --evidence-run-id <run-id>
 ```
 
+The hosted consumers execute the verifier and pinned control matrix from a
+separate `aduboseh/iter` `main` checkout, never the candidate's verifier. Both
+preflight and evaluation use isolated Python (`-I -B`) and take the subject via
+`--iter-root iter`; the resolved authority commit is recorded in the job log.
+An unavailable or incompatible authority fails closed. A local CLI invocation
+is trustworthy only to the extent that the caller trusts its verifier checkout.
+
+Release PRs run readiness checks only: no certification, private SCG checkout,
+or evidence download. Post-merge release pushes require certification success;
+skipped, cancelled, and failed certification cannot pass the final release gate.
+Manual certification dispatches must originate on `main`. These workflow guards
+do not replace repository protection of workflow changes or independent approval;
+a PR readiness result is not a release authorization or a certification result.
+
 This authenticates account-level approval, not independent human acceptance or
 the scientific validity of a control claim. An alternate account owned by the
 same person is not an independent operator. The v1 bundle checks remain structural;

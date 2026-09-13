@@ -206,10 +206,19 @@ jobs:
   apex-productization:
     name: APEX Productization Certification
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.ref_name, 'v0.') }}
+    # PR jobs test candidates; only post-merge runs may access private subjects.
+    if: ${{ github.event_name == 'push' && !startsWith(github.ref_name, 'v0.') }}
     env:
-      ITER_SUBJECT: ${{ github.event.pull_request.head.sha || github.sha }}
+      ITER_SUBJECT: ${{ github.sha }}
     steps:
+      - name: Check out verifier authority
+        uses: actions/checkout@v4
+        with:
+          repository: aduboseh/iter
+          ref: refs/heads/main
+          path: authority
+          persist-credentials: false
+
       - name: Check out iter release subject
         uses: actions/checkout@v4
         with:
@@ -253,7 +262,9 @@ jobs:
             echo "::error::Expected exactly one active ${ARTIFACT_NAME} artifact for ${ITER_SUBJECT}; found ${#RUN_IDS[@]}"
             exit 1
           fi
-          python3 -B iter/scripts/verify_productization_matrix.py \
+          echo "Verifier authority: $(git -C authority rev-parse HEAD)"
+          python3 -I -B authority/scripts/verify_productization_matrix.py \
+            --iter-root iter \
             --verify-evidence-run --evidence-run-id "${RUN_IDS[0]}"
           echo "name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
           echo "run-id=${RUN_IDS[0]}" >> "$GITHUB_OUTPUT"
@@ -296,7 +307,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 iter/scripts/verify_productization_matrix.py \
+          python3 -I -B authority/scripts/verify_productization_matrix.py \
             --iter-root iter \
             --scg-root SCG \
             --evidence-dir apex-evidence \
@@ -316,16 +327,29 @@ jobs:
     name: Release Gate
     needs: [governance, sdk-rust, sdk-typescript, version-check, changelog-check, boundary-check, apex-productization]
     runs-on: ubuntu-latest
+    if: ${{ always() && !startsWith(github.ref_name, 'v0.') }}
     steps:
-      - name: All gates passed
+      - name: Verify gate outcomes
+        shell: bash
+        env:
+          GATE_RESULTS: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "✅ All release gates passed"
-          echo ""
-          echo "Release checklist:"
-          echo "  ✓ Governance tests"
-          echo "  ✓ Rust SDK"
-          echo "  ✓ TypeScript SDK"
-          echo "  ✓ Version consistency"
-          echo "  ✓ Changelog entry"
-          echo "  ✓ Boundary integrity"
-          echo "  ✓ SBOM generated (for tags)"
+          set -euo pipefail
+          python3 -I - <<'PY'
+          import json
+          import os
+
+          results = json.loads(os.environ["GATE_RESULTS"])
+          for gate in ("governance", "sdk-rust", "sdk-typescript", "version-check", "changelog-check", "boundary-check"):
+              if results.get(gate, {}).get("result") != "success":
+                  raise SystemExit(f"::error::Required gate {gate} did not succeed")
+          certification = results.get("apex-productization", {}).get("result")
+          event = os.environ["EVENT_NAME"]
+          if event == "pull_request" and certification == "skipped":
+              print("PR readiness checks passed. Release certification is NOT executed on PRs.")
+          elif event == "push" and certification == "success":
+              print("Release checks and productization certification passed.")
+          else:
+              raise SystemExit("::error::Unexpected or unsuccessful certification outcome")
+          PY
