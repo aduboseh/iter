@@ -626,9 +626,11 @@ class EvidenceRunTests(unittest.TestCase):
         for name in ("apex_productization.yml", "release_gate.yml"):
             workflow = (workflows / name).read_text(encoding="utf-8")
             self.assertEqual(workflow.count("--verify-evidence-run"), 1)
+            self.assertNotIn("uses: actions/download-artifact", workflow)
+            self.assertNotIn("--evidence-dir", workflow)
             self.assertLess(
                 workflow.index("--verify-evidence-run"),
-                workflow.index("uses: actions/download-artifact"),
+                workflow.index("--scg-root SCG"),
             )
         required = (workflows / "mcp_integration.yml").read_text(encoding="utf-8")
         self.assertIn("python -B tests/test_productization_matrix.py", required)
@@ -865,6 +867,526 @@ class EvidenceRunTests(unittest.TestCase):
                     self.assertIn("certification is NOT executed", result.stdout)
 
 
+class ArtifactBindingTests(unittest.TestCase):
+    """Exercise authenticated archive binding independently of producer activation."""
+
+    def test_repository_metadata_endpoint_has_no_trailing_slash(self):
+        """Use the REST repository root route proven by the live API probe."""
+        with mock.patch.object(
+            VERIFIER.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], 0, '{"id":789}', ""),
+        ) as api:
+            self.assertEqual(VERIFIER.github_json(""), {"id": 789})
+        self.assertEqual(api.call_args.args[0][-1], "repos/aduboseh/iter")
+
+    def setUp(self) -> None:
+        """Use a real ZIP with API-shaped metadata, not a claimed local digest."""
+        self.heads = {"iter": "a" * 40, "scg": "b" * 40}
+        self.archive = self.zip_bytes([("result.txt", b"observed result")])
+        self.metadata = {
+            "id": 456,
+            "name": "apex-productization-evidence-" + "a" * 40 + "-" + "b" * 40,
+            "expired": False,
+            "size_in_bytes": len(self.archive),
+            "digest": "sha256:" + hashlib.sha256(self.archive).hexdigest(),
+            "workflow_run": {
+                "id": 123,
+                "head_sha": self.heads["iter"],
+                "repository_id": 789,
+                "head_repository_id": 789,
+            },
+        }
+
+    @staticmethod
+    def zip_bytes(entries) -> bytes:
+        """Create archive bytes including deliberately unsafe member fixtures."""
+        import zipfile
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for name, data in entries:
+                archive.writestr(name, data)
+        return buffer.getvalue()
+
+    def api(self, endpoint):
+        """Return only the expected repository, listing and immutable-ID records."""
+        if endpoint == "":
+            return {"id": 789, "full_name": "aduboseh/iter", "fork": False}
+        if endpoint.startswith("actions/runs/123/artifacts?"):
+            return {"total_count": 1, "artifacts": [self.metadata]}
+        if endpoint == "actions/artifacts/456":
+            return self.metadata
+        raise AssertionError(endpoint)
+
+    def bind(self):
+        """Invoke the production selector and ZIP verifier using a mock transport."""
+        with (
+            mock.patch.object(VERIFIER, "github_json", side_effect=self.api),
+            mock.patch.object(
+                VERIFIER, "download_evidence_archive", return_value=self.archive
+            ),
+        ):
+            return VERIFIER.evidence_artifact_check(123, self.heads)
+
+    def test_api_digest_binds_immutable_consumed_bytes_and_receipt(self):
+        """A valid API-bound ZIP yields immutable bytes and an API-derived receipt."""
+        files, receipt = self.bind()
+        self.assertEqual(dict(files), {"result.txt": b"observed result"})
+        self.assertEqual(receipt["artifact_id"], 456)
+        self.assertEqual(receipt["run_id"], 123)
+        self.assertEqual(receipt["digest"], self.metadata["digest"])
+        self.assertEqual(receipt["subject_commits"], self.heads)
+        with self.assertRaises(TypeError):
+            files["result.txt"] = b"replaced"
+
+    def test_archive_substitution_rejected_even_with_recomputed_local_hashes(self):
+        """A real ZIP with rewritten content cannot use the original API digest."""
+        self.archive = self.zip_bytes([("result.txt", b"forged result")])
+        self.metadata["size_in_bytes"] = len(self.archive)
+        with self.assertRaisesRegex(ValueError, "digest"):
+            self.bind()
+
+    def test_invalid_artifact_metadata_fails_before_download(self):
+        """Wrong origin, expiry, identity, size and absent digest fail closed."""
+        mutations = [
+            ("id", True),
+            ("id", 0),
+            ("name", "other"),
+            ("expired", True),
+            ("expired", None),
+            ("digest", None),
+            ("digest", "sha256:" + "A" * 64),
+            ("size_in_bytes", 0),
+            ("size_in_bytes", True),
+            ("size_in_bytes", 2**40),
+            ("workflow_run.id", 999),
+            ("workflow_run.id", True),
+            ("workflow_run.head_sha", "c" * 40),
+            ("workflow_run.repository_id", 999),
+            ("workflow_run.head_repository_id", 999),
+        ]
+        original = copy.deepcopy(self.metadata)
+        for field, value in mutations:
+            with self.subTest(field=field, value=value):
+                self.metadata = copy.deepcopy(original)
+                target = self.metadata
+                parts = field.split(".")
+                if len(parts) == 2:
+                    target = target[parts[0]]
+                target[parts[-1]] = value
+                with (
+                    mock.patch.object(VERIFIER, "github_json", side_effect=self.api),
+                    mock.patch.object(
+                        VERIFIER, "download_evidence_archive"
+                    ) as download,
+                    self.assertRaises(ValueError),
+                ):
+                    VERIFIER.evidence_artifact_check(123, self.heads)
+                download.assert_not_called()
+
+    def test_ambiguous_missing_or_incomplete_listing_rejected(self):
+        """A missing page or duplicate selection cannot become a unique artifact."""
+        for count, records in [
+            (0, []),
+            (2, [self.metadata] * 2),
+            (101, [self.metadata]),
+            (True, [self.metadata]),
+        ]:
+            with self.subTest(count=count):
+
+                def api(endpoint):
+                    if endpoint.startswith("actions/runs/"):
+                        return {"total_count": count, "artifacts": records}
+                    return self.api(endpoint)
+
+                with (
+                    mock.patch.object(VERIFIER, "github_json", side_effect=api),
+                    mock.patch.object(
+                        VERIFIER, "download_evidence_archive"
+                    ) as download,
+                    self.assertRaises(ValueError),
+                ):
+                    VERIFIER.evidence_artifact_check(123, self.heads)
+                download.assert_not_called()
+
+    def test_unsafe_member_names_and_aliases_rejected(self):
+        """No platform can reinterpret a member as a path outside the bundle."""
+        names = [
+            "../escape",
+            "/abs",
+            "C:/drive",
+            "a\\b",
+            "a//b",
+            "a/./b",
+            "a/../b",
+            "a:b",
+            "file.",
+            "NUL",
+            "COM1.txt",
+            "a\x00suffix",
+            "space ",
+            "\u00e9",
+        ]
+        for name in names:
+            with self.subTest(name=name):
+                raw = self.zip_bytes([(name, b"x")])
+                if "\\" in name:
+                    raw = raw.replace(b"a/b", b"a\\b")
+                # ZipInfo truncates NUL names when writing; patch both headers.
+                if "\x00" in name:
+                    raw = self.zip_bytes([("abc", b"x")]).replace(b"abc", b"a\x00c")
+                with self.assertRaises(ValueError):
+                    VERIFIER.verified_archive_files(
+                        raw, "sha256:" + hashlib.sha256(raw).hexdigest()
+                    )
+        for entries in [
+            [("a", b"x"), ("A", b"y")],
+            [("a", b"x"), ("a/b", b"y")],
+            [("a/b", b"x"), ("A/c", b"y")],
+        ]:
+            with self.subTest(entries=entries):
+                raw = self.zip_bytes(entries)
+                with self.assertRaises(ValueError):
+                    VERIFIER.verified_archive_files(
+                        raw, "sha256:" + hashlib.sha256(raw).hexdigest()
+                    )
+
+    def test_links_encryption_corruption_and_limits_rejected(self):
+        """Even an API-matching digest cannot bless an unsafe or oversized ZIP."""
+        import stat
+        import zipfile
+
+        link = zipfile.ZipInfo("link")
+        link.create_system = 3
+        link.external_attr = (stat.S_IFLNK | 0o777) << 16
+        encrypted = bytearray(self.archive)
+        encrypted[6] |= 1
+        offset = encrypted.index(b"PK\x01\x02")
+        encrypted[offset + 8] |= 1
+        for raw in [
+            b"not zip",
+            self.archive[:-10],
+            self.zip_bytes([(link, b"target")]),
+            bytes(encrypted),
+        ]:
+            with self.subTest(raw=raw[:20]), self.assertRaises(ValueError):
+                VERIFIER.verified_archive_files(
+                    raw, "sha256:" + hashlib.sha256(raw).hexdigest()
+                )
+        for limit in [
+            "MAX_ARCHIVE_BYTES",
+            "MAX_EVIDENCE_BYTES",
+            "MAX_EVIDENCE_FILE_BYTES",
+            "MAX_EVIDENCE_MEMBERS",
+        ]:
+            with (
+                self.subTest(limit=limit),
+                mock.patch.object(VERIFIER, limit, 1),
+                self.assertRaises(ValueError),
+            ):
+                raw = self.zip_bytes([("a", b"xx"), ("b", b"xx")])
+                VERIFIER.verified_archive_files(
+                    raw, "sha256:" + hashlib.sha256(raw).hexdigest()
+                )
+
+    def test_cli_binding_failure_cannot_be_allowed_or_consume_evidence(self):
+        """Full execution cannot downgrade artifact rejection to advisory status."""
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    str(SCRIPT),
+                    "--control",
+                    "G1-01",
+                    "--evidence-run-id",
+                    "123",
+                    "--allow-failures",
+                ],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value="a" * 40),
+            mock.patch.object(
+                VERIFIER, "git_worktree_clean", return_value=(True, "clean")
+            ),
+            mock.patch.object(
+                VERIFIER, "directive_mirror_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "scg_release_ref_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(True, "approved")
+            ),
+            mock.patch.object(
+                VERIFIER,
+                "evidence_artifact_check",
+                side_effect=ValueError("digest mismatch"),
+            ),
+            mock.patch.object(VERIFIER, "evidence_check") as consume,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        consume.assert_not_called()
+
+    def test_artifact_identity_cannot_change_between_listing_and_download(self):
+        """Replaced metadata and a mismatched repository cannot authorize download."""
+        for endpoint in ("actions/artifacts/456", ""):
+            with self.subTest(endpoint=endpoint):
+
+                def api(value):
+                    result = copy.deepcopy(self.api(value))
+                    if value == endpoint:
+                        result["id"] = 999
+                    return result
+
+                with (
+                    mock.patch.object(VERIFIER, "github_json", side_effect=api),
+                    mock.patch.object(
+                        VERIFIER, "download_evidence_archive"
+                    ) as download,
+                    self.assertRaises(ValueError),
+                ):
+                    VERIFIER.evidence_artifact_check(123, self.heads)
+                download.assert_not_called()
+
+    def test_duplicate_members_bad_crc_and_size_mismatch_rejected(self):
+        """ZIP integrity errors cannot be masked by a valid transport digest."""
+        import warnings
+        import zipfile
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            duplicate = self.zip_bytes([("same", b"x"), ("same", b"y")])
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
+            archive.writestr("a", b"original")
+        corrupt = buffer.getvalue().replace(b"original", b"tampered")
+        for raw in (duplicate, corrupt):
+            with self.assertRaises(ValueError):
+                VERIFIER.verified_archive_files(
+                    raw, "sha256:" + hashlib.sha256(raw).hexdigest()
+                )
+        self.metadata["size_in_bytes"] += 1
+        with self.assertRaisesRegex(ValueError, "size mismatch"):
+            self.bind()
+
+    def test_download_is_bounded_and_does_not_forward_or_log_credentials(self):
+        """Exercise actual transport code with a signed redirect and bounded stream."""
+        from urllib.error import HTTPError
+
+        token = "fixture-secret"
+        signed_url = "https://storage.example.test/archive?secret=signed"
+        opener = mock.Mock()
+        response = mock.MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.read1.side_effect = [self.archive, b""]
+        opener.open.side_effect = [
+            HTTPError(
+                "https://api.github.com", 302, "Found", {"Location": signed_url}, None
+            ),
+            response,
+        ]
+        with (
+            mock.patch.object(VERIFIER, "build_opener", return_value=opener),
+            mock.patch.object(
+                VERIFIER.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, token, ""),
+            ),
+        ):
+            self.assertEqual(VERIFIER.download_evidence_archive(456), self.archive)
+        api_request = opener.open.call_args_list[0].args[0]
+        storage_request = opener.open.call_args_list[1].args[0]
+        self.assertEqual(
+            api_request.full_url,
+            "https://api.github.com/repos/aduboseh/iter/actions/artifacts/456/zip",
+        )
+        self.assertEqual(api_request.get_header("Authorization"), "Bearer " + token)
+        self.assertIsNone(storage_request.get_header("Authorization"))
+        from http.client import IncompleteRead
+
+        for failure in (
+            IncompleteRead(b"protected-fixture", 5),
+            TimeoutError(signed_url),
+            HTTPError(signed_url, 403, token, {}, None),
+        ):
+            opener.open.side_effect = failure
+            with (
+                mock.patch.object(VERIFIER, "build_opener", return_value=opener),
+                mock.patch.object(
+                    VERIFIER.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0, token, ""),
+                ),
+                self.assertRaises(ValueError) as error,
+            ):
+                VERIFIER.download_evidence_archive(456)
+            self.assertNotIn(token, str(error.exception))
+            self.assertNotIn(signed_url, str(error.exception))
+        self.assertIsNone(
+            VERIFIER.NoArtifactRedirect().redirect_request(
+                None, None, 302, "", {}, signed_url
+            )
+        )
+
+    def test_download_rejects_unsafe_redirect_and_stream_limits(self):
+        """Neither metadata nor a slow storage stream can escape the transport limits."""
+        from urllib.error import HTTPError
+
+        for url, oversized, late in [
+            ("http://storage.test/file", False, False),
+            ("https://user:secret@storage.test/file", False, False),
+            ("https://storage.test:444/file", False, False),
+            ("https://storage.test/file", True, False),
+            ("https://storage.test/file", False, True),
+        ]:
+            with self.subTest(url=url, oversized=oversized, late=late):
+                opener = mock.Mock()
+                response = mock.MagicMock()
+                response.status = 200
+                response.__enter__.return_value = response
+                response.read1.side_effect = [b"012345678", b""]
+                opener.open.side_effect = [
+                    HTTPError(
+                        "https://api.github.com", 302, "Found", {"Location": url}, None
+                    ),
+                    response,
+                ]
+                with (
+                    mock.patch.object(VERIFIER, "build_opener", return_value=opener),
+                    mock.patch.object(
+                        VERIFIER.subprocess,
+                        "run",
+                        return_value=subprocess.CompletedProcess([], 0, "secret", ""),
+                    ),
+                    mock.patch.object(
+                        VERIFIER, "MAX_ARCHIVE_BYTES", 8 if oversized else 1024
+                    ),
+                    mock.patch.object(
+                        VERIFIER.time,
+                        "monotonic",
+                        side_effect=[0, 121 if late else 0, 0],
+                    ),
+                    self.assertRaises(ValueError),
+                ):
+                    VERIFIER.download_evidence_archive(456)
+
+    def test_local_directory_is_rejected_even_after_run_authentication(self):
+        """A caller cannot substitute a local bundle or recompute its declarations."""
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    str(SCRIPT),
+                    "--control",
+                    "G1-01",
+                    "--evidence-run-id",
+                    "123",
+                    "--evidence-dir",
+                    "forged",
+                    "--allow-failures",
+                ],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value="a" * 40),
+            mock.patch.object(
+                VERIFIER, "git_worktree_clean", return_value=(True, "clean")
+            ),
+            mock.patch.object(
+                VERIFIER, "directive_mirror_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "scg_release_ref_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(True, "approved")
+            ),
+            mock.patch.object(VERIFIER, "evidence_artifact_check") as bind,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        bind.assert_not_called()
+
+    def test_main_consumes_archive_bytes_and_reports_separate_authority(self):
+        """A real fixture bundle reaches evaluation and reports executed bindings."""
+        evidence = {
+            "schema_version": VERIFIER.EVIDENCE_SCHEMA,
+            "control_id": "G1-01",
+            "result": "PASS",
+            "producer": producer(),
+            "subject_commits": self.heads,
+            "commands": ["fixture-collector"],
+            "artifacts": [
+                {
+                    "path": "result.txt",
+                    "sha256": hashlib.sha256(b"observed").hexdigest(),
+                }
+            ],
+        }
+        self.archive = self.zip_bytes(
+            [
+                ("G1-01-linux-x86_64.json", json.dumps(evidence).encode()),
+                ("result.txt", b"observed"),
+            ]
+        )
+        self.metadata["size_in_bytes"] = len(self.archive)
+        self.metadata["digest"] = "sha256:" + hashlib.sha256(self.archive).hexdigest()
+        with tempfile.TemporaryDirectory() as temp:
+            report = Path(temp) / "report.json"
+            with (
+                mock.patch(
+                    "sys.argv",
+                    [
+                        str(SCRIPT),
+                        "--control",
+                        "G1-01",
+                        "--evidence-run-id",
+                        "123",
+                        "--report",
+                        str(report),
+                    ],
+                ),
+                mock.patch.object(
+                    VERIFIER,
+                    "git_head",
+                    side_effect=[
+                        self.heads["iter"],
+                        self.heads["scg"],
+                        "c" * 40,
+                        self.heads["iter"],
+                        self.heads["scg"],
+                    ],
+                ),
+                mock.patch.object(
+                    VERIFIER, "git_worktree_clean", return_value=(True, "clean")
+                ),
+                mock.patch.object(
+                    VERIFIER, "directive_mirror_check", return_value=(True, "matches")
+                ),
+                mock.patch.object(
+                    VERIFIER, "scg_release_ref_check", return_value=(True, "matches")
+                ),
+                mock.patch.object(
+                    VERIFIER, "evidence_run_check", return_value=(True, "approved")
+                ),
+                mock.patch.object(VERIFIER, "github_json", side_effect=self.api),
+                mock.patch.object(
+                    VERIFIER, "download_evidence_archive", return_value=self.archive
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(VERIFIER.main(), 0)
+            result = json.loads(report.read_text())
+            self.assertEqual(result["verifier_authority_commit"], "c" * 40)
+            self.assertEqual(
+                result["evidence_artifact"]["digest"], self.metadata["digest"]
+            )
+            self.assertEqual(result["evidence_artifact"]["artifact_id"], 456)
+            self.assertEqual(result["subject_commits"], self.heads)
+            self.assertEqual(result["summary"]["status"], "PARTIAL")
+            self.assertEqual(result["controls"][0]["status"], "PASS")
+
+
 class ExternalEvidenceTests(unittest.TestCase):
     """Prove evidence can bind immutable commits without entering the source tree."""
 
@@ -884,12 +1406,16 @@ class ExternalEvidenceTests(unittest.TestCase):
                     passed, detail, _ = VERIFIER.evidence_check(
                         "G1-01",
                         {"file": escaped_path},
-                        evidence_dir,
+                        {
+                            p.relative_to(evidence_dir).as_posix(): p.read_bytes()
+                            for p in evidence_dir.rglob("*")
+                            if p.is_file()
+                        },
                         heads,
                         123,
                     )
                     self.assertFalse(passed)
-                    self.assertIn("escapes evidence directory", detail)
+                    self.assertIn("evidence member path", detail)
 
     def test_external_evidence_binds_subjects_and_artifact(self) -> None:
         """A valid external bundle passes exact commit and SHA-256 checks."""
@@ -923,7 +1449,11 @@ class ExternalEvidenceTests(unittest.TestCase):
             passed, detail, _ = VERIFIER.evidence_check(
                 "G1-01",
                 {"file": "G1-01.json"},
-                evidence_dir,
+                {
+                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
+                    for p in evidence_dir.rglob("*")
+                    if p.is_file()
+                },
                 heads,
                 123,
             )
@@ -937,7 +1467,11 @@ class ExternalEvidenceTests(unittest.TestCase):
             passed, detail, _ = VERIFIER.evidence_check(
                 "G1-01",
                 {"file": "G1-01.json"},
-                evidence_dir,
+                {
+                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
+                    for p in evidence_dir.rglob("*")
+                    if p.is_file()
+                },
                 heads,
                 123,
             )
@@ -953,7 +1487,11 @@ class ExternalEvidenceTests(unittest.TestCase):
             passed, detail, _ = VERIFIER.evidence_check(
                 "G1-01",
                 {"file": "G1-01.json"},
-                evidence_dir,
+                {
+                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
+                    for p in evidence_dir.rglob("*")
+                    if p.is_file()
+                },
                 heads,
                 123,
             )
@@ -988,7 +1526,11 @@ class ExternalEvidenceTests(unittest.TestCase):
             passed, detail, _ = VERIFIER.evidence_check(
                 "G1-01",
                 {"file": "G1-01.json"},
-                evidence_dir,
+                {
+                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
+                    for p in evidence_dir.rglob("*")
+                    if p.is_file()
+                },
                 {"iter": "a" * 40, "scg": "b" * 40},
                 123,
             )

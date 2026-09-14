@@ -279,15 +279,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Download commit-bound evidence bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ${{ steps.evidence-artifact.outputs.name }}
-          path: apex-evidence
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.evidence-artifact.outputs.run-id }}
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -310,7 +301,6 @@ jobs:
           python3 -I -B authority/scripts/verify_productization_matrix.py \
             --iter-root iter \
             --scg-root SCG \
-            --evidence-dir apex-evidence \
             --evidence-run-id "${{ steps.evidence-artifact.outputs.run-id }}" \
             --report "$RUNNER_TEMP/apex-productization-report.json"
 
