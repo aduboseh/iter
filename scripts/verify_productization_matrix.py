@@ -9,16 +9,25 @@ skipped state.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 import hashlib
+from http.client import HTTPException
+import io
 import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import time
+from types import MappingProxyType
 from typing import Any
-from urllib.parse import quote
+from urllib.error import HTTPError
+from urllib.parse import quote, urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+import zipfile
+import zlib
 
 MATRIX_SCHEMA = "apex-productization-matrix/v1.1"
 EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
@@ -70,6 +79,11 @@ ALLOWED_CHECK_TYPES = {
 EVIDENCE_PRODUCER_REPOSITORY = "aduboseh/iter"
 TRUSTED_EVIDENCE_WORKFLOW = ".github/workflows/apex_productization_evidence.yml"
 CERTIFICATION_ENVIRONMENT = "production-certification"
+# Deliberately conservative transport limits; raising them requires collector evidence.
+MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
+MAX_EVIDENCE_BYTES = 128 * 1024 * 1024
+MAX_EVIDENCE_FILE_BYTES = 32 * 1024 * 1024
+MAX_EVIDENCE_MEMBERS = 1024
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,7 +101,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--evidence-dir",
         type=Path,
-        default=script_root / "productization" / "evidence",
+        help="Legacy local bundles are rejected for evidence controls",
     )
     parser.add_argument("--evidence-run-id", type=int)
     parser.add_argument("--control", action="append", default=[])
@@ -434,6 +448,7 @@ def cross_repo_equal_check(
 def github_json(endpoint: str) -> Any:
     """Read GitHub-owned metadata without exposing CLI diagnostics or credentials."""
 
+    repository_endpoint = f"repos/{EVIDENCE_PRODUCER_REPOSITORY}"
     result = subprocess.run(
         [
             "gh",
@@ -442,7 +457,7 @@ def github_json(endpoint: str) -> Any:
             "github.com",
             "--method",
             "GET",
-            f"repos/{EVIDENCE_PRODUCER_REPOSITORY}/{endpoint}",
+            f"{repository_endpoint}/{endpoint}" if endpoint else repository_endpoint,
         ],
         capture_output=True,
         text=True,
@@ -628,21 +643,263 @@ def evidence_run_check(run_id: int | None, iter_commit: str | None) -> tuple[boo
     )
 
 
+def positive_integer(value: Any) -> bool:
+    """Reject booleans and non-positive API identities or size declarations."""
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+class NoArtifactRedirect(HTTPRedirectHandler):
+    """Keep credentials on the API host and refuse implicit storage redirects."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        """Require callers to handle the API's signed redirect explicitly."""
+        return None
+
+
+def download_evidence_archive(artifact_id: int) -> bytes:
+    """Download bounded ZIP bytes by immutable ID without forwarding API credentials."""
+    if not positive_integer(artifact_id):
+        raise ValueError("invalid artifact ID")
+    try:
+        credential = subprocess.run(
+            ["gh", "auth", "token", "--hostname", "github.com"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        token = credential.stdout.strip()
+        if credential.returncode != 0 or not token:
+            raise ValueError("artifact credential unavailable")
+        opener = build_opener(NoArtifactRedirect())
+        request = Request(
+            f"https://api.github.com/repos/{EVIDENCE_PRODUCER_REPOSITORY}/actions/artifacts/{artifact_id}/zip",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        try:
+            with opener.open(request, timeout=30):
+                raise ValueError("expected artifact API redirect")
+        except HTTPError as response:
+            try:
+                if response.code != 302:
+                    raise ValueError("artifact download API failed")
+                location = response.headers.get("Location", "")
+            finally:
+                response.close()
+        destination = urlsplit(location)
+        if (
+            destination.scheme != "https"
+            or not destination.hostname
+            or destination.username is not None
+            or destination.password is not None
+            or destination.port not in (None, 443)
+        ):
+            raise ValueError("invalid artifact storage redirect")
+        # Never attach the API token to the signed storage request or log its URL.
+        with opener.open(Request(location), timeout=30) as response:
+            if response.status != 200:
+                raise ValueError("artifact storage download failed")
+            deadline = time.monotonic() + 120
+            data = bytearray()
+            while True:
+                chunk = response.read1(
+                    min(1024 * 1024, MAX_ARCHIVE_BYTES + 1 - len(data))
+                )
+                if time.monotonic() > deadline:
+                    raise ValueError("artifact download deadline exceeded")
+                if not chunk:
+                    break
+                data.extend(chunk)
+                if len(data) > MAX_ARCHIVE_BYTES:
+                    raise ValueError("artifact archive exceeds byte limit")
+            return bytes(data)
+    except (OSError, ValueError, HTTPException, subprocess.SubprocessError) as exc:
+        # HTTP and CLI exceptions may contain signed URLs or credentials.
+        raise ValueError(
+            "artifact download failed, timed out, or exceeded limits"
+        ) from exc
+
+
+def evidence_member_path(name: str) -> str:
+    """Require one portable, non-aliased relative evidence member name."""
+    if not isinstance(name, str) or not name or len(name) > 240:
+        raise ValueError("invalid evidence member path")
+    for part in name.split("/"):
+        if (
+            re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", part) is None
+            or part.endswith(".")
+            or re.fullmatch(
+                r"(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])", part.split(".")[0]
+            )
+        ):
+            raise ValueError("invalid or aliased evidence member path")
+    return name
+
+
+def verified_archive_files(raw: bytes, digest: str) -> Mapping[str, bytes]:
+    """Verify the API digest before parsing a bounded ZIP into immutable memory."""
+    if len(raw) > MAX_ARCHIVE_BYTES:
+        raise ValueError("artifact archive exceeds byte limit")
+    if digest != "sha256:" + hashlib.sha256(raw).hexdigest():
+        raise ValueError("artifact archive digest mismatch")
+    files: dict[str, bytes] = {}
+    members: set[str] = set()
+    nodes: dict[str, tuple[str, bool]] = {}
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            infos = archive.infolist()
+            if not infos or len(infos) > MAX_EVIDENCE_MEMBERS:
+                raise ValueError("invalid evidence member count")
+            total = 0
+            for info in infos:
+                is_dir = info.is_dir()
+                name = evidence_member_path(
+                    info.orig_filename[:-1] if is_dir else info.orig_filename
+                )
+                if info.orig_filename != info.filename:
+                    raise ValueError("truncated evidence member name")
+                if name.casefold() in members:
+                    raise ValueError("duplicate evidence member")
+                members.add(name.casefold())
+                parts = name.split("/")
+                for index in range(1, len(parts) + 1):
+                    node = "/".join(parts[:index])
+                    kind = is_dir or index < len(parts)
+                    previous = nodes.setdefault(node.casefold(), (node, kind))
+                    if previous != (node, kind):
+                        raise ValueError("aliased or conflicting evidence member")
+                mode = stat.S_IFMT(info.external_attr >> 16)
+                if mode not in (0, stat.S_IFDIR if is_dir else stat.S_IFREG):
+                    raise ValueError("evidence links and special files are forbidden")
+                if info.flag_bits & 1 or info.compress_type not in (
+                    zipfile.ZIP_STORED,
+                    zipfile.ZIP_DEFLATED,
+                ):
+                    raise ValueError("unsupported or encrypted evidence member")
+                total += info.file_size
+                if (
+                    info.file_size > MAX_EVIDENCE_FILE_BYTES
+                    or total > MAX_EVIDENCE_BYTES
+                    or (is_dir and info.file_size != 0)
+                ):
+                    raise ValueError("evidence expansion exceeds byte limit")
+                with archive.open(info) as stream:
+                    data = stream.read(MAX_EVIDENCE_FILE_BYTES + 1)
+                if len(data) != info.file_size or len(data) > MAX_EVIDENCE_FILE_BYTES:
+                    raise ValueError("evidence member size mismatch")
+                if not is_dir:
+                    files[name] = data
+    except (
+        zipfile.BadZipFile,
+        RuntimeError,
+        NotImplementedError,
+        EOFError,
+        zlib.error,
+    ) as exc:
+        raise ValueError("invalid evidence ZIP") from exc
+    if not files:
+        raise ValueError("empty evidence archive")
+    return MappingProxyType(files)
+
+
+def evidence_artifact_check(
+    run_id: int, heads: dict[str, str | None]
+) -> tuple[Mapping[str, bytes], dict[str, Any]]:
+    """After run approval, bind exact subject bytes to one GitHub artifact record."""
+    if (
+        not positive_integer(run_id)
+        or any(
+            not isinstance(heads.get(repo), str)
+            or re.fullmatch(r"[0-9a-f]{40}", heads[repo]) is None
+            for repo in ("iter", "scg")
+        )
+    ):
+        raise ValueError("exact subjects and positive evidence run required")
+    name = f"apex-productization-evidence-{heads['iter']}-{heads['scg']}"
+    listing = github_json(f"actions/runs/{run_id}/artifacts?per_page=100&name={name}")
+    if (
+        not isinstance(listing, dict)
+        or not positive_integer(listing.get("total_count"))
+        or listing["total_count"] != 1
+        or not isinstance(listing.get("artifacts"), list)
+        or len(listing["artifacts"]) != 1
+    ):
+        raise ValueError(
+            "exactly one evidence artifact required; incomplete listings rejected"
+        )
+    artifact = listing["artifacts"][0]
+    if (
+        not isinstance(artifact, dict)
+        or not positive_integer(artifact.get("id"))
+    ):
+        raise ValueError("invalid artifact ID")
+    if github_json(f"actions/artifacts/{artifact['id']}") != artifact:
+        raise ValueError("artifact metadata changed during selection")
+    repository = github_json("")
+    if (
+        not isinstance(repository, dict)
+        or repository.get("full_name") != EVIDENCE_PRODUCER_REPOSITORY
+        or repository.get("fork") is not False
+        or not positive_integer(repository.get("id"))
+    ):
+        raise ValueError("invalid evidence repository identity")
+    run = artifact.get("workflow_run")
+    expected_run = {
+        "id": run_id,
+        "head_sha": heads["iter"],
+        "repository_id": repository["id"],
+        "head_repository_id": repository["id"],
+    }
+    if not isinstance(run, dict) or any(
+        type(run.get(key)) is not type(value) or run[key] != value
+        for key, value in expected_run.items()
+    ):
+        raise ValueError("artifact run or repository mismatch")
+    digest = artifact.get("digest")
+    size = artifact.get("size_in_bytes")
+    if (
+        artifact.get("name") != name
+        or artifact.get("expired") is not False
+        or not isinstance(digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+        or not positive_integer(size)
+        or not 0 < size <= MAX_ARCHIVE_BYTES
+    ):
+        raise ValueError("invalid evidence artifact name, expiration, digest or size")
+    raw = download_evidence_archive(artifact["id"])
+    if len(raw) != size:
+        raise ValueError("artifact archive size mismatch")
+    files = verified_archive_files(raw, digest)
+    return files, {
+        "repository": EVIDENCE_PRODUCER_REPOSITORY,
+        "artifact_id": artifact["id"],
+        "run_id": run_id,
+        "name": name,
+        "digest": digest,
+        "size_in_bytes": len(raw),
+        "subject_commits": dict(heads),
+        "file_count": len(files),
+    }
+
+
 def evidence_check(
     control_id: str,
     check: dict[str, Any],
-    evidence_dir: Path,
+    evidence_files: Mapping[str, bytes],
     heads: dict[str, str | None],
     evidence_run_id: int | None,
 ) -> tuple[bool, str, float]:
-    """Check bundle structure and binding after main authenticates the run."""
+    """Check declarations against the immutable API-authenticated bundle bytes."""
 
-    path = resolve_contained_path(evidence_dir, check["file"])
-    if path is None:
-        return False, "evidence file escapes evidence directory", 0.0
     try:
-        evidence = load_json(path)
-    except ValueError as exc:
+        path = evidence_member_path(check["file"])
+        evidence = json.loads(evidence_files[path])
+        if not isinstance(evidence, dict):
+            raise ValueError("evidence must be a JSON object")
+    except (ValueError, KeyError, UnicodeError, RecursionError) as exc:
         return False, str(exc), 0.0
 
     failures: list[str] = []
@@ -664,9 +921,7 @@ def evidence_check(
                 f"producer.repository must be {EVIDENCE_PRODUCER_REPOSITORY}"
             )
         if producer.get("workflow") != TRUSTED_EVIDENCE_WORKFLOW:
-            failures.append(
-                f"producer.workflow must be {TRUSTED_EVIDENCE_WORKFLOW}"
-            )
+            failures.append(f"producer.workflow must be {TRUSTED_EVIDENCE_WORKFLOW}")
         if producer.get("run_id") != evidence_run_id:
             failures.append(f"producer.run_id must be {evidence_run_id}")
 
@@ -697,16 +952,15 @@ def evidence_check(
             if not isinstance(artifact_path, str) or not artifact_path:
                 failures.append(f"artifact {index} path missing")
                 continue
-            target = (evidence_dir / artifact_path).resolve()
             try:
-                target.relative_to(evidence_dir.resolve())
+                target = evidence_member_path(artifact_path)
             except ValueError:
-                failures.append(f"artifact {index} escapes evidence directory")
+                failures.append(f"artifact {index} invalid evidence member path")
                 continue
-            if not target.is_file():
+            if target not in evidence_files:
                 failures.append(f"artifact {index} missing: {target}")
                 continue
-            actual_hash = sha256_file(target)
+            actual_hash = hashlib.sha256(evidence_files[target]).hexdigest()
             if expected_hash != actual_hash:
                 failures.append(
                     f"artifact {index} hash mismatch: {actual_hash} != {expected_hash}"
@@ -795,7 +1049,9 @@ def main() -> int:
 
     args = parse_args()
     if args.verify_evidence_run:
-        passed, detail = evidence_run_check(args.evidence_run_id, git_head(args.iter_root))
+        passed, detail = evidence_run_check(
+            args.evidence_run_id, git_head(args.iter_root)
+        )
         print(f"{'PASS' if passed else 'FAIL'} EVIDENCE-RUN {detail}")
         return 0 if passed else 1
     try:
@@ -815,8 +1071,7 @@ def main() -> int:
         controls = [control for control in controls if control["id"] in selected]
 
     print(
-        f"MATRIX VALID: {len(matrix['controls'])} controls, "
-        f"schema={MATRIX_SCHEMA}"
+        f"MATRIX VALID: {len(matrix['controls'])} controls, " f"schema={MATRIX_SCHEMA}"
     )
     if args.validate_only:
         return 0
@@ -826,6 +1081,7 @@ def main() -> int:
         "scg": args.scg_root.resolve(),
     }
     heads = {repo: git_head(root) for repo, root in roots.items()}
+    verifier_authority_commit = git_head(Path(__file__).resolve().parents[1])
     for repo, root in roots.items():
         clean, detail = git_worktree_clean(root)
         print(f"{'PASS' if clean else 'FAIL'} {repo.upper()}-INITIAL-STATE {detail}")
@@ -833,11 +1089,11 @@ def main() -> int:
             return 2
     mirror_ok, mirror_detail = directive_mirror_check(roots["iter"], roots["scg"])
     print(f"{'PASS' if mirror_ok else 'FAIL'} DIRECTIVE-MIRROR {mirror_detail}")
-    scg_pin_ok, scg_pin_detail = scg_release_ref_check(
-        roots["iter"], heads["scg"]
-    )
+    scg_pin_ok, scg_pin_detail = scg_release_ref_check(roots["iter"], heads["scg"])
     print(f"{'PASS' if scg_pin_ok else 'FAIL'} SCG-RELEASE-REF {scg_pin_detail}")
 
+    evidence_files: Mapping[str, bytes] = MappingProxyType({})
+    evidence_artifact = None
     if any(
         check["type"] == "evidence"
         for control in controls
@@ -847,6 +1103,26 @@ def main() -> int:
         print(f"{'PASS' if trusted else 'FAIL'} EVIDENCE-RUN {detail}")
         if not trusted:
             return 1
+        if args.evidence_dir is not None:
+            print(
+                "FAIL EVIDENCE-ARTIFACT local evidence directories are not authenticated"
+            )
+            return 1
+        try:
+            evidence_files, evidence_artifact = evidence_artifact_check(
+                args.evidence_run_id, heads
+            )
+        except (ValueError, OSError, subprocess.SubprocessError) as exc:
+            detail = (
+                str(exc)
+                if isinstance(exc, ValueError)
+                else "artifact API failed or timed out"
+            )
+            print(f"FAIL EVIDENCE-ARTIFACT {detail}")
+            return 1
+        print(
+            f"PASS EVIDENCE-ARTIFACT {evidence_artifact['artifact_id']} {evidence_artifact['digest']}"
+        )
 
     results: list[dict[str, Any]] = []
     for control in controls:
@@ -865,7 +1141,7 @@ def main() -> int:
                 passed, detail, elapsed = evidence_check(
                     control["id"],
                     check,
-                    args.evidence_dir.resolve(),
+                    evidence_files,
                     heads,
                     args.evidence_run_id,
                 )
@@ -903,12 +1179,9 @@ def main() -> int:
         clean, clean_detail = git_worktree_clean(root)
         unchanged = clean and final_heads[repo] == heads[repo]
         repositories_unchanged = repositories_unchanged and unchanged
-        detail = (
-            f"initial={heads[repo]}, final={final_heads[repo]}, {clean_detail}"
-        )
+        detail = f"initial={heads[repo]}, final={final_heads[repo]}, {clean_detail}"
         print(
-            f"{'PASS' if unchanged else 'FAIL'} "
-            f"{repo.upper()}-FINAL-STATE {detail}"
+            f"{'PASS' if unchanged else 'FAIL'} " f"{repo.upper()}-FINAL-STATE {detail}"
         )
         repository_state[repo] = {
             "status": "PASS" if unchanged else "FAIL",
@@ -925,6 +1198,8 @@ def main() -> int:
         "schema_version": "apex-productization-report/v1",
         "directive_id": matrix["directive_id"],
         "subject_commits": final_heads,
+        "verifier_authority_commit": verifier_authority_commit,
+        "evidence_artifact": evidence_artifact,
         "repository_state": repository_state,
         "evidence_producer": {
             "repository": EVIDENCE_PRODUCER_REPOSITORY,

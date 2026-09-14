@@ -1,6 +1,6 @@
 # Productization Evidence
 
-This directory contains the evidence schema only. Certification evidence and
+This directory documents the evidence format; it does not contain a JSON Schema. Certification evidence and
 its artifacts MUST NOT be committed here because a tracked evidence file cannot
 truthfully contain the commit hash that includes itself.
 
@@ -20,8 +20,35 @@ branches). The subject must be that branch's current tip or its verified ancesto
 an unprotected PR head or a matching ref name alone is insufficient. Only the first run attempt is
 accepted: v1 does not bind artifacts or approvals to a rerun attempt. Dispatch a
 new run instead. Manual certification requires that run ID; release
-certification requires exactly one active artifact with that name. The artifact
-is downloaded outside both source trees before the verifier runs.
+certification requires exactly one active artifact with that name. After authenticating
+the run, the verifier selects exactly one matching artifact from that run, checks its
+immutable ID and repository identity, and downloads the raw ZIP from GitHub's API.
+The exact bytes must match the API's lowercase `sha256:` digest and byte count before
+any ZIP member is read. A missing digest fails closed, including for older artifacts.
+
+Evidence is consumed from immutable in-memory bytes, never from an extracted directory.
+Both hosted workflows use this same verifier path; there is no separate downloader
+that can turn a digest mismatch into a warning. Local bundles with recomputed hashes
+are not an authenticated substitute: `--evidence-dir` is rejected for evidence controls,
+even with `--allow-failures`. Direct evaluation uses:
+
+```text
+python -I -B scripts/verify_productization_matrix.py --iter-root <iter-checkout> --scg-root <scg-checkout> --evidence-run-id <run-id> --report <report-path>
+```
+
+The consumer permits at most 32 MiB of ZIP bytes, 128 MiB of expanded data, 32 MiB
+per file, and 1,024 members. These conservative limits must be checked against real
+collector sizes before producer activation. Only stored/deflated, unencrypted regular
+files and directories with portable ASCII relative names are accepted. Duplicate
+members, case aliases, file/directory conflicts, traversal, device names and links
+are rejected. Nothing is extracted, so failure leaves no partial evidence directory.
+Downloads use a 30-second socket timeout and a 120-second stream deadline (plus at
+most one socket timeout). Read-only failures may be retried with a new invocation;
+no fallback to stale or local evidence is permitted.
+
+Reports include the API-derived artifact ID, run, name, digest, byte count, file count
+and exact subject commits. `verifier_authority_commit` identifies the separate
+verifier checkout. This binds transport origin, not the truth of declared results.
 
 The trusted producer workflow is a GA prerequisite and is intentionally absent
 while the external certification controls remain incomplete. Until it is added
@@ -45,7 +72,7 @@ python -B scripts/verify_productization_matrix.py --verify-evidence-run --eviden
 The hosted consumers execute the verifier and pinned control matrix from a
 separate `aduboseh/iter` `main` checkout, never the candidate's verifier. Both
 preflight and evaluation use isolated Python (`-I -B`) and take the subject via
-`--iter-root iter`; the resolved authority commit is recorded in the job log.
+`--iter-root iter`; the resolved authority commit is recorded in the job log and report.
 An unavailable or incompatible authority fails closed. A local CLI invocation
 is trustworthy only to the extent that the caller trusts its verifier checkout.
 
