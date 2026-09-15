@@ -35,13 +35,15 @@ def results(count: int, status: str = "PASS") -> list[dict[str, str]]:
     return [{"status": status} for _ in range(count)]
 
 
-def producer(run_id: int = 123) -> dict[str, object]:
-    """Build the trusted producer metadata required by evidence files."""
-
-    return {
-        "repository": VERIFIER.EVIDENCE_PRODUCER_REPOSITORY,
-        "workflow": VERIFIER.TRUSTED_EVIDENCE_WORKFLOW,
-        "run_id": run_id,
+def evidence_fixture() -> tuple[dict, dict[str, bytes]]:
+    """Load shared synthetic conformance data, never certification evidence."""
+    fixture = json.loads(
+        (SCRIPT.parents[1] / "tests/data/productization_evidence_v2.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    return fixture["record"], {
+        path: content.encode("utf-8") for path, content in fixture["files"].items()
     }
 
 
@@ -1307,26 +1309,13 @@ class ArtifactBindingTests(unittest.TestCase):
             self.assertEqual(VERIFIER.main(), 1)
         bind.assert_not_called()
 
-    def test_main_consumes_archive_bytes_and_reports_separate_authority(self):
-        """A real fixture bundle reaches evaluation and reports executed bindings."""
-        evidence = {
-            "schema_version": VERIFIER.EVIDENCE_SCHEMA,
-            "control_id": "G1-01",
-            "result": "PASS",
-            "producer": producer(),
-            "subject_commits": self.heads,
-            "commands": ["fixture-collector"],
-            "artifacts": [
-                {
-                    "path": "result.txt",
-                    "sha256": hashlib.sha256(b"observed").hexdigest(),
-                }
-            ],
-        }
+    def main_record_report(self, evidence, allow_failures=False):
+        """Exercise main with authenticated transport fixtures and real record checks."""
+        _, files = evidence_fixture()
         self.archive = self.zip_bytes(
             [
                 ("G1-01-linux-x86_64.json", json.dumps(evidence).encode()),
-                ("result.txt", b"observed"),
+                *files.items(),
             ]
         )
         self.metadata["size_in_bytes"] = len(self.archive)
@@ -1344,6 +1333,7 @@ class ArtifactBindingTests(unittest.TestCase):
                         "123",
                         "--report",
                         str(report),
+                        *(["--allow-failures"] if allow_failures else []),
                     ],
                 ),
                 mock.patch.object(
@@ -1375,16 +1365,231 @@ class ArtifactBindingTests(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
-                self.assertEqual(VERIFIER.main(), 0)
-            result = json.loads(report.read_text())
-            self.assertEqual(result["verifier_authority_commit"], "c" * 40)
-            self.assertEqual(
-                result["evidence_artifact"]["digest"], self.metadata["digest"]
-            )
-            self.assertEqual(result["evidence_artifact"]["artifact_id"], 456)
-            self.assertEqual(result["subject_commits"], self.heads)
-            self.assertEqual(result["summary"]["status"], "PARTIAL")
-            self.assertEqual(result["controls"][0]["status"], "PASS")
+                code = VERIFIER.main()
+            return code, json.loads(report.read_text())
+
+    def test_main_consumes_archive_bytes_and_reports_separate_authority(self):
+        """A synthetic bundle reaches evaluation and reports authenticated bindings."""
+        evidence, _ = evidence_fixture()
+        code, result = self.main_record_report(evidence)
+        self.assertEqual(code, 0)
+        self.assertEqual(result["verifier_authority_commit"], "c" * 40)
+        self.assertEqual(result["evidence_artifact"]["digest"], self.metadata["digest"])
+        self.assertEqual(result["evidence_artifact"]["artifact_id"], 456)
+        self.assertEqual(result["subject_commits"], self.heads)
+        self.assertEqual(result["summary"]["status"], "PARTIAL")
+        self.assertEqual(result["controls"][0]["status"], "PASS")
+
+    def test_incomplete_record_remains_fail_in_advisory_mode(self):
+        """Transport authentication and advisory exit zero never upgrade a failed record."""
+        evidence, _ = evidence_fixture()
+        del evidence["execution_identity"]
+        for advisory in (False, True):
+            with self.subTest(advisory=advisory):
+                code, result = self.main_record_report(evidence, advisory)
+                self.assertEqual(code, 0 if advisory else 1)
+                self.assertEqual(result["controls"][0]["status"], "FAIL")
+                self.assertEqual(result["summary"]["status"], "FAIL")
+
+
+class EvidenceSchemaTests(unittest.TestCase):
+    """Reject incomplete declarations without claiming execution attestation."""
+
+    def setUp(self):
+        """Keep each case's declarations and raw artifact bytes isolated."""
+        self.record, self.files = evidence_fixture()
+        self.heads = dict(self.record["subject_commits"])
+
+    def check(self, record=None, raw=None, run_id=123):
+        """Evaluate bytes through the production evidence entry point."""
+        if raw is None:
+            raw = json.dumps(self.record if record is None else record).encode()
+        return VERIFIER.evidence_check(
+            "G1-01",
+            {"file": "G1-01.json"},
+            {**self.files, "G1-01.json": raw},
+            self.heads,
+            run_id,
+        )
+
+    def test_complete_v2_and_negative_exit_commands_pass(self):
+        """Preserve empty argv operands, empty logs and intentional negative tests."""
+        self.assertTrue(self.check()[0])
+        self.record["commands"][0].update(exit_code=101, expected_exit=101)
+        self.record["commands"][0]["cwd"] = "tests/fixtures"
+        self.assertTrue(self.check()[0])
+
+    def test_missing_unknown_and_null_fields_at_every_object_fail(self):
+        """Every declared field is required; silent typo/default acceptance is forbidden."""
+
+        def objects(value, path=()):
+            if isinstance(value, dict):
+                yield path, value
+                for key, child in value.items():
+                    yield from objects(child, (*path, key))
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    yield from objects(child, (*path, index))
+
+        for path, original in objects(self.record):
+            for key in (*original, "unexpected"):
+                for action in ("delete", "null") if key != "unexpected" else ("add",):
+                    with self.subTest(path=path, key=key, action=action):
+                        record = copy.deepcopy(self.record)
+                        target = record
+                        for part in path:
+                            target = target[part]
+                        if action == "delete":
+                            del target[key]
+                        else:
+                            target[key] = None
+                        self.assertFalse(self.check(record)[0])
+
+    def test_legacy_version_and_incomplete_identity_rejected(self):
+        """Neither a v1 record nor a renamed v1 record can claim completeness."""
+        self.record["schema_version"] = "apex-productization-evidence/v1"
+        self.assertFalse(self.check()[0])
+        self.record["commands"] = ["synthetic-collector"]
+        del self.record["execution_identity"]
+        self.assertFalse(self.check()[0])
+        self.record["schema_version"] = "apex-productization-evidence/v2"
+        self.assertFalse(self.check()[0])
+
+    def test_ambiguous_and_nonstandard_json_rejected(self):
+        """Reject duplicate keys, NaN/Infinity and malformed or overnested JSON."""
+        raw = json.dumps(self.record)
+        for malformed in (
+            raw.replace('"result": "PASS"', '"result": "FAIL", "result": "PASS"', 1),
+            raw.replace('"run_id": 123', '"run_id": 999, "run_id": 123', 1),
+            raw.replace('"exit_code": 0', '"exit_code": NaN', 1),
+            raw.replace('"exit_code": 0', '"exit_code": Infinity', 1),
+            raw.replace('"exit_code": 0', '"exit_code": -Infinity', 1),
+            "null",
+            "[]",
+            "{",
+            "[" * 1200 + "]" * 1200,
+        ):
+            with self.subTest(raw=malformed[:80]):
+                self.assertFalse(self.check(raw=malformed.encode())[0])
+
+    def test_identity_strings_arrays_and_subjects_rejected(self):
+        """Reject blank identities, missing toolchains and malformed commit strings."""
+        paths = (
+            ("execution_identity", "runner", "os"),
+            ("execution_identity", "runner", "architecture"),
+            ("execution_identity", "runner", "image"),
+            ("execution_identity", "toolchains", 0, "name"),
+            ("execution_identity", "toolchains", 0, "version"),
+        )
+        for path in paths:
+            for invalid in ("", " \t", 12, True, [], {}):
+                record = copy.deepcopy(self.record)
+                target = record
+                for part in path[:-1]:
+                    target = target[part]
+                target[path[-1]] = invalid
+                with self.subTest(path=path, invalid=invalid):
+                    self.assertFalse(self.check(record)[0])
+        for path in (
+            ("commands",),
+            ("artifacts",),
+            ("execution_identity", "toolchains"),
+        ):
+            for invalid in ([], {}, "not-an-array", [None]):
+                record = copy.deepcopy(self.record)
+                target = record
+                for part in path[:-1]:
+                    target = target[part]
+                target[path[-1]] = invalid
+                self.assertFalse(self.check(record)[0])
+        for invalid in ("a" * 39, "A" * 40, "a" * 40 + "\n", True):
+            record = copy.deepcopy(self.record)
+            record["subject_commits"]["iter"] = invalid
+            self.heads["iter"] = invalid
+            self.assertFalse(self.check(record)[0])
+
+    def test_run_identity_is_strict_integer_first_attempt(self):
+        """Python bool/float equality must not impersonate a run or first attempt."""
+        for key, invalid in (
+            ("run_id", True),
+            ("run_id", 123.0),
+            ("run_id", 0),
+            ("run_id", "123"),
+            ("run_id", 124),
+            ("run_attempt", True),
+            ("run_attempt", 1.0),
+            ("run_attempt", 2),
+        ):
+            record = copy.deepcopy(self.record)
+            record["producer"][key] = invalid
+            with self.subTest(key=key, invalid=invalid):
+                self.assertFalse(self.check(record)[0])
+        for invalid in (None, True, 123.0, 0):
+            self.assertFalse(self.check(run_id=invalid)[0])
+
+    def test_every_reference_requires_declared_verified_bytes(self):
+        """Hash-only claims and undeclared logs cannot satisfy execution identity."""
+        references = [
+            ("execution_identity", "corpus"),
+            ("execution_identity", "configuration"),
+            ("execution_identity", "result"),
+            ("execution_identity", "toolchains", 0, "version_log"),
+            ("commands", 0, "stdout"),
+            ("commands", 0, "stderr"),
+        ]
+        for path in references:
+            for replacement in ("undeclared.txt", "../escape", "A" * 64, 1, ""):
+                record = copy.deepcopy(self.record)
+                target = record
+                for part in path[:-1]:
+                    target = target[part]
+                target[path[-1]] = replacement
+                with self.subTest(path=path, replacement=replacement):
+                    self.assertFalse(self.check(record)[0])
+        for artifact in self.record["artifacts"]:
+            path = artifact["path"]
+            original = self.files.pop(path)
+            with self.subTest(path=path, case="missing"):
+                self.assertFalse(self.check()[0])
+            self.files[path] = original + b"tampered"
+            with self.subTest(path=path, case="tampered"):
+                self.assertFalse(self.check()[0])
+            self.files[path] = original
+            record = copy.deepcopy(self.record)
+            record["artifacts"] = [a for a in record["artifacts"] if a["path"] != path]
+            with self.subTest(path=path, case="undeclared"):
+                self.assertFalse(self.check(record)[0])
+
+    def test_duplicate_artifact_declaration_rejected(self):
+        """Repeated declarations are ambiguous even with the same digest."""
+        self.record["artifacts"].append(dict(self.record["artifacts"][0]))
+        self.assertFalse(self.check()[0])
+
+    def test_command_shape_paths_and_failed_exit_rejected(self):
+        """Require exact argv, contained cwd and matching non-boolean exit codes."""
+        cases = (
+            ("argv", "cargo test"),
+            ("argv", []),
+            ("argv", [""]),
+            ("argv", [" "]),
+            ("argv", ["cargo", 1]),
+            ("repo", "host"),
+            ("cwd", "../other"),
+            ("cwd", "/tmp"),
+            ("cwd", "C:\\tmp"),
+            ("cwd", ""),
+            ("cwd", 1),
+            ("exit_code", 1),
+            ("exit_code", True),
+            ("exit_code", 0.0),
+            ("expected_exit", False),
+            ("expected_exit", 0.0),
+        )
+        for key, invalid in cases:
+            record = copy.deepcopy(self.record)
+            record["commands"][0][key] = invalid
+            with self.subTest(key=key, invalid=invalid):
+                self.assertFalse(self.check(record)[0])
 
 
 class ExternalEvidenceTests(unittest.TestCase):
@@ -1418,125 +1623,44 @@ class ExternalEvidenceTests(unittest.TestCase):
                     self.assertIn("evidence member path", detail)
 
     def test_external_evidence_binds_subjects_and_artifact(self) -> None:
-        """A valid external bundle passes exact commit and SHA-256 checks."""
+        """A complete external record binds execution files and producer identity."""
+        evidence, files = evidence_fixture()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            evidence_dir = Path(temp_dir)
-            artifact_dir = evidence_dir / "artifacts" / "G1-01"
-            artifact_dir.mkdir(parents=True)
-            artifact = artifact_dir / "certification.json"
-            artifact.write_bytes(b'{"deterministic":true}\n')
-            digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-            heads = {"iter": "a" * 40, "scg": "b" * 40}
-            evidence = {
-                "schema_version": VERIFIER.EVIDENCE_SCHEMA,
-                "control_id": "G1-01",
-                "result": "PASS",
-                "producer": producer(),
-                "subject_commits": heads,
-                "commands": ["cargo test --locked --workspace"],
-                "artifacts": [
-                    {
-                        "path": "artifacts/G1-01/certification.json",
-                        "sha256": digest,
-                    }
-                ],
-            }
-            (evidence_dir / "G1-01.json").write_text(
-                json.dumps(evidence), encoding="utf-8"
-            )
-
-            passed, detail, _ = VERIFIER.evidence_check(
+        def check():
+            return VERIFIER.evidence_check(
                 "G1-01",
                 {"file": "G1-01.json"},
-                {
-                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
-                    for p in evidence_dir.rglob("*")
-                    if p.is_file()
-                },
-                heads,
-                123,
-            )
-
-            self.assertTrue(passed, detail)
-
-            evidence["commands"] = [None]
-            (evidence_dir / "G1-01.json").write_text(
-                json.dumps(evidence), encoding="utf-8"
-            )
-            passed, detail, _ = VERIFIER.evidence_check(
-                "G1-01",
-                {"file": "G1-01.json"},
-                {
-                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
-                    for p in evidence_dir.rglob("*")
-                    if p.is_file()
-                },
-                heads,
-                123,
-            )
-            self.assertFalse(passed)
-            self.assertIn("non-empty strings", detail)
-
-            evidence["commands"] = ["cargo test --locked --workspace"]
-            evidence["producer"] = producer()
-            evidence["producer"]["workflow"] = ".github/workflows/untrusted.yml"
-            (evidence_dir / "G1-01.json").write_text(
-                json.dumps(evidence), encoding="utf-8"
-            )
-            passed, detail, _ = VERIFIER.evidence_check(
-                "G1-01",
-                {"file": "G1-01.json"},
-                {
-                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
-                    for p in evidence_dir.rglob("*")
-                    if p.is_file()
-                },
-                heads,
-                123,
-            )
-            self.assertFalse(passed)
-            self.assertIn("producer.workflow", detail)
-
-    def test_stale_external_evidence_fails_closed(self) -> None:
-        """A stale iter commit is rejected even when the artifact digest is valid."""
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            evidence_dir = Path(temp_dir)
-            artifact = evidence_dir / "artifact.txt"
-            artifact.write_text("evidence", encoding="utf-8")
-            evidence = {
-                "schema_version": VERIFIER.EVIDENCE_SCHEMA,
-                "control_id": "G1-01",
-                "result": "PASS",
-                "producer": producer(),
-                "subject_commits": {"iter": "c" * 40, "scg": "b" * 40},
-                "commands": ["certify"],
-                "artifacts": [
-                    {
-                        "path": "artifact.txt",
-                        "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
-                    }
-                ],
-            }
-            (evidence_dir / "G1-01.json").write_text(
-                json.dumps(evidence), encoding="utf-8"
-            )
-
-            passed, detail, _ = VERIFIER.evidence_check(
-                "G1-01",
-                {"file": "G1-01.json"},
-                {
-                    p.relative_to(evidence_dir).as_posix(): p.read_bytes()
-                    for p in evidence_dir.rglob("*")
-                    if p.is_file()
-                },
+                {**files, "G1-01.json": json.dumps(evidence).encode()},
                 {"iter": "a" * 40, "scg": "b" * 40},
                 123,
             )
 
-            self.assertFalse(passed)
-            self.assertIn("does not match", detail)
+        passed, detail, _ = check()
+        self.assertTrue(passed, detail)
+        commands = evidence["commands"]
+        evidence["commands"] = [None]
+        passed, detail, _ = check()
+        self.assertFalse(passed)
+        self.assertIn("command must be an object", detail)
+        evidence["commands"] = commands
+        evidence["producer"]["workflow"] = ".github/workflows/untrusted.yml"
+        passed, detail, _ = check()
+        self.assertFalse(passed)
+        self.assertIn("producer.workflow", detail)
+
+    def test_stale_external_evidence_fails_closed(self) -> None:
+        """A stale subject fails even when execution artifact digests are valid."""
+        evidence, files = evidence_fixture()
+        evidence["subject_commits"]["iter"] = "c" * 40
+        passed, detail, _ = VERIFIER.evidence_check(
+            "G1-01",
+            {"file": "G1-01.json"},
+            {**files, "G1-01.json": json.dumps(evidence).encode()},
+            {"iter": "a" * 40, "scg": "b" * 40},
+            123,
+        )
+        self.assertFalse(passed)
+        self.assertIn("does not match", detail)
 
 
 class RepositoryPathTests(unittest.TestCase):

@@ -1,14 +1,58 @@
 # Productization Evidence
 
-This directory documents the evidence format; it does not contain a JSON Schema. Certification evidence and
+This directory contains the Draft 7 `evidence-v2.schema.json` and its contract. Certification evidence and
 its artifacts MUST NOT be committed here because a tracked evidence file cannot
 truthfully contain the commit hash that includes itself.
 
 Evidence is not a narrative approval. Each file must use schema
-`apex-productization-evidence/v1`, identify one release-matrix control, bind
-both exact iter and SCG commits, list commands executed, and include at least
-one artifact whose SHA-256 digest is verified by
-`scripts/verify_productization_matrix.py`.
+`apex-productization-evidence/v2`, identify one release-matrix control, bind
+both exact iter and SCG commits, and capture declared execution identity and
+artifact bytes. `scripts/verify_productization_matrix.py` validates the record
+using only the Python standard library. Legacy v1 and unknown versions fail
+closed; there is no automatic migration or fallback. No active producer exists
+to migrate. Future collectors must explicitly emit v2.
+
+## Record Contract
+
+Every field below is required. Unknown fields, duplicate JSON keys and nonfinite
+JSON numbers are rejected rather than silently defaulted or normalized.
+
+| Field | Required content |
+| --- | --- |
+| `schema_version`, `control_id`, `result` | Exact v2 version, selected matrix control, `PASS` or `FAIL`; only `PASS` is accepted as passing evidence. |
+| `producer` | Exact trusted repository/workflow, positive integer `run_id`, integer `run_attempt: 1`. All must agree with authenticated transport. |
+| `subject_commits` | Exact lowercase 40-hex `iter` and `scg` commits. |
+| `execution_identity.runner` | Nonblank `os`, `architecture`, `image` identity strings. For containers use the immutable image digest; hosted collectors must record their runner image version. |
+| `execution_identity.toolchains` | Nonempty array of `name`, exact `version`, and `version_log` artifact reference. |
+| `execution_identity.corpus`, `configuration`, `result` | References to files capturing the actual inputs, configuration and observed result; each is bound by an artifact digest. |
+| `commands` | Nonempty array of `repo` (`iter` or `scg`), repository-relative `cwd` (`.` for root), exact `argv`, integer `exit_code` and `expected_exit`, plus `stdout` and `stderr` artifact references. |
+| `artifacts` | Nonempty array of unique portable `path` and lowercase SHA-256 digest `sha256`, checked against the authenticated archive bytes. |
+
+Every corpus/configuration/result, toolchain version log and command log reference
+must name a declared, verified artifact, not a digest without bytes. Multi-file
+corpora need a collector-defined manifest and complete artifact list; validating
+its completeness and interpreting control-specific results remain collector duties.
+Empty output files and empty non-executable argv operands are valid and preserved.
+The executable must be nonblank. Exit codes must match the expected outcome;
+intentional negative tests may declare a nonzero expected exit. No command in an
+evidence record is executed by the consumer.
+
+The schema is a structural minimum, not the full acceptance policy. Python also
+enforces current subjects, the authenticated run, portable paths, unique artifact
+declarations, byte digests, cross-field references and exit equality. It requires
+integer JSON tokens for run IDs, attempts and exit codes (rejecting `1.0` as well
+as booleans); Draft 7 considers `1.0` mathematically integral. Rust tests use the
+existing `jsonschema` dependency to independently validate the shared, explicitly
+synthetic conformance fixture in `tests/data/productization_evidence_v2.json`.
+That fixture is not execution evidence and must never be uploaded as certification.
+
+This contract establishes declared execution identity and byte binding, not proof
+that commands ran, image identities are genuine, the result satisfies a control,
+or a signer attested to it. Behavioral collectors and attestation policy remain
+separate prerequisites. An advisory `--allow-failures` exit zero does not change
+a rejected record's report status from `FAIL`.
+
+## Authenticated Transport
 
 Evidence is transported as a GitHub Actions artifact named
 `apex-productization-evidence-<iter-commit>-<scg-commit>`. The producing run
@@ -18,7 +62,7 @@ come from the trusted workflow
 `workflow_dispatch` run on a protected source branch (including protected release
 branches). The subject must be that branch's current tip or its verified ancestor;
 an unprotected PR head or a matching ref name alone is insufficient. Only the first run attempt is
-accepted: v1 does not bind artifacts or approvals to a rerun attempt. Dispatch a
+accepted: the transport policy does not authenticate approvals and artifacts for reruns. Dispatch a
 new run instead. Manual certification requires that run ID; release
 certification requires exactly one active artifact with that name. After authenticating
 the run, the verifier selects exactly one matching artifact from that run, checks its
@@ -85,8 +129,8 @@ a PR readiness result is not a release authorization or a certification result.
 
 This authenticates account-level approval, not independent human acceptance or
 the scientific validity of a control claim. An alternate account owned by the
-same person is not an independent operator. The v1 bundle checks remain structural;
-behavioral collectors, complete execution identity, protected producer jobs,
+same person is not an independent operator. The v2 bundle checks remain structural;
+behavioral collectors, trustworthy execution capture, protected producer jobs,
 short-lived cross-repository authentication and private artifact transport must
 be implemented before producer activation. Do not add a producer that simply
 copies PASS declarations or repackages local smoke reports as certification.
@@ -95,30 +139,45 @@ Missing or ambiguous evidence, stale commit binding, missing artifacts, and
 digest mismatch are all FAIL. Do not commit placeholder or completed PASS
 evidence.
 
-Minimal shape:
+Illustrative shape (placeholders are intentionally invalid, not evidence):
 
 ```json
 {
-  "schema_version": "apex-productization-evidence/v1",
+  "schema_version": "apex-productization-evidence/v2",
   "control_id": "G1-01",
   "result": "PASS",
   "producer": {
     "repository": "aduboseh/iter",
     "workflow": ".github/workflows/apex_productization_evidence.yml",
-    "run_id": 123456789
+    "run_id": 123456789,
+    "run_attempt": 1
   },
   "subject_commits": {
     "iter": "<40-hex commit>",
     "scg": "<40-hex commit>"
   },
-  "commands": [
-    "cargo test --locked --workspace"
-  ],
+  "execution_identity": {
+    "runner": { "os": "<os>", "architecture": "<arch>", "image": "<image version or digest>" },
+    "toolchains": [{ "name": "rustc", "version": "<exact version>", "version_log": "logs/rustc.log" }],
+    "corpus": "inputs/corpus.json",
+    "configuration": "inputs/config.json",
+    "result": "outputs/result.json"
+  },
+  "commands": [{
+    "repo": "iter", "cwd": ".", "argv": ["cargo", "test", "--locked", "--workspace"],
+    "exit_code": 0, "expected_exit": 0,
+    "stdout": "logs/tests.stdout.log", "stderr": "logs/tests.stderr.log"
+  }],
   "artifacts": [
     {
-      "path": "artifacts/G1-01/certification.json",
+      "path": "outputs/result.json",
       "sha256": "<64 lowercase hex>"
     }
   ]
 }
 ```
+
+The example omits the remaining artifact declarations for brevity; every referenced
+file must also be declared with its exact digest. Reverting to v1 would reopen
+incomplete-record acceptance and must keep certification blocked. Runtime public
+APIs, persistence formats, SCG digest casing and canonical payload rules are unchanged.

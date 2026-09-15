@@ -1,0 +1,84 @@
+{
+  "purpose": "SYNTHETIC CONFORMANCE FIXTURE, NOT CERTIFICATION EVIDENCE",
+  "record": {
+    "schema_version": "apex-productization-evidence/v2",
+    "control_id": "G1-01",
+    "result": "PASS",
+    "producer": {
+      "repository": "aduboseh/iter",
+      "workflow": ".github/workflows/apex_productization_evidence.yml",
+      "run_id": 123,
+      "run_attempt": 1
+    },
+    "subject_commits": {
+      "iter": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scg": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "execution_identity": {
+      "runner": {
+        "os": "synthetic-linux-fixture",
+        "architecture": "x86_64",
+        "image": "synthetic-test-image@fixture-001"
+      },
+      "toolchains": [
+        {
+          "name": "rustc",
+          "version": "1.93.0-fixture",
+          "version_log": "logs/rustc-version.log"
+        }
+      ],
+      "corpus": "inputs/corpus.json",
+      "configuration": "inputs/config.json",
+      "result": "outputs/result.json"
+    },
+    "commands": [
+      {
+        "repo": "iter",
+        "cwd": ".",
+        "argv": [
+          "synthetic-collector",
+          "--argument",
+          ""
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "stdout": "logs/collector.stdout.log",
+        "stderr": "logs/collector.stderr.log"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "inputs/config.json",
+        "sha256": "c7dd5e5eabfb20329dcc4e7d65fbfa8b35c794d58a03272587990b5b483dc8eb"
+      },
+      {
+        "path": "inputs/corpus.json",
+        "sha256": "218589323cbe80b7ed077e3ee36f1663e7cb5f8f4e4ad02c938ad8a5c2c5a6b9"
+      },
+      {
+        "path": "logs/collector.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "logs/collector.stdout.log",
+        "sha256": "b0ceb98563416273032f23db2ac2aafd1de078771a4fb3772f036709a1ca00a8"
+      },
+      {
+        "path": "logs/rustc-version.log",
+        "sha256": "62bdf48affb174d28458e790828e915cf92ba5b1ec09f1224530eda936c7a694"
+      },
+      {
+        "path": "outputs/result.json",
+        "sha256": "6d4c7c48770d98d0a45b25ddde914bf9b5de6db16c16213f407fe11118626bb4"
+      }
+    ]
+  },
+  "files": {
+    "inputs/corpus.json": "{\"fixture\":true}\n",
+    "inputs/config.json": "{\"seed\":0}\n",
+    "outputs/result.json": "{\"synthetic_test_result\":true}\n",
+    "logs/collector.stdout.log": "synthetic fixture output\n",
+    "logs/collector.stderr.log": "",
+    "logs/rustc-version.log": "rustc 1.93.0 (synthetic fixture, not execution evidence)\n"
+  }
+}
