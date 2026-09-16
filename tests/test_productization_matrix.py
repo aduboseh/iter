@@ -1455,6 +1455,37 @@ class EvidenceSchemaTests(unittest.TestCase):
         self.record["schema_version"] = "apex-productization-evidence/v2"
         self.assertFalse(self.check()[0])
 
+    def test_mutable_container_images_and_missing_collector_are_rejected(self):
+        """A mutable image label and an unversioned collector cannot identify execution."""
+        self.record["execution_identity"]["runner"]["image"] = "ubuntu:latest"
+        self.assertFalse(self.check()[0])
+        self.record, self.files = evidence_fixture()
+        self.record["execution_identity"].pop("collector", None)
+        self.assertFalse(self.check()[0])
+
+    def test_runner_kind_and_version_formats_are_enforced(self):
+        """Reject floating labels, unknown runner types and cross-kind identities."""
+        runner = self.record["execution_identity"]["runner"]
+        digest = "sha256:" + "c" * 64
+        for kind, image, passes in (
+            ("container", digest, True),
+            ("container", "ubuntu:latest", False),
+            ("container", "sha256:" + "c" * 63, False),
+            ("container", digest + "\n", False),
+            ("container", "ubuntu-24.04@20260914.1.0", False),
+            ("github-hosted", "ubuntu-24.04@20260914.1.0", True),
+            ("github-hosted", "windows-2025@20260914.3.0", True),
+            ("github-hosted", "ubuntu-latest", False),
+            ("github-hosted", "ubuntu-24.04@latest", False),
+            ("github-hosted", "ubuntu-24.04@20260914.1.0\n", False),
+            ("github-hosted", digest, False),
+            ("workstation", digest, False),
+        ):
+            with self.subTest(kind=kind, image=image):
+                runner.update(kind=kind, image=image)
+                passed, detail, _ = self.check()
+                self.assertEqual(passed, passes, detail)
+
     def test_ambiguous_and_nonstandard_json_rejected(self):
         """Reject duplicate keys, NaN/Infinity and malformed or overnested JSON."""
         raw = json.dumps(self.record)
@@ -1478,6 +1509,8 @@ class EvidenceSchemaTests(unittest.TestCase):
             ("execution_identity", "runner", "os"),
             ("execution_identity", "runner", "architecture"),
             ("execution_identity", "runner", "image"),
+            ("execution_identity", "collector", "name"),
+            ("execution_identity", "collector", "version"),
             ("execution_identity", "toolchains", 0, "name"),
             ("execution_identity", "toolchains", 0, "version"),
         )
@@ -1533,6 +1566,7 @@ class EvidenceSchemaTests(unittest.TestCase):
             ("execution_identity", "corpus"),
             ("execution_identity", "configuration"),
             ("execution_identity", "result"),
+            ("execution_identity", "collector", "artifact"),
             ("execution_identity", "toolchains", 0, "version_log"),
             ("commands", 0, "stdout"),
             ("commands", 0, "stderr"),

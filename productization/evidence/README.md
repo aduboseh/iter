@@ -22,13 +22,14 @@ JSON numbers are rejected rather than silently defaulted or normalized.
 | `schema_version`, `control_id`, `result` | Exact v2 version, selected matrix control, `PASS` or `FAIL`; only `PASS` is accepted as passing evidence. |
 | `producer` | Exact trusted repository/workflow, positive integer `run_id`, integer `run_attempt: 1`. All must agree with authenticated transport. |
 | `subject_commits` | Exact lowercase 40-hex `iter` and `scg` commits. |
-| `execution_identity.runner` | Nonblank `os`, `architecture`, `image` identity strings. For containers use the immutable image digest; hosted collectors must record their runner image version. |
+| `execution_identity.runner` | `kind` (`container` or `github-hosted`), nonblank `os`/`architecture`, and `image`. Containers require `sha256:` plus exactly 64 lowercase hex digits. Hosted images require `<image-name>@<YYYYMMDD>.<revision>.<revision>` (for example `ubuntu-24.04@20260914.1.0`). Mutable tags, unversioned labels and other runner kinds are rejected. |
+| `execution_identity.collector` | Nonblank `name` and `version`, plus `artifact` referencing the exact collector source or executable bytes. Its artifact digest binds identity even if a human-readable version label is reused. |
 | `execution_identity.toolchains` | Nonempty array of `name`, exact `version`, and `version_log` artifact reference. |
 | `execution_identity.corpus`, `configuration`, `result` | References to files capturing the actual inputs, configuration and observed result; each is bound by an artifact digest. |
 | `commands` | Nonempty array of `repo` (`iter` or `scg`), repository-relative `cwd` (`.` for root), exact `argv`, integer `exit_code` and `expected_exit`, plus `stdout` and `stderr` artifact references. |
 | `artifacts` | Nonempty array of unique portable `path` and lowercase SHA-256 digest `sha256`, checked against the authenticated archive bytes. |
 
-Every corpus/configuration/result, toolchain version log and command log reference
+Every corpus/configuration/result, collector artifact, toolchain version log and command log reference
 must name a declared, verified artifact, not a digest without bytes. Multi-file
 corpora need a collector-defined manifest and complete artifact list; validating
 its completeness and interpreting control-specific results remain collector duties.
@@ -47,7 +48,7 @@ synthetic conformance fixture in `tests/data/productization_evidence_v2.json`.
 That fixture is not execution evidence and must never be uploaded as certification.
 
 This contract establishes declared execution identity and byte binding, not proof
-that commands ran, image identities are genuine, the result satisfies a control,
+that commands ran, declared image identities match the executing environment, the result satisfies a control,
 or a signer attested to it. Behavioral collectors and attestation policy remain
 separate prerequisites. An advisory `--allow-failures` exit zero does not change
 a rejected record's report status from `FAIL`.
@@ -157,7 +158,8 @@ Illustrative shape (placeholders are intentionally invalid, not evidence):
     "scg": "<40-hex commit>"
   },
   "execution_identity": {
-    "runner": { "os": "<os>", "architecture": "<arch>", "image": "<image version or digest>" },
+    "runner": { "kind": "container", "os": "<os>", "architecture": "<arch>", "image": "sha256:<64 lowercase hex>" },
+    "collector": { "name": "<collector>", "version": "<exact version>", "artifact": "tools/collector.py" },
     "toolchains": [{ "name": "rustc", "version": "<exact version>", "version_log": "logs/rustc.log" }],
     "corpus": "inputs/corpus.json",
     "configuration": "inputs/config.json",

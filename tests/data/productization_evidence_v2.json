@@ -16,9 +16,15 @@
     },
     "execution_identity": {
       "runner": {
+        "kind": "container",
         "os": "synthetic-linux-fixture",
         "architecture": "x86_64",
-        "image": "synthetic-test-image@fixture-001"
+        "image": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "collector": {
+        "name": "synthetic-collector",
+        "version": "fixture-v1",
+        "artifact": "tools/collector.py"
       },
       "toolchains": [
         {
@@ -70,6 +76,10 @@
       {
         "path": "outputs/result.json",
         "sha256": "6d4c7c48770d98d0a45b25ddde914bf9b5de6db16c16213f407fe11118626bb4"
+      },
+      {
+        "path": "tools/collector.py",
+        "sha256": "3ce1f5080a0d73b3c72da5364aef66410e714b083762a741cd8db4616e844064"
       }
     ]
   },
@@ -79,6 +89,7 @@
     "outputs/result.json": "{\"synthetic_test_result\":true}\n",
     "logs/collector.stdout.log": "synthetic fixture output\n",
     "logs/collector.stderr.log": "",
-    "logs/rustc-version.log": "rustc 1.93.0 (synthetic fixture, not execution evidence)\n"
+    "logs/rustc-version.log": "rustc 1.93.0 (synthetic fixture, not execution evidence)\n",
+    "tools/collector.py": "# SYNTHETIC collector identity fixture; not executed.\n"
   }
 }

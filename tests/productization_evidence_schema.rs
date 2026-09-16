@@ -126,3 +126,26 @@ fn schema_allows_failure_reports_and_negative_test_exit_codes() {
     record["commands"][0]["expected_exit"] = json!(101);
     assert!(schema().is_valid(&record));
 }
+
+#[test]
+fn schema_requires_digest_or_version_for_each_runner_kind() {
+    let mut record = fixture()["record"].clone();
+    let schema = schema();
+    let digest = format!("sha256:{}", "c".repeat(64));
+    for (kind, image, valid) in [
+        ("container", digest.as_str(), true),
+        ("container", "ubuntu:latest", false),
+        ("container", "ubuntu-24.04@20260914.1.0", false),
+        ("github-hosted", "ubuntu-24.04@20260914.1.0", true),
+        ("github-hosted", "windows-2025@20260914.3.0", true),
+        ("github-hosted", "ubuntu-latest", false),
+        ("github-hosted", "ubuntu-24.04@latest", false),
+        ("github-hosted", "ubuntu-24.04@20260914.1.0\n", false),
+        ("github-hosted", digest.as_str(), false),
+        ("workstation", digest.as_str(), false),
+    ] {
+        record["execution_identity"]["runner"]["kind"] = json!(kind);
+        record["execution_identity"]["runner"]["image"] = json!(image);
+        assert_eq!(schema.is_valid(&record), valid, "{kind} {image}");
+    }
+}

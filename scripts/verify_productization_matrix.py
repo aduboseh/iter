@@ -987,12 +987,29 @@ def validate_evidence_record(
 
     identity = evidence["execution_identity"]
     evidence_fields(
-        identity, "runner toolchains corpus configuration result", "execution_identity"
+        identity,
+        "runner collector toolchains corpus configuration result",
+        "execution_identity",
     )
     runner = identity["runner"]
-    evidence_fields(runner, "os architecture image", "execution_identity.runner")
+    evidence_fields(runner, "kind os architecture image", "execution_identity.runner")
     for field, value in runner.items():
         evidence_text(value, f"runner.{field}")
+    if runner["kind"] == "container":
+        image_pattern = r"sha256:[0-9a-f]{64}"
+    elif runner["kind"] == "github-hosted":
+        image_pattern = r"[A-Za-z0-9][A-Za-z0-9_.-]*@[0-9]{8}\.[0-9]+\.[0-9]+"
+    else:
+        raise ValueError("runner.kind must be container or github-hosted")
+    if re.fullmatch(image_pattern, runner["image"]) is None:
+        raise ValueError(
+            "runner.image must identify an exact digest or hosted image version"
+        )
+    collector = identity["collector"]
+    evidence_fields(collector, "name version artifact", "collector")
+    evidence_text(collector["name"], "collector.name")
+    evidence_text(collector["version"], "collector.version")
+    bound_artifact(collector["artifact"], "collector.artifact")
     evidence_array(identity["toolchains"], "toolchains")
     for toolchain in identity["toolchains"]:
         evidence_fields(toolchain, "name version version_log", "toolchain")
