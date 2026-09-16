@@ -30,7 +30,7 @@ import zipfile
 import zlib
 
 MATRIX_SCHEMA = "apex-productization-matrix/v1.1"
-EVIDENCE_SCHEMA = "apex-productization-evidence/v1"
+EVIDENCE_SCHEMA = "apex-productization-evidence/v2"
 DIRECTIVE_ID = "APEX-SCG-ITER-PROD-001"
 AUTHORITY_DOCUMENT = "APEX_PRODUCTIZATION_V1.md"
 AUTHORITY_AMENDMENT = "APEX_PRODUCTIZATION_GAP_CLOSURE_001.md"
@@ -885,6 +885,165 @@ def evidence_artifact_check(
     }
 
 
+def unique_evidence_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate JSON keys rather than accepting the last declaration."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate evidence JSON key")
+        result[key] = value
+    return result
+
+
+def reject_evidence_constant(value: str) -> None:
+    """Reject non-JSON numeric constants accepted by Python's default decoder."""
+    raise ValueError("nonfinite evidence JSON number")
+
+
+def evidence_fields(value: Any, fields: str, location: str) -> None:
+    """Require an exact object shape without defaulting missing or unknown fields."""
+    if not isinstance(value, dict) or set(value) != set(fields.split()):
+        raise ValueError(f"{location} must be an object with exactly: {fields}")
+
+
+def evidence_array(value: Any, location: str) -> None:
+    """Require at least one declaration in each evidence collection."""
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{location} must be a non-empty array")
+
+
+def evidence_text(value: Any, location: str) -> None:
+    """Require a nonblank identity string without normalizing its recorded bytes."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{location} must be a non-empty string")
+
+
+def validate_evidence_record(
+    evidence: Any,
+    evidence_files: Mapping[str, bytes],
+    control_id: str,
+    heads: dict[str, str | None],
+    evidence_run_id: int | None,
+) -> None:
+    """Validate v2 declarations and byte bindings, not execution or scientific truth."""
+    evidence_fields(
+        evidence,
+        "schema_version control_id result producer subject_commits execution_identity commands artifacts",
+        "evidence",
+    )
+    if evidence["schema_version"] != EVIDENCE_SCHEMA:
+        raise ValueError(f"schema_version must be {EVIDENCE_SCHEMA}")
+    if evidence["control_id"] != control_id or control_id not in EXPECTED_CONTROL_IDS:
+        raise ValueError(f"control_id must be {control_id}")
+    if evidence["result"] != "PASS":
+        raise ValueError("result must be PASS")
+
+    producer = evidence["producer"]
+    evidence_fields(producer, "repository workflow run_id run_attempt", "producer")
+    if producer["repository"] != EVIDENCE_PRODUCER_REPOSITORY:
+        raise ValueError(f"producer.repository must be {EVIDENCE_PRODUCER_REPOSITORY}")
+    if producer["workflow"] != TRUSTED_EVIDENCE_WORKFLOW:
+        raise ValueError(f"producer.workflow must be {TRUSTED_EVIDENCE_WORKFLOW}")
+    if not positive_integer(evidence_run_id):
+        raise ValueError("trusted evidence_run_id is required")
+    if (
+        not positive_integer(producer["run_id"])
+        or producer["run_id"] != evidence_run_id
+    ):
+        raise ValueError(f"producer.run_id must be {evidence_run_id}")
+    if not positive_integer(producer["run_attempt"]) or producer["run_attempt"] != 1:
+        raise ValueError("producer.run_attempt must be integer 1")
+
+    subjects = evidence["subject_commits"]
+    evidence_fields(subjects, "iter scg", "subject_commits")
+    for repo in ("iter", "scg"):
+        actual = subjects[repo]
+        if not isinstance(actual, str) or re.fullmatch(r"[0-9a-f]{40}", actual) is None:
+            raise ValueError(
+                f"subject_commits.{repo} must be a lowercase 40-hex commit"
+            )
+        if heads.get(repo) is None or actual != heads[repo]:
+            raise ValueError(f"{repo} evidence commit does not match current subject")
+
+    artifacts = evidence["artifacts"]
+    evidence_array(artifacts, "artifacts")
+    artifact_paths: set[str] = set()
+    for index, artifact in enumerate(artifacts):
+        evidence_fields(artifact, "path sha256", f"artifacts[{index}]")
+        path = evidence_member_path(artifact["path"])
+        if path in artifact_paths:
+            raise ValueError("duplicate artifact declaration")
+        artifact_paths.add(path)
+        if path not in evidence_files:
+            raise ValueError(f"artifact {index} missing")
+        actual_hash = hashlib.sha256(evidence_files[path]).hexdigest()
+        if artifact["sha256"] != actual_hash:
+            raise ValueError(f"artifact {index} hash mismatch")
+
+    def bound_artifact(value: Any, location: str) -> None:
+        """Require an exact reference to already verified artifact bytes."""
+        if not isinstance(value, str) or value not in artifact_paths:
+            raise ValueError(f"{location} must reference a declared verified artifact")
+
+    identity = evidence["execution_identity"]
+    evidence_fields(
+        identity,
+        "runner collector toolchains corpus configuration result",
+        "execution_identity",
+    )
+    runner = identity["runner"]
+    evidence_fields(runner, "kind os architecture image", "execution_identity.runner")
+    for field, value in runner.items():
+        evidence_text(value, f"runner.{field}")
+    if runner["kind"] == "container":
+        image_pattern = r"sha256:[0-9a-f]{64}"
+    elif runner["kind"] == "github-hosted":
+        image_pattern = r"[A-Za-z0-9][A-Za-z0-9_.-]*@[0-9]{8}\.[0-9]+\.[0-9]+"
+    else:
+        raise ValueError("runner.kind must be container or github-hosted")
+    if re.fullmatch(image_pattern, runner["image"]) is None:
+        raise ValueError(
+            "runner.image must identify an exact digest or hosted image version"
+        )
+    collector = identity["collector"]
+    evidence_fields(collector, "name version artifact", "collector")
+    evidence_text(collector["name"], "collector.name")
+    evidence_text(collector["version"], "collector.version")
+    bound_artifact(collector["artifact"], "collector.artifact")
+    evidence_array(identity["toolchains"], "toolchains")
+    for toolchain in identity["toolchains"]:
+        evidence_fields(toolchain, "name version version_log", "toolchain")
+        evidence_text(toolchain["name"], "toolchain.name")
+        evidence_text(toolchain["version"], "toolchain.version")
+        bound_artifact(toolchain["version_log"], "toolchain.version_log")
+    for field in ("corpus", "configuration", "result"):
+        bound_artifact(identity[field], f"execution_identity.{field}")
+
+    evidence_array(evidence["commands"], "commands")
+    for command in evidence["commands"]:
+        evidence_fields(
+            command, "repo cwd argv exit_code expected_exit stdout stderr", "command"
+        )
+        if command["repo"] not in ("iter", "scg"):
+            raise ValueError("command.repo must be iter or scg")
+        if command["cwd"] != ".":
+            evidence_member_path(command["cwd"])
+        argv = command["argv"]
+        evidence_array(argv, "command.argv")
+        evidence_text(argv[0], "command.argv[0]")
+        if not all(isinstance(argument, str) for argument in argv):
+            raise ValueError("command.argv must contain only strings")
+        if any(
+            not isinstance(code, int) or isinstance(code, bool)
+            for code in (command["exit_code"], command["expected_exit"])
+        ):
+            raise ValueError("command exit codes must be integers")
+        if command["exit_code"] != command["expected_exit"]:
+            raise ValueError("command exit_code does not match expected_exit")
+        for field in ("stdout", "stderr"):
+            bound_artifact(command[field], f"command.{field}")
+
+
 def evidence_check(
     control_id: str,
     check: dict[str, Any],
@@ -896,86 +1055,17 @@ def evidence_check(
 
     try:
         path = evidence_member_path(check["file"])
-        evidence = json.loads(evidence_files[path])
-        if not isinstance(evidence, dict):
-            raise ValueError("evidence must be a JSON object")
+        evidence = json.loads(
+            evidence_files[path],
+            object_pairs_hook=unique_evidence_object,
+            parse_constant=reject_evidence_constant,
+        )
+        validate_evidence_record(
+            evidence, evidence_files, control_id, heads, evidence_run_id
+        )
     except (ValueError, KeyError, UnicodeError, RecursionError) as exc:
         return False, str(exc), 0.0
 
-    failures: list[str] = []
-    if evidence.get("schema_version") != EVIDENCE_SCHEMA:
-        failures.append(f"schema_version must be {EVIDENCE_SCHEMA}")
-    if evidence.get("control_id") != control_id:
-        failures.append(f"control_id must be {control_id}")
-    if evidence.get("result") != "PASS":
-        failures.append("result must be PASS")
-
-    producer = evidence.get("producer")
-    if evidence_run_id is None:
-        failures.append("trusted evidence_run_id is required")
-    if not isinstance(producer, dict):
-        failures.append("producer must be an object")
-    else:
-        if producer.get("repository") != EVIDENCE_PRODUCER_REPOSITORY:
-            failures.append(
-                f"producer.repository must be {EVIDENCE_PRODUCER_REPOSITORY}"
-            )
-        if producer.get("workflow") != TRUSTED_EVIDENCE_WORKFLOW:
-            failures.append(f"producer.workflow must be {TRUSTED_EVIDENCE_WORKFLOW}")
-        if producer.get("run_id") != evidence_run_id:
-            failures.append(f"producer.run_id must be {evidence_run_id}")
-
-    subjects = evidence.get("subject_commits")
-    if not isinstance(subjects, dict):
-        failures.append("subject_commits must be an object")
-    else:
-        for repo in ("iter", "scg"):
-            expected = heads[repo]
-            actual = subjects.get(repo)
-            if expected is None:
-                failures.append(f"cannot resolve current {repo} commit")
-            elif actual != expected:
-                failures.append(
-                    f"{repo} evidence commit {actual!r} does not match {expected}"
-                )
-
-    artifacts = evidence.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        failures.append("artifacts must be a non-empty array")
-    else:
-        for index, artifact in enumerate(artifacts):
-            if not isinstance(artifact, dict):
-                failures.append(f"artifact {index} must be an object")
-                continue
-            artifact_path = artifact.get("path")
-            expected_hash = artifact.get("sha256")
-            if not isinstance(artifact_path, str) or not artifact_path:
-                failures.append(f"artifact {index} path missing")
-                continue
-            try:
-                target = evidence_member_path(artifact_path)
-            except ValueError:
-                failures.append(f"artifact {index} invalid evidence member path")
-                continue
-            if target not in evidence_files:
-                failures.append(f"artifact {index} missing: {target}")
-                continue
-            actual_hash = hashlib.sha256(evidence_files[target]).hexdigest()
-            if expected_hash != actual_hash:
-                failures.append(
-                    f"artifact {index} hash mismatch: {actual_hash} != {expected_hash}"
-                )
-
-    commands = evidence.get("commands")
-    if (
-        not isinstance(commands, list)
-        or not commands
-        or not all(isinstance(command, str) and command.strip() for command in commands)
-    ):
-        failures.append("commands must be a non-empty array of non-empty strings")
-
-    if failures:
-        return False, "; ".join(failures), 0.0
     return True, f"commit-bound evidence verified: {path}", 0.0
 
 

@@ -1,0 +1,292 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "APEX evidence v2: declared execution identity, not independent certification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "control_id",
+    "result",
+    "producer",
+    "subject_commits",
+    "execution_identity",
+    "commands",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "apex-productization-evidence/v2"
+    },
+    "control_id": {
+      "type": "string",
+      "pattern": "^G[0-6]-[0-9]{2}$",
+      "maxLength": 5
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow",
+        "run_id",
+        "run_attempt"
+      ],
+      "properties": {
+        "repository": {
+          "const": "aduboseh/iter"
+        },
+        "workflow": {
+          "const": ".github/workflows/apex_productization_evidence.yml"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "const": 1
+        }
+      }
+    },
+    "subject_commits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "iter",
+        "scg"
+      ],
+      "properties": {
+        "iter": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "maxLength": 40
+        },
+        "scg": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "maxLength": 40
+        }
+      }
+    },
+    "execution_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner",
+        "collector",
+        "toolchains",
+        "corpus",
+        "configuration",
+        "result"
+      ],
+      "properties": {
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "os",
+            "architecture",
+            "image"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "container",
+                "github-hosted"
+              ]
+            },
+            "os": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "architecture": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "image": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "container"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "image": {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "maxLength": 71
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "image": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*@[0-9]{8}\\.[0-9]+\\.[0-9]+$",
+                    "not": {
+                      "pattern": "\\s"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "collector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "artifact"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "toolchains": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version",
+              "version_log"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "version": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "version_log": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "corpus": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "repo",
+          "cwd",
+          "argv",
+          "exit_code",
+          "expected_exit",
+          "stdout",
+          "stderr"
+        ],
+        "properties": {
+          "repo": {
+            "enum": [
+              "iter",
+              "scg"
+            ]
+          },
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "argv": {
+            "type": "array",
+            "minItems": 1,
+            "items": [
+              {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            ],
+            "additionalItems": {
+              "type": "string"
+            }
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "expected_exit": {
+            "type": "integer"
+          },
+          "stdout": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stderr": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          }
+        }
+      }
+    }
+  }
+}
