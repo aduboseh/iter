@@ -122,6 +122,29 @@ try {
 }
 ```
 
+## Development
+
+The lint toolchain requires Node.js `^20.19.0 || ^22.13.0 || >=24`; use a supported
+Node.js LTS release for development. This does not change the published SDK's
+Node.js `>=18.0.0` runtime requirement. Lint dependencies are development-only.
+
+From `sdks/typescript`:
+
+```bash
+npm ci
+npm run lint
+npm run test:lint
+npm run typecheck
+npm test -- --runInBand
+npm run build
+```
+
+Lint covers production and test TypeScript using the recommended ESLint and
+typescript-eslint rules. Only test doubles may use explicit `any` and `Function`
+types to exercise private process boundaries; production rules remain enabled.
+`test:lint` checks those boundaries and the CLI's failure behavior. Typechecking
+remains a separate required check; lint is not a substitute for it.
+
 ## License
 
 Apache-2.0
