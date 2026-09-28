@@ -7,6 +7,10 @@ const sdkRoot = path.resolve(__dirname, "..");
 const eslintRoot = path.dirname(require.resolve("eslint/package.json"));
 const eslintBin = path.join(eslintRoot, require("eslint/package.json").bin.eslint);
 
+/**
+ * Run a snippet through the real ESLint CLI, preserving expected rule failures.
+ * Reject process, configuration, or parser failures before returning its report.
+ */
 function lint(source, filePath = "src/lint-probe.ts", extraArgs = []) {
   const result = spawnSync(process.execPath, [
     eslintBin, "--stdin", "--stdin-filename", filePath,
