@@ -3,15 +3,25 @@
 from __future__ import annotations
 
 import hashlib
+import copy
+import contextlib
 import importlib.util
+import io
 import json
+import os
 from pathlib import Path
+import shlex
 import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
+from unittest import mock
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "verify_productization_matrix.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[1] / "scripts" / "verify_productization_matrix.py"
+)
 SPEC = importlib.util.spec_from_file_location("verify_productization_matrix", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"cannot load verifier: {SCRIPT}")
@@ -202,6 +212,657 @@ class CertificationStatusTests(unittest.TestCase):
         self.assertEqual(
             VERIFIER.certification_status(False, results(30)), ("FAIL", False)
         )
+
+
+class EvidenceRunTests(unittest.TestCase):
+    """Exercise GitHub metadata policy with fixtures, never certification records."""
+
+    def setUp(self) -> None:
+        """Build API fixtures without writing reusable certification evidence."""
+
+        self.commit = "a" * 40
+        self.branch = {"protected": True, "commit": {"sha": self.commit}}
+        self.run = {
+            "id": 123,
+            "head_sha": self.commit,
+            "head_branch": "main",
+            "path": VERIFIER.TRUSTED_EVIDENCE_WORKFLOW,
+            "event": "workflow_dispatch",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1,
+            "repository": {"full_name": "aduboseh/iter", "fork": False},
+            "head_repository": {"full_name": "aduboseh/iter", "fork": False},
+            "actor": {"id": 10},
+            "triggering_actor": {"id": 11},
+        }
+        self.environment = {
+            "id": 5,
+            "name": VERIFIER.CERTIFICATION_ENVIRONMENT,
+            "deployment_branch_policy": {
+                "protected_branches": True,
+                "custom_branch_policies": False,
+            },
+            "protection_rules": [
+                {
+                    "type": "required_reviewers",
+                    "prevent_self_review": True,
+                    "reviewers": [{"type": "User", "reviewer": {"id": 20}}],
+                }
+            ],
+        }
+        self.reviews = [
+            {
+                "state": "approved",
+                "user": {"id": 20, "type": "User"},
+                "environments": [{"id": 5, "name": VERIFIER.CERTIFICATION_ENVIRONMENT}],
+            }
+        ]
+
+    def check(self) -> tuple[bool, str]:
+        """Exercise the complete policy with only GitHub transport substituted."""
+
+        with mock.patch.object(
+            VERIFIER,
+            "github_json",
+            side_effect=[
+                self.run,
+                self.branch,
+                self.environment,
+                self.reviews,
+            ],
+        ):
+            return VERIFIER.evidence_run_check(123, self.commit)
+
+    def test_first_attempt_with_authorized_environment_approval(self) -> None:
+        """One authorized non-triggering account satisfies the approval policy."""
+
+        passed, detail = self.check()
+        self.assertTrue(passed, detail)
+
+    def test_run_metadata_mutations_are_rejected(self) -> None:
+        """Valid neighboring fields cannot compensate for an invalid identity."""
+
+        for field, value in (
+            ("id", 124),
+            ("id", True),
+            ("head_sha", "b" * 40),
+            ("head_branch", None),
+            ("head_branch", ""),
+            ("path", ".github/workflows/other.yml"),
+            ("event", "push"),
+            ("status", "in_progress"),
+            ("conclusion", "failure"),
+            ("run_attempt", 2),
+            ("run_attempt", True),
+            ("repository", None),
+            ("head_repository", {"full_name": "fork/iter", "fork": True}),
+            ("actor", {}),
+            ("triggering_actor", {"id": True}),
+        ):
+            with self.subTest(field=field, value=value):
+                original = self.run[field]
+                self.run[field] = value
+                self.assertFalse(self.check()[0])
+                self.run[field] = original
+
+    def test_missing_run_fields_are_rejected(self) -> None:
+        """Sparse metadata never inherits defaults from the expected policy."""
+
+        for field in list(self.run):
+            with self.subTest(field=field):
+                value = self.run.pop(field)
+                self.assertFalse(self.check()[0])
+                self.run[field] = value
+
+    def test_environment_policy_mutations_are_rejected(self) -> None:
+        """Branch protection cannot substitute for environment review rules."""
+
+        original = copy.deepcopy(self.environment)
+        cases = [
+            ("id", None),
+            ("name", "other"),
+            ("deployment_branch_policy", None),
+            (
+                "deployment_branch_policy",
+                {"protected_branches": False, "custom_branch_policies": False},
+            ),
+            ("protection_rules", []),
+            ("protection_rules", [{"type": "wait_timer"}]),
+            (
+                "protection_rules",
+                [dict(original["protection_rules"][0], prevent_self_review=False)],
+            ),
+            ("protection_rules", [dict(original["protection_rules"][0], reviewers=[])]),
+            (
+                "protection_rules",
+                [
+                    dict(
+                        original["protection_rules"][0],
+                        reviewers=[{"type": "Team", "reviewer": {"id": 20}}],
+                    )
+                ],
+            ),
+        ]
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                self.environment = dict(original, **{field: value})
+                self.assertFalse(self.check()[0])
+
+    def test_missing_rejected_wrong_environment_and_self_reviews_fail(self) -> None:
+        """Policy configuration alone is not attributable run-specific approval."""
+
+        original = copy.deepcopy(self.reviews[0])
+        cases = [
+            [],
+            [{}],
+            [dict(original, state="rejected")],
+            [
+                dict(
+                    original,
+                    environments=[
+                        {"id": 6, "name": VERIFIER.CERTIFICATION_ENVIRONMENT}
+                    ],
+                )
+            ],
+            [dict(original, environments=[{"id": 5, "name": "other"}])],
+            [dict(original, user={"id": 20, "type": "Bot"})],
+            [dict(original, user={"id": 30, "type": "User"})],
+            [original, dict(original, state="rejected")],
+        ]
+        for actor_id in (10, 11):
+            self.environment["protection_rules"][0]["reviewers"].append(
+                {"type": "User", "reviewer": {"id": actor_id}}
+            )
+            cases.append([dict(original, user={"id": actor_id, "type": "User"})])
+        for reviews in cases:
+            with self.subTest(reviews=reviews):
+                self.reviews = reviews
+                self.assertFalse(self.check()[0])
+
+    def test_api_error_at_every_query_fails_closed(self) -> None:
+        """No failed metadata hop may be omitted from the trust chain."""
+
+        responses = [self.run, self.branch, self.environment, self.reviews]
+        for index in range(len(responses)):
+            with self.subTest(query=index):
+                with mock.patch.object(
+                    VERIFIER,
+                    "github_json",
+                    side_effect=responses[:index] + [ValueError("API denied")],
+                ):
+                    passed, detail = VERIFIER.evidence_run_check(123, self.commit)
+                self.assertFalse(passed)
+                self.assertIn("API denied", detail)
+
+    def test_unprotected_branch_fails(self) -> None:
+        """Approval cannot bless code from an unprotected source branch."""
+
+        with mock.patch.object(
+            VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
+        ):
+            self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+
+    def test_protected_release_branches_are_supported_and_url_encoded(self) -> None:
+        """Release sources follow the same policy without being forced onto main."""
+
+        self.run["head_branch"] = "release/v1.0"
+        with mock.patch.object(
+            VERIFIER,
+            "github_json",
+            side_effect=[
+                self.run,
+                self.branch,
+                self.environment,
+                self.reviews,
+            ],
+        ) as api:
+            passed, detail = VERIFIER.evidence_run_check(123, self.commit)
+        self.assertTrue(passed, detail)
+        self.assertEqual(api.call_args_list[1].args, ("branches/release%2Fv1.0",))
+        with mock.patch.object(
+            VERIFIER, "github_json", side_effect=[self.run, {"protected": False}]
+        ):
+            self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+
+    def test_protected_main_ancestry_is_required_not_just_ref_name(self) -> None:
+        """The ref label must correspond to the subject's actual ancestry."""
+
+        tip = "b" * 40
+        for comparison, expected in (
+            ({"status": "ahead", "merge_base_commit": {"sha": self.commit}}, True),
+            ({"status": "diverged", "merge_base_commit": {"sha": "c" * 40}}, False),
+            ({"status": "behind", "merge_base_commit": {"sha": tip}}, False),
+            ({"status": "ahead", "merge_base_commit": {"sha": "c" * 40}}, False),
+            ({}, False),
+        ):
+            with (
+                self.subTest(comparison=comparison),
+                mock.patch.object(
+                    VERIFIER,
+                    "github_json",
+                    side_effect=[
+                        self.run,
+                        {"protected": True, "commit": {"sha": tip}},
+                        comparison,
+                        self.environment,
+                        self.reviews,
+                    ],
+                ) as api,
+            ):
+                self.assertEqual(
+                    VERIFIER.evidence_run_check(123, self.commit)[0], expected
+                )
+                self.assertEqual(
+                    api.call_args_list[2].args, (f"compare/{self.commit}...{tip}",)
+                )
+
+    def test_missing_main_commit_and_ancestry_api_failure_fail_closed(self) -> None:
+        """Unknown branch state cannot be treated as a matching source."""
+
+        for tip in (None, {}, {"sha": "main"}):
+            with (
+                self.subTest(tip=tip),
+                mock.patch.object(
+                    VERIFIER,
+                    "github_json",
+                    side_effect=[self.run, {"protected": True, "commit": tip}],
+                ),
+            ):
+                self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+        with mock.patch.object(
+            VERIFIER,
+            "github_json",
+            side_effect=[
+                self.run,
+                {"protected": True, "commit": {"sha": "b" * 40}},
+                ValueError("API denied"),
+            ],
+        ):
+            self.assertFalse(VERIFIER.evidence_run_check(123, self.commit)[0])
+
+    def test_invalid_subjects_do_not_query_api(self) -> None:
+        """Reject ambiguous IDs before forming authenticated API requests."""
+
+        for run_id, commit in (
+            (None, self.commit),
+            (0, self.commit),
+            (True, self.commit),
+            ("123", self.commit),
+            (123, "main"),
+            (123, None),
+            (123, "A" * 40),
+        ):
+            with self.subTest(run_id=run_id, commit=commit):
+                with mock.patch.object(VERIFIER, "github_json") as api:
+                    self.assertFalse(VERIFIER.evidence_run_check(run_id, commit)[0])
+                api.assert_not_called()
+
+    def test_cli_errors_and_timeout_are_not_success_or_secret_disclosure(self) -> None:
+        """Errors stay fail-closed without exposing token-bearing CLI stderr."""
+
+        failures = [
+            FileNotFoundError("TOKEN-SENTINEL"),
+            subprocess.TimeoutExpired("gh", 30, stderr="TOKEN-SENTINEL"),
+            subprocess.CompletedProcess([], 1, "", "TOKEN-SENTINEL"),
+            subprocess.CompletedProcess([], 0, "not json", ""),
+        ]
+        for failure in failures:
+            with self.subTest(failure=type(failure).__name__):
+                options = (
+                    {"side_effect": failure}
+                    if isinstance(failure, Exception)
+                    else {"return_value": failure}
+                )
+                with mock.patch.object(VERIFIER.subprocess, "run", **options):
+                    passed, detail = VERIFIER.evidence_run_check(123, self.commit)
+                self.assertFalse(passed)
+                self.assertNotIn("TOKEN-SENTINEL", detail)
+
+    def test_api_uses_fixed_host_read_only_and_timeout(self) -> None:
+        """Pin the authority host and prohibit shell or indefinite execution."""
+
+        with mock.patch.object(
+            VERIFIER.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], 0, "{}", ""),
+        ) as command:
+            self.assertEqual(VERIFIER.github_json("actions/runs/123"), {})
+        argv = command.call_args.args[0]
+        self.assertEqual(
+            argv,
+            [
+                "gh",
+                "api",
+                "--hostname",
+                "github.com",
+                "--method",
+                "GET",
+                "repos/aduboseh/iter/actions/runs/123",
+            ],
+        )
+        self.assertEqual(command.call_args.kwargs["timeout"], 30)
+        self.assertFalse(command.call_args.kwargs.get("shell", False))
+
+    def test_subject_commands_do_not_inherit_api_credentials(self) -> None:
+        """Neither inherited nor declared environment gives code an API token."""
+
+        check = {
+            "argv": ["cargo", "test"],
+            "repo": "iter",
+            "env": {"GH_TOKEN": "override"},
+        }
+        with (
+            mock.patch.dict(
+                VERIFIER.os.environ, {"GH_TOKEN": "secret", "GITHUB_TOKEN": "secret"}
+            ),
+            mock.patch.object(
+                VERIFIER.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, "test result: ok. 1 passed", ""
+                ),
+            ) as command,
+        ):
+            self.assertTrue(VERIFIER.command_check(check, {"iter": SCRIPT.parent})[0])
+        environment = command.call_args.kwargs["env"]
+        self.assertNotIn("GH_TOKEN", environment)
+        self.assertNotIn("GITHUB_TOKEN", environment)
+
+    def test_matrix_cannot_consume_evidence_or_allow_failure_after_auth_rejection(
+        self,
+    ) -> None:
+        """Advisory mode cannot turn failed authentication into accepted evidence."""
+
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    str(SCRIPT),
+                    "--control",
+                    "G1-01",
+                    "--evidence-run-id",
+                    "123",
+                    "--allow-failures",
+                ],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value=self.commit),
+            mock.patch.object(
+                VERIFIER, "git_worktree_clean", return_value=(True, "clean")
+            ),
+            mock.patch.object(
+                VERIFIER, "directive_mirror_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "scg_release_ref_check", return_value=(True, "matches")
+            ),
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(False, "not approved")
+            ) as authenticate,
+            mock.patch.object(VERIFIER, "evidence_check") as consume,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        authenticate.assert_called_once_with(123, self.commit)
+        consume.assert_not_called()
+
+    def test_preflight_and_both_workflows_share_authentication(self) -> None:
+        """Both workflows authenticate before downloading any evidence bundle."""
+
+        with (
+            mock.patch(
+                "sys.argv",
+                [str(SCRIPT), "--verify-evidence-run", "--evidence-run-id", "123"],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value=self.commit),
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(False, "not approved")
+            ) as authenticate,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        authenticate.assert_called_once_with(123, self.commit)
+        workflows = SCRIPT.parents[1] / ".github" / "workflows"
+        for name in ("apex_productization.yml", "release_gate.yml"):
+            workflow = (workflows / name).read_text(encoding="utf-8")
+            self.assertEqual(workflow.count("--verify-evidence-run"), 1)
+            self.assertLess(
+                workflow.index("--verify-evidence-run"),
+                workflow.index("uses: actions/download-artifact"),
+            )
+        required = (workflows / "mcp_integration.yml").read_text(encoding="utf-8")
+        self.assertIn("python -B tests/test_productization_matrix.py", required)
+        self.assertIn("python -BO tests/test_productization_matrix.py", required)
+
+    def test_preflight_uses_explicit_subject_not_authority_commit(self) -> None:
+        """A separate verifier checkout must authenticate the candidate's HEAD."""
+
+        subject = Path("candidate")
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    str(SCRIPT),
+                    "--iter-root",
+                    str(subject),
+                    "--verify-evidence-run",
+                    "--evidence-run-id",
+                    "123",
+                ],
+            ),
+            mock.patch.object(VERIFIER, "git_head", return_value=self.commit) as head,
+            mock.patch.object(
+                VERIFIER, "evidence_run_check", return_value=(False, "not approved")
+            ) as authenticate,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(VERIFIER.main(), 1)
+        head.assert_called_once_with(subject)
+        authenticate.assert_called_once_with(123, self.commit)
+
+    def test_hosted_verifiers_are_separate_from_candidate_code(self) -> None:
+        """Preflight and controls use isolated, main-sourced authority in both jobs."""
+
+        workflows = SCRIPT.parents[1] / ".github" / "workflows"
+        for name in ("apex_productization.yml", "release_gate.yml"):
+            with self.subTest(workflow=name):
+                workflow = (workflows / name).read_text(encoding="utf-8")
+                authority = workflow.split("name: Check out verifier authority", 1)[1]
+                authority = authority.split("\n  release-gate:", 1)[0]
+                checkout = authority.split("\n      - ", 1)[0]
+                self.assertIn("repository: aduboseh/iter", checkout)
+                self.assertIn("ref: refs/heads/main", checkout)
+                self.assertIn("path: authority", checkout)
+                self.assertIn("persist-credentials: false", checkout)
+                commands = [
+                    shlex.split(line.strip())
+                    for line in authority.replace("\\\n", " ").splitlines()
+                    if line.strip().startswith("python3 ")
+                ]
+                self.assertEqual(len(commands), 2)
+                for command in commands:
+                    self.assertEqual(
+                        command[:4],
+                        [
+                            "python3",
+                            "-I",
+                            "-B",
+                            "authority/scripts/verify_productization_matrix.py",
+                        ],
+                    )
+                    index = command.index("--iter-root")
+                    self.assertEqual(command[index + 1], "iter")
+                    self.assertNotIn("--matrix", command)
+        release = (workflows / "release_gate.yml").read_text(encoding="utf-8")
+        certification = release.split("  apex-productization:", 1)[1].split(
+            "    steps:", 1
+        )[0]
+        self.assertIn("github.event_name == 'push'", certification)
+        manual = (workflows / "apex_productization.yml").read_text(encoding="utf-8")
+        certification = manual.split("  release-certification:", 1)[1]
+        condition = certification.split("    steps:", 1)[0]
+        self.assertIn("if: github.event_name == 'workflow_dispatch'", condition)
+        self.assertNotIn("github.ref", condition)
+        self.assertLess(
+            certification.index("name: Reject non-main certification dispatch"),
+            certification.index("name: Check out verifier authority"),
+        )
+
+    def test_non_main_dispatch_fails_instead_of_skipping_certification(self) -> None:
+        """A selected non-main ref produces failure, not a green skipped job."""
+
+        workflow = (
+            SCRIPT.parents[1] / ".github/workflows/apex_productization.yml"
+        ).read_text(encoding="utf-8")
+        guard = workflow.split("name: Reject non-main certification dispatch", 1)[
+            1
+        ].split("\n      - ", 1)[0]
+        self.assertIn("DISPATCH_REF: ${{ github.ref }}", guard)
+        self.assertNotIn("\n        if:", guard)
+        source = textwrap.dedent(
+            guard.split("python3 -I - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        )
+        for ref in ("refs/heads/main", "refs/heads/release/v1.0", "refs/tags/v1.0", ""):
+            with self.subTest(ref=ref):
+                environment = os.environ.copy()
+                environment["DISPATCH_REF"] = ref
+                result = subprocess.run(
+                    [sys.executable, "-I", "-c", source],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(result.returncode == 0, ref == "refs/heads/main")
+                if ref != "refs/heads/main":
+                    self.assertIn("::error::Certification dispatch", result.stderr)
+
+    def test_workflow_preflight_cannot_execute_candidate_or_import_shadow(self) -> None:
+        """Actual workflow argv rejects a run despite candidate scripts that exit 0."""
+
+        workflows = SCRIPT.parents[1] / ".github" / "workflows"
+        for name in ("apex_productization.yml", "release_gate.yml"):
+            with self.subTest(workflow=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                authority = root / "authority" / "scripts"
+                candidate = root / "iter" / "scripts"
+                authority.mkdir(parents=True)
+                candidate.mkdir(parents=True)
+                (authority / SCRIPT.name).write_bytes(SCRIPT.read_bytes())
+                attack = "from pathlib import Path\nPath('candidate-executed').touch()\nraise SystemExit(0)\n"
+                (candidate / SCRIPT.name).write_text(attack, encoding="utf-8")
+                (candidate / "sitecustomize.py").write_text(attack, encoding="utf-8")
+                workflow = (workflows / name).read_text(encoding="utf-8")
+                line = next(
+                    line
+                    for line in workflow.replace("\\\n", " ").splitlines()
+                    if "--verify-evidence-run" in line
+                )
+                command = shlex.split(line.strip())
+                command[0] = sys.executable
+                command[command.index("--evidence-run-id") + 1] = "0"
+                environment = os.environ.copy()
+                environment["PYTHONPATH"] = str(candidate)
+                result = subprocess.run(
+                    command,
+                    cwd=root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("FAIL EVIDENCE-RUN", result.stdout)
+                self.assertFalse((root / "candidate-executed").exists())
+
+    def test_final_release_gate_distinguishes_readiness_from_certification(
+        self,
+    ) -> None:
+        """Execute the workflow decision code against every non-success outcome."""
+
+        workflow = (SCRIPT.parents[1] / ".github/workflows/release_gate.yml").read_text(
+            encoding="utf-8"
+        )
+        final_gate = workflow.split("  release-gate:", 1)[1]
+        self.assertIn("always()", final_gate)
+        source = textwrap.dedent(
+            final_gate.split("python3 -I - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        )
+        gates = (
+            "governance",
+            "sdk-rust",
+            "sdk-typescript",
+            "version-check",
+            "changelog-check",
+            "boundary-check",
+        )
+        passing = {gate: {"result": "success"} for gate in gates}
+        passing["sbom"] = {"result": "skipped"}
+        needs = final_gate.split("needs: [", 1)[1].split("]", 1)[0]
+        self.assertEqual(
+            {name.strip() for name in needs.split(",")},
+            set(gates) | {"sbom", "apex-productization"},
+        )
+        cases = []
+        for event in ("push", "pull_request", "workflow_dispatch"):
+            for status in ("success", "failure", "cancelled", "skipped", None):
+                values = copy.deepcopy(passing)
+                if status is not None:
+                    values["apex-productization"] = {"result": status}
+                expected = (event, status) in (
+                    ("push", "success"),
+                    ("pull_request", "skipped"),
+                )
+                cases.append((event, "refs/heads/release/v1.0", values, expected))
+        for event, certification in (("push", "success"), ("pull_request", "skipped")):
+            for gate in gates:
+                for status in ("failure", "cancelled", "skipped", None):
+                    values = copy.deepcopy(passing)
+                    values["apex-productization"] = {"result": certification}
+                    if status is None:
+                        del values[gate]
+                    else:
+                        values[gate] = {"result": status}
+                    cases.append((event, "refs/heads/release/v1.0", values, False))
+        for event, ref in (
+            ("push", "refs/tags/v1.0"),
+            ("push", "refs/heads/release/v1.0"),
+            ("pull_request", "refs/pull/72/merge"),
+        ):
+            for status in ("success", "failure", "cancelled", "skipped", None):
+                values = copy.deepcopy(passing)
+                values["apex-productization"] = {
+                    "result": "skipped" if event == "pull_request" else "success"
+                }
+                if status is None:
+                    del values["sbom"]
+                else:
+                    values["sbom"] = {"result": status}
+                expected = status == (
+                    "success" if ref.startswith("refs/tags/v") else "skipped"
+                )
+                cases.append((event, ref, values, expected))
+        for event, ref, values, expected in cases:
+            with self.subTest(event=event, ref=ref, results=values):
+                environment = os.environ.copy()
+                environment.update(
+                    EVENT_NAME=event, RELEASE_REF=ref, GATE_RESULTS=json.dumps(values)
+                )
+                result = subprocess.run(
+                    [sys.executable, "-I", "-c", source],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode == 0, expected, result.stdout + result.stderr
+                )
+                if event == "pull_request" and expected:
+                    self.assertIn("certification is NOT executed", result.stdout)
 
 
 class ExternalEvidenceTests(unittest.TestCase):
