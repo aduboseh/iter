@@ -22,9 +22,7 @@ use iter_mcp_server::governance_connector::ScgRuntime;
 use iter_mcp_server::governed::GovernedRuntime;
 use iter_mcp_server::policy::PolicyConfig;
 use iter_mcp_server::runtime::{GovernanceRuntime, GovernanceRuntimeError};
-use iter_mcp_server::substrate::stub::{
-    AuditSearchFilter, GovernanceProposal, ReplayResult, ReplayStatus, StubRuntime,
-};
+use iter_mcp_server::substrate::stub::{AuditSearchFilter, GovernanceProposal, StubRuntime};
 
 const GOVERNANCE_HASH: &str = include_str!("../governance/governance.hash");
 const RESOURCE_PATH: &str = "docs/README.md";
@@ -46,13 +44,17 @@ struct McpTestClient {
 
 impl McpTestClient {
     fn spawn_governed_backed(endpoint: &str) -> Self {
+        Self::spawn_mode("scg-backed", endpoint)
+    }
+
+    fn spawn_mode(mode: &str, endpoint: &str) -> Self {
         let bin_path = env!("CARGO_BIN_EXE_iter-server");
         let governance_hash_path =
             format!("{}/governance/governance.hash", env!("CARGO_MANIFEST_DIR"));
 
         let mut cmd = Command::new(bin_path);
         cmd.arg("--json-only")
-            .arg("--runtime-mode=scg-backed")
+            .arg(format!("--runtime-mode={mode}"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -445,21 +447,30 @@ fn trace_step<TInput: Serialize, TOutput: Serialize>(
 }
 
 fn make_trace() -> ExecutionTrace {
-    let hash_input = (
-        "runtime-seam-001b".to_string(),
-        VALID_HASH.to_string(),
-        VALID_HASH.to_string(),
+    make_trace_for(&expected_request(), VALID_HASH, ScgDecision::Allow)
+}
+
+fn make_trace_for(
+    request: &GovernanceRequest,
+    live_hash: &str,
+    decision: ScgDecision,
+) -> ExecutionTrace {
+    let hash_input = serde_json::to_value(request).unwrap();
+    let snapshot_match = request.state_snapshot_hash == live_hash;
+    let hash_output = (
+        snapshot_match,
+        request.state_snapshot_hash.clone(),
+        live_hash.to_string(),
     );
-    let hash_output = (true, VALID_HASH.to_string(), VALID_HASH.to_string());
     let policy_input = hash_output.clone();
     let policy_output = (policy_input.clone(), 0.0_f64, true);
     let state_input = policy_output.clone();
     let state_output = (state_input.clone(), Vec::<String>::new(), false, false);
     let decision_input = state_output.clone();
     let decision_output = (
-        ScgDecision::Allow,
-        "write to docs/README.md".to_string(),
-        true,
+        decision,
+        request.requested_action.clone(),
+        snapshot_match,
         true,
         false,
         false,
@@ -468,7 +479,7 @@ fn make_trace() -> ExecutionTrace {
     let finalize_output = (
         GOVERNANCE_HASH.trim(),
         CONTRACT_VERSION_STR,
-        "runtime-seam-001b",
+        request.proposal_id.as_str(),
         "trace-sealed",
     );
 
@@ -550,6 +561,259 @@ fn contract_outcome(
 
 fn runtime_for(endpoint: &str, hash: &str) -> ScgRuntime {
     ScgRuntime::connect(endpoint.to_string(), hash.to_string()).expect("connect runtime")
+}
+
+fn outcome_bound_to_request(request: &GovernanceRequest) -> ScgGovernanceOutcome {
+    let mut outcome = contract_outcome(
+        CONTRACT_VERSION_STR,
+        ScgDecision::Allow,
+        GOVERNANCE_HASH.trim(),
+        false,
+    );
+    outcome.execution_trace = make_trace_for(request, VALID_HASH, ScgDecision::Allow);
+    reseal_outcome(&mut outcome);
+    outcome
+}
+
+fn reseal_outcome(outcome: &mut ScgGovernanceOutcome) {
+    outcome.replay_id = ScgGovernanceOutcome::compute_replay_id(
+        &outcome.contract_version,
+        &outcome.decision,
+        &outcome.governance_hash,
+        &outcome.state_snapshot_hash,
+        &outcome.state_envelope_schema,
+        &outcome.state_envelope_hash,
+        &outcome.execution_trace,
+    );
+    outcome.verify_replay_id().unwrap();
+}
+
+#[test]
+fn request_binding_rejects_each_substituted_field_before_recording() {
+    let _guard = seam_guard();
+    let ledger_path = std::env::temp_dir().join(format!(
+        "iter-request-binding-{}-{}.jsonl",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+    ));
+    std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&ledger_path)
+        .unwrap();
+    let ledger_env = EnvVarGuard::set("ITER_AUDIT_LEDGER_PATH", ledger_path.to_str().unwrap());
+    for field in [
+        "proposal_id",
+        "requested_action",
+        "state_snapshot_hash",
+        "constraints",
+    ] {
+        let mut other = expected_request();
+        match field {
+            "proposal_id" => other.proposal_id.push_str("-other"),
+            "requested_action" => other.requested_action.push_str("-other"),
+            "state_snapshot_hash" => other.state_snapshot_hash = "F".repeat(64),
+            "constraints" => {
+                other
+                    .constraints
+                    .insert("scope".into(), "another-resource".into());
+            }
+            _ => unreachable!(),
+        }
+        let body = serde_json::to_string(&outcome_bound_to_request(&other)).unwrap();
+        let server = MockScgServer::spawn(vec![
+            MockHttpResponse {
+                status_code: 200,
+                body: body.clone(),
+            },
+            MockHttpResponse {
+                status_code: 200,
+                body,
+            },
+        ]);
+        let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+        let evaluated = runtime.evaluate(&proposal());
+        let previewed = runtime.preview(&proposal());
+        server.finish();
+        for result in [evaluated, previewed] {
+            assert!(
+                matches!(result, Err(GovernanceRuntimeError::ReplayIntegrityViolation(ref reason))
+                    if reason.contains("does not bind the submitted governance request")),
+                "substitution of {field} must fail closed"
+            );
+        }
+        assert_eq!(
+            runtime
+                .search_decisions(&AuditSearchFilter::default())
+                .count,
+            0
+        );
+        assert!(runtime.replay_decisions().is_empty());
+        drop(runtime);
+        assert!(std::fs::read(&ledger_path).unwrap().is_empty());
+    }
+    drop(ledger_env);
+    std::fs::remove_file(ledger_path).unwrap();
+}
+
+#[test]
+fn request_binding_accepts_matching_request() {
+    let _guard = seam_guard();
+    let server = MockScgServer::spawn(vec![MockHttpResponse {
+        status_code: 200,
+        body: serde_json::to_string(&outcome_bound_to_request(&expected_request())).unwrap(),
+    }]);
+    let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+    assert!(runtime.evaluate(&proposal()).is_ok());
+    assert_eq!(
+        runtime
+            .search_decisions(&AuditSearchFilter::default())
+            .count,
+        1
+    );
+    server.finish();
+}
+
+#[test]
+fn request_binding_accepts_escalation_for_changed_live_state() {
+    let _guard = seam_guard();
+    let mut outcome = outcome_bound_to_request(&expected_request());
+    outcome.decision = ScgDecision::Escalate;
+    outcome.state_snapshot_hash = "E".repeat(64);
+    outcome.state_envelope.state_snapshot_hash = outcome.state_snapshot_hash.clone();
+    outcome.state_envelope_hash = outcome.state_envelope.compute_hash();
+    outcome.execution_trace = make_trace_for(
+        &expected_request(),
+        &outcome.state_snapshot_hash,
+        ScgDecision::Escalate,
+    );
+    reseal_outcome(&mut outcome);
+    let server = MockScgServer::spawn(vec![MockHttpResponse {
+        status_code: 200,
+        body: serde_json::to_string(&outcome).unwrap(),
+    }]);
+    let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+    assert_eq!(
+        runtime.evaluate(&proposal()).unwrap().verdict,
+        iter_mcp_server::runtime::GovernanceVerdict::Review
+    );
+    server.finish();
+}
+
+#[test]
+fn request_binding_rejects_legacy_unbound_trace() {
+    let _guard = seam_guard();
+    let mut outcome = outcome_bound_to_request(&expected_request());
+    let mut steps = outcome.execution_trace.into_steps();
+    steps[0].input_payload =
+        serde_json::to_string(&("runtime-seam-001b", VALID_HASH, VALID_HASH)).unwrap();
+    steps[0].input_hash = governance_bridge::trace::payload_hash(&steps[0].input_payload).unwrap();
+    outcome.execution_trace = ExecutionTrace::from_steps(steps).unwrap();
+    reseal_outcome(&mut outcome);
+    let server = MockScgServer::spawn(vec![MockHttpResponse {
+        status_code: 200,
+        body: serde_json::to_string(&outcome).unwrap(),
+    }]);
+    let mut runtime = runtime_for(server.endpoint(), GOVERNANCE_HASH.trim());
+    assert!(matches!(
+        runtime.evaluate(&proposal()),
+        Err(GovernanceRuntimeError::ReplayIntegrityViolation(_))
+    ));
+    assert_eq!(
+        runtime
+            .search_decisions(&AuditSearchFilter::default())
+            .count,
+        0
+    );
+    server.finish();
+}
+
+#[test]
+fn scg_attestation_rejected_before_upstream_access() {
+    let _guard = seam_guard();
+    let mut runtime = runtime_for("http://127.0.0.1:1", GOVERNANCE_HASH.trim());
+    for (bytes, hash) in [
+        (Some("e30="), None),
+        (None, Some("00")),
+        (Some("NOT-BASE64"), Some("00")),
+        (Some("e30="), Some("00")),
+    ] {
+        let mut invalid = proposal();
+        invalid.proposal_c14n = bytes.map(str::to_string);
+        invalid.proposal_hash = hash.map(str::to_string);
+        assert!(matches!(
+            runtime.evaluate(&invalid),
+            Err(GovernanceRuntimeError::ProposalInvalid { .. })
+        ));
+        assert!(matches!(
+            runtime.preview(&invalid),
+            Err(GovernanceRuntimeError::ProposalInvalid { .. })
+        ));
+    }
+    assert_eq!(
+        runtime
+            .search_decisions(&AuditSearchFilter::default())
+            .count,
+        0
+    );
+}
+
+#[test]
+fn mcp_governed_local_rejects_partial_attestation() {
+    let _guard = seam_guard();
+    let mut client = McpTestClient::spawn_mode("governed-local", "http://127.0.0.1:1");
+    client.register_fixture_resource();
+    let response = client.call(
+        "tools/call",
+        json!({
+            "name": "decision.check",
+            "arguments": {
+                "proposal_id": "partial-attestation",
+                "requested_action": "write to docs/README.md",
+                "state_snapshot_hash": VALID_HASH,
+                "resource_path": RESOURCE_PATH,
+                "constraints": {},
+                "proposal_c14n": "NOT-BASE64",
+                "proposal_hash": null
+            }
+        }),
+    );
+    client.close();
+    assert!(
+        response.pointer("/result/error").is_some() || response.get("error").is_some(),
+        "partial attestation must not return a decision: {response}"
+    );
+}
+
+#[test]
+fn mcp_attestation_types_cannot_fall_back_to_legacy() {
+    let _guard = seam_guard();
+    for mode in ["governed-local", "scg-backed", "demo"] {
+        let mut client = McpTestClient::spawn_mode(mode, "http://127.0.0.1:1");
+        client.register_fixture_resource();
+        for tool in ["decision.check", "decision.preview"] {
+            for field in ["proposal_c14n", "proposal_hash"] {
+                for invalid in [json!(123), json!({}), json!([]), json!(true)] {
+                    let mut arguments = serde_json::to_value(proposal()).unwrap();
+                    arguments["resource_path"] = json!(RESOURCE_PATH);
+                    arguments[field] = invalid;
+                    let response =
+                        client.call("tools/call", json!({"name": tool, "arguments": arguments}));
+                    let message = response
+                        .pointer("/result/error/message")
+                        .and_then(Value::as_str);
+                    assert!(
+                        message.is_some_and(|s| s.contains("must be a string or null")),
+                        "invalid {field} in {mode}/{tool} must fail at parsing"
+                    );
+                }
+            }
+        }
+        client.close();
+    }
 }
 
 fn governed_local_runtime() -> GovernedRuntime {
@@ -846,8 +1110,19 @@ fn audit_search_rejects_unsupported_filters_on_governed_backed_mode() {
 }
 
 #[test]
-fn audit_replay_returns_governed_remote_decision_history() {
+fn audit_replay_does_not_claim_remote_decision_reexecution() {
     let _guard = seam_guard();
+    let path = std::env::temp_dir().join(format!(
+        "iter-remote-history-{}-{}.jsonl",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+    ));
+    drop(iter_mcp_server::audit::PersistentAuditLedger::open(&path).unwrap());
+    let _ledger_env = EnvVarGuard::set("ITER_AUDIT_LEDGER_PATH", path.to_str().unwrap());
+    let _required_env = EnvVarGuard::set("ITER_REQUIRE_AUDIT_LEDGER", "1");
     let server = MockScgServer::spawn(vec![MockHttpResponse {
         status_code: 200,
         body: serde_json::to_string(&contract_outcome(
@@ -888,23 +1163,35 @@ fn audit_replay_returns_governed_remote_decision_history() {
             "arguments": {}
         }),
     );
-    let replay_results: Vec<ReplayResult> =
-        serde_json::from_value(tool_payload(&replay_response)).expect("replay results");
+    assert!(!decision_id.is_empty());
+    assert_eq!(evaluate_payload["replay_sufficient"], false);
+    assert_eq!(replay_response["result"]["error"]["code"], 5003);
+    assert!(replay_response["result"]["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("audit.history"));
 
-    assert_eq!(
-        replay_results.len(),
-        1,
-        "expected one SCG-backed replay result"
-    );
-    assert_eq!(replay_results[0].decision_id, decision_id);
-    assert_eq!(replay_results[0].replay_status, ReplayStatus::Match);
-    assert_eq!(
-        replay_results[0].propagation_checksum.as_deref(),
-        Some(decision_id.as_str())
-    );
-
+    let before = tool_payload(&client.call(
+        "tools/call",
+        json!({
+            "name":"audit.history", "arguments":{}
+        }),
+    ));
+    assert_eq!(before["records"][0]["packet"], evaluate_payload["packet"]);
+    assert_eq!(before["verified_next_sequence"], 1);
     client.close();
     server.finish();
+    // No upstream exists now: history must come from verified local persistence.
+    let mut restarted = McpTestClient::spawn_governed_backed("http://127.0.0.1:1");
+    let after = tool_payload(&restarted.call(
+        "tools/call",
+        json!({
+            "name":"audit.history", "arguments":{}
+        }),
+    ));
+    assert_eq!(after, before);
+    restarted.close();
+    std::fs::remove_file(path).unwrap();
 }
 
 #[test]

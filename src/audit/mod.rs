@@ -6,12 +6,12 @@
 //!
 //! # Invariants
 //!
-//! - INV-ITER-05: DecisionPacket contains everything needed to explain and
-//!   reproduce the decision path without re-running learning.
+//! - DecisionPacket captures a checksummed decision summary, not all evaluator
+//!   inputs. Integrity verification is not semantic re-execution.
 //! - Packet checksum mismatch is a hard error.
 
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, Serialize};
@@ -430,6 +430,13 @@ pub enum AuditError {
         /// Integrity failure reason
         reason: String,
     },
+
+    /// Invalid history cursor or page size; no ledger state was changed.
+    #[error("audit history query error: {reason}")]
+    LedgerQuery {
+        /// Query rejection reason.
+        reason: String,
+    },
 }
 
 // ============================================================================
@@ -605,8 +612,14 @@ impl AuditLog {
 
 const LEDGER_SCHEMA: &str = "iter.audit.ledger.v1";
 const ZERO_RECORD_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+/// Maximum number of records in one durable history page.
+pub const MAX_HISTORY_RECORDS: usize = 100;
+// Bound both ingestion and history memory. Oversized legacy records fail closed,
+// never truncate; operators must preserve and review the original ledger.
+const MAX_LEDGER_RECORD_BYTES: usize = 16 * 1024 * 1024;
+const MAX_HISTORY_PAGE_BYTES: usize = MAX_LEDGER_RECORD_BYTES;
 
-/// Durable JSONL record for a replay-sufficient decision packet.
+/// Durable JSONL record for an integrity-verifiable decision packet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditLedgerRecord {
     /// Ledger record schema.
@@ -617,10 +630,33 @@ pub struct AuditLedgerRecord {
     pub previous_record_hash: String,
     /// In-memory audit event captured at decision time.
     pub event: AuditEvent,
-    /// Replay-sufficient decision packet.
+    /// Recorded decision packet; not sufficient for semantic re-execution.
     pub packet: DecisionPacket,
     /// SHA-256 over this record with this field blank.
     pub record_hash: String,
+}
+
+/// What was verified when returning durable history.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HistoryVerification {
+    /// Entire ledger chain and checksums checked; evaluator was not re-run.
+    IntegrityOnly,
+}
+
+/// Sequence-ordered page from the durable ledger, never the session cache.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditHistoryPage {
+    /// Scope of verification; does not prove the recorded verdict is correct.
+    pub verification: HistoryVerification,
+    /// At most 100 contiguous records, also bounded by the serialized byte budget.
+    pub records: Vec<AuditLedgerRecord>,
+    /// Cursor for the next page, or None at the verified end of this read.
+    pub next_sequence: Option<u64>,
+    /// Exclusive end of the fully verified ledger, including records outside this page.
+    pub verified_next_sequence: u64,
+    /// Hash of that verified tail, or the zero hash for an empty ledger.
+    pub verified_record_hash: String,
 }
 
 /// File-backed append-only audit ledger.
@@ -628,9 +664,13 @@ pub struct AuditLedgerRecord {
 /// Records are JSONL, hash-chained, flushed and fsynced on every append. The
 /// chain is verified when opened so a production process fails closed on
 /// malformed, truncated, or checksum-invalid evidence.
+/// A nonblocking OS writer lock is held until drop. An uncertain write poisons
+/// the instance; recovery requires closing it and verifying the entire ledger.
 #[derive(Debug)]
 pub struct PersistentAuditLedger {
     path: PathBuf,
+    file: fs::File,
+    poisoned: bool,
     next_sequence: u64,
     last_record_hash: String,
 }
@@ -657,12 +697,29 @@ impl PersistentAuditLedger {
             })?;
         }
 
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .append(true)
+            .open(&path)
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("audit ledger {:?} is not appendable: {}", path, err),
+            })?;
+        file.try_lock()
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("audit ledger {:?} writer lock unavailable: {}", path, err),
+            })?;
+        file.sync_all()
+            .map_err(|err| AuditError::LedgerPersistence {
+                reason: format!("audit ledger {:?} cannot be synced: {}", path, err),
+            })?;
         let mut ledger = Self {
             path,
+            file,
+            poisoned: false,
             next_sequence: 0,
             last_record_hash: ZERO_RECORD_HASH.to_string(),
         };
-        ledger.assert_appendable()?;
         ledger.verify_existing_records()?;
         Ok(ledger)
     }
@@ -706,6 +763,20 @@ impl PersistentAuditLedger {
         event: &AuditEvent,
         packet: &DecisionPacket,
     ) -> Result<AuditLedgerRecord, AuditError> {
+        self.append_with(event, packet, |file, bytes| {
+            file.write_all(bytes)
+                .and_then(|_| file.flush())
+                .and_then(|_| file.sync_all())
+        })
+    }
+
+    fn append_with(
+        &mut self,
+        event: &AuditEvent,
+        packet: &DecisionPacket,
+        persist: impl FnOnce(&mut fs::File, &[u8]) -> std::io::Result<()>,
+    ) -> Result<AuditLedgerRecord, AuditError> {
+        self.ensure_healthy()?;
         let mut record = AuditLedgerRecord {
             schema: LEDGER_SCHEMA.to_string(),
             ledger_sequence: self.next_sequence,
@@ -722,28 +793,39 @@ impl PersistentAuditLedger {
             "append",
         )?;
 
-        let serialized =
-            serde_json::to_string(&record).map_err(|err| AuditError::LedgerPersistence {
+        let mut serialized =
+            serde_json::to_vec(&record).map_err(|err| AuditError::LedgerPersistence {
                 reason: format!("failed to serialize audit ledger record: {}", err),
             })?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(|err| AuditError::LedgerPersistence {
-                reason: format!("failed to open audit ledger {:?}: {}", self.path, err),
-            })?;
-        file.write_all(serialized.as_bytes())
-            .and_then(|_| file.write_all(b"\n"))
-            .and_then(|_| file.flush())
-            .and_then(|_| file.sync_all())
-            .map_err(|err| AuditError::LedgerPersistence {
-                reason: format!("failed to persist audit ledger {:?}: {}", self.path, err),
-            })?;
+        serialized.push(b'\n');
+        if serialized.len() > MAX_LEDGER_RECORD_BYTES {
+            return Err(AuditError::LedgerPersistence {
+                reason: format!(
+                    "audit ledger record exceeds {} bytes",
+                    MAX_LEDGER_RECORD_BYTES
+                ),
+            });
+        }
+        // Even a full write followed by a sync error has an uncertain outcome.
+        // Keep the instance poisoned on errors or unwinding; never retry here.
+        self.poisoned = true;
+        persist(&mut self.file, &serialized).map_err(|err| AuditError::LedgerPersistence {
+            reason: format!("failed to persist audit ledger {:?}: {}", self.path, err),
+        })?;
 
         self.last_record_hash = record.record_hash.clone();
         self.next_sequence += 1;
+        self.poisoned = false;
         Ok(record)
+    }
+
+    pub(crate) fn ensure_healthy(&self) -> Result<(), AuditError> {
+        if self.poisoned {
+            return Err(AuditError::LedgerPersistence {
+                reason: "audit ledger is poisoned after an uncertain write or failed verification; stop and reopen for full verification".to_string(),
+            });
+        }
+        Ok(())
     }
 
     /// Next durable ledger sequence.
@@ -757,53 +839,105 @@ impl PersistentAuditLedger {
     }
 
     fn verify_existing_records(&mut self) -> Result<(), AuditError> {
-        if !self.path.exists() {
-            return Ok(());
-        }
-
-        let contents =
-            fs::read_to_string(&self.path).map_err(|err| AuditError::LedgerPersistence {
-                reason: format!("failed to read audit ledger {:?}: {}", self.path, err),
-            })?;
-        let mut expected_sequence = 0_u64;
-        let mut previous_hash = ZERO_RECORD_HASH.to_string();
-
-        for (line_index, line) in contents.lines().enumerate() {
-            if line.trim().is_empty() {
-                return Err(AuditError::LedgerIntegrity {
-                    reason: format!("empty audit ledger record at line {}", line_index + 1),
-                });
-            }
-            let record: AuditLedgerRecord =
-                serde_json::from_str(line).map_err(|err| AuditError::LedgerIntegrity {
-                    reason: format!(
-                        "failed to parse audit ledger record at line {}: {}",
-                        line_index + 1,
-                        err
-                    ),
-                })?;
-            Self::verify_record(&record, expected_sequence, previous_hash.as_str(), "open")?;
-            previous_hash = record.record_hash;
-            expected_sequence += 1;
-        }
-
-        self.next_sequence = expected_sequence;
-        self.last_record_hash = previous_hash;
+        let page = self.scan_records(0, 0)?;
+        self.next_sequence = page.verified_next_sequence;
+        self.last_record_hash = page.verified_record_hash;
         Ok(())
     }
 
-    fn assert_appendable(&self) -> Result<(), AuditError> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
+    /// Read a page after verifying the entire ledger through the owned handle.
+    ///
+    /// Reads are O(ledger bytes), with memory bounded by one record and one page.
+    /// Failure returns no prefix and poisons the writer. A cursor equal to the
+    /// tail yields an explicitly verified empty page; a missing ledger is not a page.
+    pub fn history(
+        &mut self,
+        start_sequence: u64,
+        limit: usize,
+    ) -> Result<AuditHistoryPage, AuditError> {
+        self.ensure_healthy()?;
+        if !(1..=MAX_HISTORY_RECORDS).contains(&limit) || start_sequence > self.next_sequence {
+            return Err(AuditError::LedgerQuery {
+                reason: format!(
+                    "limit must be 1..={MAX_HISTORY_RECORDS} and start_sequence must not exceed {}",
+                    self.next_sequence
+                ),
+            });
+        }
+        self.poisoned = true;
+        let page = self.scan_records(start_sequence, limit)?;
+        if page.verified_next_sequence != self.next_sequence
+            || page.verified_record_hash != self.last_record_hash
+        {
+            return Err(AuditError::LedgerIntegrity {
+                reason: "audit ledger tail changed outside this writer".to_string(),
+            });
+        }
+        self.poisoned = false;
+        Ok(page)
+    }
+
+    fn scan_records(
+        &mut self,
+        start_sequence: u64,
+        limit: usize,
+    ) -> Result<AuditHistoryPage, AuditError> {
+        self.file
+            .seek(SeekFrom::Start(0))
             .map_err(|err| AuditError::LedgerPersistence {
-                reason: format!("audit ledger {:?} is not appendable: {}", self.path, err),
+                reason: format!("failed to seek audit ledger: {err}"),
             })?;
-        file.sync_all()
-            .map_err(|err| AuditError::LedgerPersistence {
-                reason: format!("audit ledger {:?} cannot be synced: {}", self.path, err),
-            })
+        let mut reader = BufReader::new(&mut self.file);
+        let mut line = Vec::new();
+        let mut records = Vec::new();
+        let mut page_bytes = 0;
+        let mut page_full = limit == 0;
+        let mut expected_sequence = 0_u64;
+        let mut previous_hash = ZERO_RECORD_HASH.to_string();
+        loop {
+            line.clear();
+            let bytes = reader
+                .by_ref()
+                .take((MAX_LEDGER_RECORD_BYTES + 1) as u64)
+                .read_until(b'\n', &mut line)
+                .map_err(|err| AuditError::LedgerPersistence {
+                    reason: format!("failed to read audit ledger: {err}"),
+                })?;
+            if bytes == 0 {
+                break;
+            }
+            if bytes > MAX_LEDGER_RECORD_BYTES || !line.ends_with(b"\n") {
+                return Err(AuditError::LedgerIntegrity {
+                    reason: format!("oversized or unterminated audit ledger record at sequence {expected_sequence}"),
+                });
+            }
+            let record: AuditLedgerRecord =
+                serde_json::from_slice(&line).map_err(|err| AuditError::LedgerIntegrity {
+                    reason: format!(
+                        "failed to parse audit ledger record at sequence {}: {}",
+                        expected_sequence, err
+                    ),
+                })?;
+            Self::verify_record(&record, expected_sequence, previous_hash.as_str(), "read")?;
+            previous_hash = record.record_hash.clone();
+            if expected_sequence >= start_sequence && !page_full {
+                if records.len() < limit && page_bytes + bytes <= MAX_HISTORY_PAGE_BYTES {
+                    records.push(record);
+                    page_bytes += bytes;
+                } else {
+                    page_full = true;
+                }
+            }
+            expected_sequence += 1;
+        }
+        let cursor = start_sequence + records.len() as u64;
+        Ok(AuditHistoryPage {
+            verification: HistoryVerification::IntegrityOnly,
+            records,
+            next_sequence: (cursor < expected_sequence).then_some(cursor),
+            verified_next_sequence: expected_sequence,
+            verified_record_hash: previous_hash,
+        })
     }
 
     fn verify_record(
@@ -893,7 +1027,7 @@ fn env_truthy(key: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::contracts::{LearningStatus, PolicyDecision};
 
@@ -936,6 +1070,179 @@ mod tests {
             std::process::id(),
             unique
         ))
+    }
+
+    #[test]
+    fn history_pages_are_contiguous_and_reads_preserve_append() {
+        let path = temp_ledger_path("history-pages");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let packet = make_test_packet();
+        for sequence in 0..5 {
+            ledger
+                .append(&AuditEvent::from_packet(sequence, &packet), &packet)
+                .unwrap();
+        }
+        for (start, limit) in [(0, 0), (0, 101), (6, 1), (u64::MAX, 1)] {
+            assert!(matches!(
+                ledger.history(start, limit),
+                Err(AuditError::LedgerQuery { .. })
+            ));
+            ledger.ensure_healthy().unwrap();
+        }
+        let mut cursor = 0;
+        let mut sequences = Vec::new();
+        loop {
+            let page = ledger.history(cursor, 2).unwrap();
+            assert_eq!(page.verification, HistoryVerification::IntegrityOnly);
+            assert_eq!(page.verified_next_sequence, 5);
+            sequences.extend(page.records.iter().map(|record| record.ledger_sequence));
+            match page.next_sequence {
+                Some(next) => cursor = next,
+                None => break,
+            }
+        }
+        assert_eq!(sequences, vec![0, 1, 2, 3, 4]);
+        ledger
+            .append(&AuditEvent::from_packet(5, &packet), &packet)
+            .unwrap();
+        assert_eq!(ledger.history(5, 1).unwrap().records[0].ledger_sequence, 5);
+        assert!(ledger.history(6, 1).unwrap().records.is_empty());
+        drop(ledger);
+        let reopened = PersistentAuditLedger::open(&path).unwrap();
+        assert_eq!(reopened.next_sequence(), 6);
+        drop(reopened);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn history_checks_suffix_outside_page_and_poison_blocks_append() {
+        let path = temp_ledger_path("history-suffix");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let packet = make_test_packet();
+        ledger
+            .append(&AuditEvent::from_packet(0, &packet), &packet)
+            .unwrap();
+        // Emulate an uncooperative writer via the test's owned handle.
+        ledger.file.write_all(b"not a record\n").unwrap();
+        assert!(
+            ledger.history(0, 1).is_err(),
+            "must not return a valid prefix of corrupt evidence"
+        );
+        assert!(ledger.ensure_healthy().is_err());
+        let length = ledger.file.metadata().unwrap().len();
+        assert!(ledger
+            .append(&AuditEvent::from_packet(1, &packet), &packet)
+            .is_err());
+        assert_eq!(ledger.file.metadata().unwrap().len(), length);
+        drop(ledger);
+        assert!(PersistentAuditLedger::open(&path).is_err());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn history_rejects_valid_tail_rollback_during_ownership() {
+        let path = temp_ledger_path("history-rollback");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let packet = make_test_packet();
+        ledger
+            .append(&AuditEvent::from_packet(0, &packet), &packet)
+            .unwrap();
+        let first_length = ledger.file.metadata().unwrap().len();
+        ledger
+            .append(&AuditEvent::from_packet(1, &packet), &packet)
+            .unwrap();
+        let last_record_hash = ledger.last_record_hash.clone();
+        drop(ledger);
+        // Windows denies truncation through the production append-only handle.
+        // Only this adversarial fixture gets write access to simulate rollback.
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        file.try_lock().unwrap();
+        let mut ledger = PersistentAuditLedger {
+            path: path.clone(),
+            file,
+            poisoned: false,
+            next_sequence: 2,
+            last_record_hash,
+        };
+        ledger.history(0, 1).unwrap();
+        ledger.file.set_len(first_length).unwrap();
+        assert!(matches!(
+            ledger.history(0, 1),
+            Err(AuditError::LedgerIntegrity { .. })
+        ));
+        assert!(ledger.ensure_healthy().is_err());
+        drop(ledger);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn history_refuses_poisoned_ledger_even_with_complete_record() {
+        let path = temp_ledger_path("history-poison");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let packet = make_test_packet();
+        ledger
+            .append_with(
+                &AuditEvent::from_packet(0, &packet),
+                &packet,
+                |file, bytes| {
+                    file.write_all(bytes)?;
+                    Err(std::io::Error::other("injected sync failure"))
+                },
+            )
+            .unwrap_err();
+        assert!(ledger.history(0, 1).is_err());
+        drop(ledger);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn history_page_byte_budget_does_not_skip_records() {
+        let path = temp_ledger_path("history-byte-budget");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let mut packet = make_test_packet();
+        packet.execution_trace = vec!["x".repeat(MAX_HISTORY_PAGE_BYTES / 2)];
+        packet.checksum = packet.compute_checksum();
+        for sequence in 0..2 {
+            ledger
+                .append(&AuditEvent::from_packet(sequence, &packet), &packet)
+                .unwrap();
+        }
+        let first = ledger.history(0, 2).unwrap();
+        assert_eq!(first.records.len(), 1);
+        assert_eq!(first.next_sequence, Some(1));
+        assert_eq!(first.verified_next_sequence, 2);
+        let second = ledger.history(1, 2).unwrap();
+        assert_eq!(second.records[0].ledger_sequence, 1);
+        assert_eq!(second.next_sequence, None);
+        drop(ledger);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn history_record_bound_applies_to_append_and_open() {
+        let path = temp_ledger_path("history-record-bound");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let mut packet = make_test_packet();
+        packet.execution_trace = vec!["x".repeat(MAX_LEDGER_RECORD_BYTES)];
+        packet.checksum = packet.compute_checksum();
+        assert!(ledger
+            .append(&AuditEvent::from_packet(0, &packet), &packet)
+            .is_err());
+        assert_eq!(ledger.file.metadata().unwrap().len(), 0);
+        ledger.ensure_healthy().unwrap();
+        // Overlong legacy/corrupt input must fail without an unbounded read.
+        ledger
+            .file
+            .write_all(packet.execution_trace[0].as_bytes())
+            .unwrap();
+        ledger.file.write_all(b"\n").unwrap();
+        drop(ledger);
+        assert!(PersistentAuditLedger::open(&path).is_err());
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
@@ -1236,11 +1543,215 @@ mod tests {
         assert_eq!(ledger.next_sequence(), 1);
         assert_eq!(ledger.last_record_hash(), record.record_hash);
 
+        drop(ledger);
         let reopened = PersistentAuditLedger::open(&path).expect("ledger reopens verified");
         assert_eq!(reopened.next_sequence(), 1);
         assert_eq!(reopened.last_record_hash(), record.record_hash);
 
+        drop(reopened);
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_writer_rejects_second_handle_and_releases_on_drop() {
+        let path = temp_ledger_path("writer-lock");
+        let ledger = PersistentAuditLedger::open(&path).unwrap();
+        let rejected = PersistentAuditLedger::open(&path);
+        assert!(
+            matches!(rejected, Err(AuditError::LedgerPersistence { ref reason })
+            if reason.contains("writer lock")),
+            "second writer was not rejected: {rejected:?}"
+        );
+        drop(ledger);
+        drop(PersistentAuditLedger::open(&path).unwrap());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn ledger_writer_rejects_unterminated_record_on_reopen() {
+        let path = temp_ledger_path("unterminated");
+        let packet = make_test_packet();
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        ledger
+            .append(&AuditEvent::from_packet(0, &packet), &packet)
+            .unwrap();
+        drop(ledger);
+        let mut bytes = fs::read(&path).unwrap();
+        assert_eq!(bytes.pop(), Some(b'\n'));
+        fs::write(&path, bytes).unwrap();
+        assert!(matches!(
+            PersistentAuditLedger::open(&path),
+            Err(AuditError::LedgerIntegrity { .. })
+        ));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn ledger_writer_lock_covers_hard_link_alias() {
+        let path = temp_ledger_path("alias-lock");
+        let alias = path.with_extension("alias");
+        let ledger = PersistentAuditLedger::open(&path).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        assert!(matches!(PersistentAuditLedger::open(&alias),
+            Err(AuditError::LedgerPersistence { ref reason }) if reason.contains("writer lock")));
+        drop(ledger);
+        drop(PersistentAuditLedger::open(&alias).unwrap());
+        fs::remove_file(alias).unwrap();
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn ledger_writer_prewrite_validation_error_does_not_poison() {
+        let path = temp_ledger_path("validation");
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let packet = make_test_packet();
+        let wrong_sequence = AuditEvent::from_packet(1, &packet);
+        assert!(matches!(
+            ledger.append(&wrong_sequence, &packet),
+            Err(AuditError::LedgerIntegrity { .. })
+        ));
+        assert_eq!(fs::metadata(&path).unwrap().len(), 0);
+        assert_eq!(ledger.next_sequence(), 0);
+        ledger
+            .append(&AuditEvent::from_packet(0, &packet), &packet)
+            .unwrap();
+        drop(ledger);
+        assert_eq!(
+            PersistentAuditLedger::open(&path).unwrap().next_sequence(),
+            1
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    #[ignore = "subprocess fixture invoked by ledger_writer_process_exclusion_and_crash_release"]
+    fn ledger_writer_child_holder() {
+        use std::io::Read;
+        let path = std::env::var_os("ITER_TEST_LEDGER_LOCK_PATH").expect("parent supplies path");
+        let _ledger = PersistentAuditLedger::open(path).unwrap();
+        println!("LEDGER_LOCK_HELD");
+        std::io::stdout().flush().unwrap();
+        let mut byte = [0];
+        let _ = std::io::stdin().read(&mut byte);
+    }
+
+    #[test]
+    fn ledger_writer_process_exclusion_and_crash_release() {
+        use std::io::{BufRead, BufReader};
+        use std::process::{Command, Stdio};
+        struct ChildGuard(std::process::Child);
+        impl Drop for ChildGuard {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let path = temp_ledger_path("process-lock");
+        let mut child = ChildGuard(
+            Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "audit::tests::ledger_writer_child_holder",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("ITER_TEST_LEDGER_LOCK_PATH", &path)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
+        let stdout = child.0.stdout.take().unwrap();
+        let (send, recv) = std::sync::mpsc::channel();
+        let reader = std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines() {
+                if line.unwrap().contains("LEDGER_LOCK_HELD") {
+                    send.send(()).unwrap();
+                    break;
+                }
+            }
+        });
+        recv.recv_timeout(std::time::Duration::from_secs(10))
+            .expect("child acquired ledger");
+        reader.join().unwrap();
+        assert!(matches!(PersistentAuditLedger::open(&path),
+            Err(AuditError::LedgerPersistence { ref reason }) if reason.contains("writer lock")));
+        child.0.kill().unwrap();
+        child.0.wait().unwrap();
+        let mut ledger = PersistentAuditLedger::open(&path).expect("crashed owner released lock");
+        let packet = make_test_packet();
+        ledger
+            .append(&AuditEvent::from_packet(0, &packet), &packet)
+            .unwrap();
+        drop(ledger);
+        assert_eq!(
+            PersistentAuditLedger::open(&path).unwrap().next_sequence(),
+            1
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    pub(crate) fn failed_append_ledger(name: &str) -> (PersistentAuditLedger, PathBuf) {
+        let path = temp_ledger_path(name);
+        let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+        let packet = make_test_packet();
+        ledger
+            .append_with(
+                &AuditEvent::from_packet(0, &packet),
+                &packet,
+                |file, bytes| {
+                    file.write_all(&bytes[..bytes.len() / 2])?;
+                    Err(std::io::Error::other("injected partial write"))
+                },
+            )
+            .unwrap_err();
+        (ledger, path)
+    }
+
+    #[test]
+    fn ledger_writer_io_failure_is_sticky_without_advancing_tail() {
+        for stage in ["write", "partial", "flush", "sync"] {
+            let path = temp_ledger_path(stage);
+            let mut ledger = PersistentAuditLedger::open(&path).unwrap();
+            let packet = make_test_packet();
+            let event = AuditEvent::from_packet(0, &packet);
+            let err = ledger
+                .append_with(&event, &packet, |file, bytes| {
+                    match stage {
+                        "write" => {}
+                        "partial" => file.write_all(&bytes[..bytes.len() / 2])?,
+                        "flush" => file.write_all(bytes)?,
+                        "sync" => {
+                            file.write_all(bytes)?;
+                            file.flush()?;
+                        }
+                        _ => unreachable!(),
+                    }
+                    Err(std::io::Error::other(format!("injected {stage} failure")))
+                })
+                .unwrap_err();
+            assert!(matches!(err, AuditError::LedgerPersistence { .. }));
+            assert_eq!(ledger.next_sequence(), 0);
+            assert_eq!(ledger.last_record_hash(), ZERO_RECORD_HASH);
+            let length = fs::metadata(&path).unwrap().len();
+            for _ in 0..2 {
+                assert!(
+                    matches!(ledger.append(&event, &packet),
+                    Err(AuditError::LedgerPersistence { ref reason }) if reason.contains("poisoned")),
+                    "{stage} failure allowed subsequent append"
+                );
+                assert_eq!(fs::metadata(&path).unwrap().len(), length);
+            }
+            drop(ledger);
+            let reopened = PersistentAuditLedger::open(&path);
+            if stage == "partial" {
+                assert!(matches!(reopened, Err(AuditError::LedgerIntegrity { .. })));
+            } else {
+                let reopened = reopened.unwrap();
+                assert_eq!(reopened.next_sequence(), u64::from(stage != "write"));
+            }
+            fs::remove_file(path).unwrap();
+        }
     }
 
     #[test]
@@ -1251,6 +1762,7 @@ mod tests {
         let mut ledger = PersistentAuditLedger::open(&path).expect("ledger opens");
         ledger.append(&event, &packet).expect("ledger append");
 
+        drop(ledger);
         let contents = std::fs::read_to_string(&path).expect("ledger readable");
         let tampered = contents.replacen("\"decision\":\"ALLOW\"", "\"decision\":\"DENY\"", 1);
         std::fs::write(&path, tampered).expect("ledger tampered");
@@ -1296,6 +1808,7 @@ mod tests {
         let mut ledger = PersistentAuditLedger::open(&path).expect("ledger opens");
         ledger.append(&event, &packet).expect("ledger append");
 
+        drop(ledger);
         let mut reopened = PersistentAuditLedger::open(&path).expect("ledger reopens");
         assert_eq!(reopened.next_sequence(), 1);
         let reset_event = AuditEvent::from_packet(0, &packet);
@@ -1308,6 +1821,7 @@ mod tests {
             "unexpected error: {err}"
         );
 
+        drop(reopened);
         let _ = std::fs::remove_file(path);
     }
 

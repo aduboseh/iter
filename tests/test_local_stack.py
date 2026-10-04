@@ -20,7 +20,7 @@ class LocalStackTests(unittest.TestCase):
     def setUp(self):
         self.outcome = {
             "mode": "governed", "verdict": "ALLOW", "authoritative_pdp": True,
-            "trace_available": True, "replay_sufficient": True,
+            "trace_available": True, "replay_sufficient": False,
             "packet": {"governance_hash": "authority", "state_snapshot_hash": "snapshot",
                        "execution_trace": ["step"]},
         }
@@ -51,11 +51,16 @@ class LocalStackTests(unittest.TestCase):
                     LOCAL.validate_outcome(outcome, "authority", "snapshot")
 
     def test_false_guarantees_fail(self):
-        for field in ("authoritative_pdp", "trace_available", "replay_sufficient"):
+        for field in ("authoritative_pdp", "trace_available"):
             outcome = copy.deepcopy(self.outcome)
             outcome[field] = False
             with self.assertRaises(RuntimeError):
                 LOCAL.validate_outcome(outcome, "authority", "snapshot")
+
+    def test_unsupported_semantic_replay_claim_fails(self):
+        self.outcome["replay_sufficient"] = True
+        with self.assertRaises(RuntimeError):
+            LOCAL.validate_outcome(self.outcome, "authority", "snapshot")
 
     def test_error_responses_cannot_become_results(self):
         for response in ({"error": {}}, {"result": {"error": {}}}, {"result": {"isError": True}}):

@@ -545,12 +545,12 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
         }),
         json!({
             "name": "lineage.replay",
-            "description": "[DEPRECATED: use audit.replay] Replay lineage",
+            "description": "[DEPRECATED: use audit.replay] Demo lineage diagnostics only; governed semantic replay is unavailable",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
             "name": "audit.replay",
-            "description": "Deterministic replay of decision history (canonical)",
+            "description": "Demo lineage diagnostics only. Governed modes reject semantic replay; use audit.history for durable integrity-verified evidence",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -608,8 +608,20 @@ fn governance_tool_defs() -> Vec<serde_json::Value> {
             }
         }),
         json!({
+            "name": "audit.history",
+            "description": "Read durable ledger records in sequence order after verifying the entire chain. Requires a configured ledger. Integrity only, not semantic re-execution; each page reports its verified tail",
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "start_sequence": { "type": "integer", "minimum": 0, "default": 0 },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 }
+                }
+            }
+        }),
+        json!({
             "name": "audit.search",
-            "description": "Search governance decision history with filters (canonical, Phase 2)",
+            "description": "Search current-process decision summaries only, not complete durable history. Use audit.history for verified records after restart",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -738,6 +750,7 @@ fn validate_surface(profile: ServerProfile, tools: &[serde_json::Value]) -> Resu
             "audit.export",
             "audit.replay",
             "audit.search",
+            "audit.history",
             "register_resource",
             "governance.health",
             "governor.health",
@@ -810,7 +823,22 @@ fn handle_request(
 #[cfg(feature = "public_stub")]
 fn parse_governance_proposal(
     args: &serde_json::Value,
-) -> iter_mcp_server::substrate::stub::GovernanceProposal {
+) -> Result<
+    iter_mcp_server::substrate::stub::GovernanceProposal,
+    iter_mcp_server::runtime::GovernanceRuntimeError,
+> {
+    for field in ["proposal_c14n", "proposal_hash"] {
+        if args
+            .get(field)
+            .is_some_and(|value| !value.is_null() && !value.is_string())
+        {
+            return Err(
+                iter_mcp_server::runtime::GovernanceRuntimeError::ProposalInvalid {
+                    reason: format!("{field} must be a string or null"),
+                },
+            );
+        }
+    }
     let proposal_id = args
         .get("proposal_id")
         .and_then(|v| v.as_str())
@@ -836,14 +864,14 @@ fn parse_governance_proposal(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    iter_mcp_server::substrate::stub::GovernanceProposal {
+    Ok(iter_mcp_server::substrate::stub::GovernanceProposal {
         proposal_id,
         state_snapshot_hash,
         constraints,
         requested_action,
         proposal_c14n,
         proposal_hash,
-    }
+    })
 }
 
 #[cfg(feature = "public_stub")]
@@ -999,21 +1027,52 @@ fn handle_tool(
                 None => json!({"error": {"code": 4004, "message": "Node not found"}}),
             }
         }
-        "lineage.replay" | "audit.replay" => {
-            let lineage = match runtime {
-                ServerRuntime::ScgBacked(runtime) => runtime.replay_decisions(),
-                _ => runtime.graph().lineage_replay(),
+        "lineage.replay" | "audit.replay" => match runtime {
+            ServerRuntime::Demo(runtime) => tool_text(&runtime.lineage_replay()),
+            _ => json!({"error": {"code": 5003, "message":
+                    "Semantic replay is unavailable for governed decision packets. Use audit.history for durable integrity verification; stored verdicts are not re-executed."}}),
+        },
+        "audit.history" => {
+            use iter_mcp_server::runtime::GovernanceRuntime;
+            #[derive(serde::Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct HistoryQuery {
+                #[serde(default)]
+                start_sequence: u64,
+                #[serde(default = "default_limit")]
+                limit: usize,
+            }
+            fn default_limit() -> usize {
+                iter_mcp_server::audit::MAX_HISTORY_RECORDS
+            }
+            let query: HistoryQuery = match serde_json::from_value(args.clone()) {
+                Ok(query) => query,
+                Err(err) => {
+                    return json!({"error": {"code": 5002, "message": format!("invalid audit.history query: {err}")}})
+                }
             };
-            tool_text(&lineage)
+            let result = match runtime {
+                ServerRuntime::Demo(runtime) => runtime.history(query.start_sequence, query.limit),
+                ServerRuntime::GovernedLocal(runtime) => {
+                    runtime.history(query.start_sequence, query.limit)
+                }
+                ServerRuntime::ScgBacked(runtime) => {
+                    runtime.history(query.start_sequence, query.limit)
+                }
+            };
+            match result {
+                Ok(page) => tool_text(&page),
+                Err(err) => {
+                    json!({"error": {"code": 5002, "message": err.to_string(), "data": serde_json::to_value(&err).ok()}})
+                }
+            }
         }
         "governance.evaluate" | "decision.check" => {
             if let Some(rejection) = validate_decision_contract(args, registry) {
                 return rejection;
             }
 
-            let proposal = parse_governance_proposal(args);
-
-            match runtime.evaluate(&proposal) {
+            match parse_governance_proposal(args).and_then(|proposal| runtime.evaluate(&proposal)) {
                 Ok(outcome) => tool_text(&outcome),
                 Err(e) => {
                     json!({"error": {"code": 1001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})
@@ -1021,8 +1080,7 @@ fn handle_tool(
             }
         }
         "decision.preview" => {
-            let proposal = parse_governance_proposal(args);
-            match runtime.preview(&proposal) {
+            match parse_governance_proposal(args).and_then(|proposal| runtime.preview(&proposal)) {
                 Ok(outcome) => tool_text(&outcome),
                 Err(e) => {
                     json!({"error": {"code": 5001, "message": e.to_string(), "data": serde_json::to_value(&e).ok()}})

@@ -55,11 +55,12 @@ def tool_payload(response):
 
 
 def validate_outcome(outcome, governance_hash, snapshot):
-    """Require an authoritative, replayable packet bound to the live SCG state."""
+    """Require an authoritative evaluation with integrity evidence, not a replay claim."""
     require(outcome.get("mode") == "governed", "demo fallback is forbidden")
     require(outcome.get("verdict") == "ALLOW", "expected matching empty-cluster ALLOW")
-    for key in ("authoritative_pdp", "trace_available", "replay_sufficient"):
+    for key in ("authoritative_pdp", "trace_available"):
         require(outcome.get(key) is True, f"missing guarantee: {key}")
+    require(outcome.get("replay_sufficient") is False, "unsupported semantic replay claim")
     packet = outcome.get("packet") or {}
     require(packet.get("governance_hash") == governance_hash, "governance identity mismatch")
     require(packet.get("state_snapshot_hash") == snapshot, "SCG snapshot mismatch")
@@ -255,7 +256,8 @@ def execute(args, output, report):
                                "--policy-version", outcome["policy_version"],
                                "--schema-version", outcome["schema_version"]]
                 replay = json.loads(run(replay_args, output, f"replay-{attempt}"))
-                require(replay.get("outcome") == "VERIFIED", "CLI did not verify the real packet")
+                require(replay.get("outcome") == "INTEGRITY_VERIFIED", "CLI did not verify the real packet")
+                require(replay.get("semantic_replay") is False, "CLI overclaims semantic replay")
                 if attempt == 1:
                     mutated = dict(packet, checksum="0" * 64)
                     tamper_file = output / "packet-tampered.json"
@@ -263,7 +265,7 @@ def execute(args, output, report):
                     replay_args[3] = tamper_file
                     rejected = json.loads(run(replay_args, output, "replay-tampered", expected=2))
                     require(rejected.get("outcome") == "MISMATCH", "tamper was not rejected")
-                    passed("offline_replay_and_tamper_rejection")
+                    passed("offline_integrity_and_tamper_rejection")
                     gateway.terminate()
                     gateway.wait(timeout=5)
                     failure = client.tool("decision.check", proposal)

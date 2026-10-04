@@ -122,6 +122,7 @@ fn governance_profile_contains_all_canonical_tools() {
         "audit.export",
         "audit.replay",
         "audit.search",
+        "audit.history",
         "governance.health",
         "governor.health",
     ];

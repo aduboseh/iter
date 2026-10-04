@@ -165,7 +165,7 @@ fn governed_local_decision_check_emits_packet_with_hash_and_trace() {
     );
     assert_eq!(
         outcome.get("replay_sufficient").and_then(|v| v.as_bool()),
-        Some(true)
+        Some(false)
     );
     assert_eq!(
         packet.get("governance_hash").and_then(|v| v.as_str()),

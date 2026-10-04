@@ -331,7 +331,7 @@ fn determinism_iteration_test() {
 ///
 /// Proves the full governed path:
 /// 1. GovernedRuntime.evaluate() produces a DecisionPacket
-/// 2. replay_decision() verifies and reproduces the verdict
+/// 2. replay_decision() checks integrity and reads the stored verdict, without re-execution
 /// 3. Packet checksum survives the roundtrip
 #[test]
 fn golden_vector_6_governed_replay_cycle() {
@@ -355,7 +355,7 @@ fn golden_vector_6_governed_replay_cycle() {
     let outcome = rt.evaluate(&proposal).expect("governed evaluate");
     assert_eq!(outcome.mode, GovernanceMode::Governed);
     assert!(outcome.authoritative_pdp);
-    assert!(outcome.replay_sufficient);
+    assert!(!outcome.replay_sufficient);
 
     let packet = outcome.packet.as_ref().expect("governed must emit packet");
     assert!(packet.verify_checksum().is_ok());
@@ -371,8 +371,8 @@ fn golden_vector_6_governed_replay_cycle() {
 
     assert_eq!(replayed.verdict, outcome.verdict);
     assert_eq!(replayed.mode, GovernanceMode::Governed);
-    assert!(replayed.authoritative_pdp);
-    assert!(replayed.replay_sufficient);
+    assert!(!replayed.authoritative_pdp);
+    assert!(!replayed.replay_sufficient);
 
     let replayed_packet = replayed.packet.expect("replay must return packet");
     assert_eq!(replayed_packet.checksum, packet.checksum);
