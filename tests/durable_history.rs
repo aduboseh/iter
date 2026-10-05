@@ -9,6 +9,21 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+#[test]
+fn governed_local_banner_does_not_claim_semantic_replay() {
+    let output = Command::new(env!("CARGO_BIN_EXE_iter-server"))
+        .arg("--runtime-mode=governed-local")
+        .env_remove("ITER_REQUIRE_AUDIT_LEDGER")
+        .env_remove("ITER_AUDIT_LEDGER_PATH")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let banner = String::from_utf8(output.stderr).unwrap();
+    assert!(banner.contains("not semantic replay evidence"));
+    assert!(!banner.contains("replay-capable"));
+}
+
 fn packet() -> DecisionPacket {
     let mut runtime = GovernedRuntime::new(
         StubRuntime::new(),

@@ -78,7 +78,7 @@ GENERAL OPTIONS:
     -h, --help                 Print help
 
 EXIT CODES:
-    0    Success (VERIFIED / EXPORTED)
+    0    Success (INTEGRITY_VERIFIED / EXPORTED)
     1    Input error (file missing, malformed JSON, missing flags)
     2    Replay mismatch or integrity failure
     3    Internal error"#,

@@ -68,6 +68,24 @@ async fn main() -> iter_sdk::Result<()> {
 }
 ```
 
+## Durable Audit History
+
+For a governed-mode connection with a configured durable ledger:
+
+```rust
+let page = client.audit_history(0, 100).await?;
+assert_eq!(page["verification"], "integrity_only");
+if let Some(cursor) = page["next_sequence"].as_u64() {
+    let next_page = client.audit_history(cursor, 100).await?;
+}
+```
+
+This verifies stored ledger integrity, not semantic replay or decision correctness.
+The server checks the complete chain on each page; limits are 1..100 records.
+Unavailable or corrupt history returns `SdkError::RequestFailed` with code `5002`.
+`audit_replay()` remains a demo-lineage API; governed modes return code `5003`.
+Neither method silently falls back to the other. See [history contract](../../docs/AUDIT_HISTORY.md).
+
 ## Version Compatibility
 
 This SDK supports protocol versions 1.0.0 through 1.x.x. Incompatible versions will fail fast at connection time.

@@ -26,6 +26,16 @@ fn iter_cli_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_iter-cli"))
 }
 
+#[test]
+fn help_describes_integrity_verification_not_semantic_replay() {
+    let output = Command::new(iter_cli_bin()).arg("--help").output().unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stderr).unwrap();
+    assert!(help.contains("Success (INTEGRITY_VERIFIED / EXPORTED)"));
+    assert!(help.contains("not decision correctness"));
+    assert!(!help.contains("Success (VERIFIED / EXPORTED)"));
+}
+
 fn build_gv1_packet() -> DecisionPacket {
     let energy = EnergyEnvelope::new(100.0, 10.0, 0.95).unwrap();
     let reasoning = ReasoningEnvelope::new(0.95, 0.5, 0.1, 0.8).unwrap();

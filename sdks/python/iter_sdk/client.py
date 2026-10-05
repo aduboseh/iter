@@ -246,10 +246,22 @@ class IterClient:
         return self._parse_tool_result(response)
 
     async def audit_replay(self) -> Any:
-        """Replay decision history (canonical)."""
+        """Replay demo lineage; governed modes reject this with error 5003."""
         response = await self.send("tools/call", {
             "name": "audit.replay",
             "arguments": {},
+        })
+        return self._parse_tool_result(response)
+
+    async def audit_history(self, start_sequence: int = 0, limit: int = 100) -> Any:
+        """Read integrity-only durable history, not semantic replay evidence.
+
+        The server validates the cursor and limit (1..100), and fails with
+        error 5002 when durable history is unavailable or fails verification.
+        """
+        response = await self.send("tools/call", {
+            "name": "audit.history",
+            "arguments": {"start_sequence": start_sequence, "limit": limit},
         })
         return self._parse_tool_result(response)
 
@@ -512,6 +524,8 @@ class IterClient:
             raise RequestError(response.error)
 
         result = response.result or {}
+        if result.get("error") is not None:
+            raise RequestError(RpcError(**result["error"]))
         content = result.get("content", [])
 
         if not content or not isinstance(content, list) or len(content) == 0:

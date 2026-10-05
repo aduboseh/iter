@@ -248,7 +248,7 @@ fn print_mode_banner(runtime_mode: RuntimeMode) {
             eprintln!("│ SCG execution path still inactive                          │");
             eprintln!("└────────────────────────────────────────────────────────────┘");
             eprintln!(
-                "WARNING: Governed local mode is packet-emitting and replay-capable, but not SCG-backed. See WO-ITER-RUNTIME-001B."
+                "WARNING: Governed local mode emits integrity-verifiable packets, not semantic replay evidence, and is not SCG-backed. See WO-ITER-RUNTIME-001B."
             );
         }
         RuntimeMode::ScgBacked => {

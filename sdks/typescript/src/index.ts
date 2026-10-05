@@ -483,7 +483,7 @@ export class IterClient {
   }
 
   /**
-   * Replay decision history (canonical).
+   * Replay demo lineage; governed modes reject this with error 5003.
    */
   async auditReplay(): Promise<unknown> {
     const response = await this.send("tools/call", {
@@ -491,6 +491,23 @@ export class IterClient {
       arguments: {},
     });
 
+    return this.parseToolResult<unknown>(response);
+  }
+
+  /**
+   * Read integrity-only durable history, not semantic replay evidence.
+   * The server validates cursor/limit (1..100); unavailable or invalid history
+   * fails with error 5002. JavaScript cursors must be safe integers.
+   */
+  async auditHistory(args: { start_sequence?: number; limit?: number } = {}): Promise<unknown> {
+    if (args.start_sequence !== undefined &&
+        (!Number.isSafeInteger(args.start_sequence) || args.start_sequence < 0)) {
+      throw new RangeError("start_sequence must be a nonnegative safe integer");
+    }
+    const response = await this.send("tools/call", {
+      name: "audit.history",
+      arguments: args,
+    });
     return this.parseToolResult<unknown>(response);
   }
 
@@ -768,7 +785,10 @@ export class IterClient {
       throw new RequestError(response.error);
     }
 
-    const result = response.result as { content?: { text?: string }[] };
+    const result = response.result as { content?: { text?: string }[]; error?: RpcError };
+    if (result?.error) {
+      throw new RequestError(result.error);
+    }
     const text = result?.content?.[0]?.text;
 
     if (!text) {

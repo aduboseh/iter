@@ -646,6 +646,43 @@ describe("CT4.1: Graceful Shutdown", () => {
 });
 
 describe("Governance Helper Methods", () => {
+  test.each([{}, { start_sequence: 7, limit: 2 }])(
+    "auditHistory returns the integrity page with args %j", async (args) => {
+      const client = new (IterClient as any)(1);
+      const page = { verification: "integrity_only", records: [], next_sequence: null,
+        verified_next_sequence: 7, verified_record_hash: "a".repeat(64) };
+      client.send = jest.fn().mockResolvedValue({ jsonrpc: "2.0", id: 1,
+        result: { content: [{ type: "text", text: JSON.stringify(page) }] } });
+      expect(await client.auditHistory(args)).toEqual(page);
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(client.send).toHaveBeenCalledWith("tools/call", {
+        name: "audit.history", arguments: args,
+      });
+    }
+  );
+
+  test.each([["auditHistory", 5002], ["auditReplay", 5003]])(
+    "%s preserves tool error %i without fallback", async (method, code) => {
+      const client = new (IterClient as any)(1);
+      client.send = jest.fn().mockResolvedValue({ jsonrpc: "2.0", id: 1,
+        result: { error: { code, message: "audit unavailable" },
+          content: [{ text: '{"verification":"integrity_only"}' }] } });
+      await expect(client[method]()).rejects.toMatchObject({
+        rpcError: { code, message: "audit unavailable" },
+      });
+      expect(client.send).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity])(
+    "auditHistory rejects unsafe cursor %s before dispatch", async (cursor) => {
+      const client = new (IterClient as any)(1);
+      client.send = jest.fn();
+      await expect(client.auditHistory({ start_sequence: cursor })).rejects.toThrow(RangeError);
+      expect(client.send).not.toHaveBeenCalled();
+    }
+  );
+
   test("decisionPreview calls decision.preview with canonical args", async () => {
     const client = new (IterClient as any)(1);
     const response = {

@@ -660,7 +660,7 @@ impl IterClient {
         extract_raw_result(response)
     }
 
-    /// Replay recorded decision history.
+    /// Replay demo lineage; governed modes reject this with error 5003.
     pub async fn audit_replay(&mut self) -> Result<serde_json::Value> {
         let response = self
             .send(
@@ -673,6 +673,28 @@ impl IterClient {
             )
             .await?;
 
+        extract_raw_result(response)
+    }
+
+    /// Read integrity-only durable history, not semantic replay evidence.
+    ///
+    /// The server validates the cursor and limit (1..100). Unavailable or
+    /// invalid history returns error 5002 rather than falling back to replay.
+    pub async fn audit_history(
+        &mut self,
+        start_sequence: u64,
+        limit: usize,
+    ) -> Result<serde_json::Value> {
+        let response = self
+            .send(
+                "tools/call",
+                Some(serde_json::json!({
+                    "name": "audit.history",
+                    "arguments": { "start_sequence": start_sequence, "limit": limit }
+                })),
+                30000,
+            )
+            .await?;
         extract_raw_result(response)
     }
 
@@ -904,6 +926,14 @@ fn parse_tool_result<T: serde::de::DeserializeOwned>(response: RpcResponse) -> R
         message: "No result".into(),
     })?;
 
+    if let Some(error) = result.get("error").filter(|error| !error.is_null()) {
+        let error: RpcError = serde_json::from_value(error.clone()).map_err(SdkError::Json)?;
+        return Err(SdkError::RequestFailed {
+            code: error.code,
+            message: error.message,
+        });
+    }
+
     let content = result
         .get("content")
         .and_then(|c| c.as_array())
@@ -968,8 +998,44 @@ mod tests {
 
     #[test]
     fn governance_helper_methods_are_exposed() {
+        let _ = IterClient::audit_history;
         let _ = IterClient::decision_preview;
         let _ = IterClient::audit_search;
+    }
+
+    #[test]
+    fn raw_result_preserves_audit_tool_errors_over_content() {
+        for code in [5002, 5003] {
+            let response = RpcResponse {
+                jsonrpc: "2.0".into(),
+                result: Some(serde_json::json!({
+                    "error": {"code": code, "message": "audit unavailable"},
+                    "content": [{"text": "{\"verification\":\"integrity_only\"}"}]
+                })),
+                error: None,
+                id: serde_json::json!(1),
+            };
+            assert!(matches!(extract_raw_result(response),
+                Err(SdkError::RequestFailed { code: actual, message })
+                if actual == code && message == "audit unavailable"));
+        }
+    }
+
+    #[test]
+    fn raw_result_preserves_integrity_history_page() {
+        let page = serde_json::json!({
+            "verification": "integrity_only", "records": [], "next_sequence": null,
+            "verified_next_sequence": 7, "verified_record_hash": "a".repeat(64)
+        });
+        let response = RpcResponse {
+            jsonrpc: "2.0".into(),
+            result: Some(serde_json::json!({
+                "content": [{"type": "text", "text": page.to_string()}]
+            })),
+            error: None,
+            id: serde_json::json!(1),
+        };
+        assert_eq!(extract_raw_result(response).unwrap(), page);
     }
 
     #[test]

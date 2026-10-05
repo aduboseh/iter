@@ -675,6 +675,16 @@ pub struct PersistentAuditLedger {
     last_record_hash: String,
 }
 
+impl Drop for PersistentAuditLedger {
+    fn drop(&mut self) {
+        // On Unix, duplicated or fork-inherited handles can outlive the owner.
+        // Closing only this handle would leave the shared file lock held.
+        if let Err(error) = self.file.unlock() {
+            tracing::error!(%error, "failed to release audit ledger writer lock");
+        }
+    }
+}
+
 impl PersistentAuditLedger {
     /// Open and verify a ledger at `path`, creating parent directories if needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AuditError> {
@@ -1563,6 +1573,23 @@ pub(crate) mod tests {
             "second writer was not rejected: {rejected:?}"
         );
         drop(ledger);
+        drop(PersistentAuditLedger::open(&path).unwrap());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn ledger_drop_releases_lock_with_duplicate_handle_alive() {
+        let path = temp_ledger_path("duplicated-writer-lock");
+        let ledger = PersistentAuditLedger::open(&path).unwrap();
+        let duplicate = ledger.file.try_clone().unwrap();
+        assert!(PersistentAuditLedger::open(&path).is_err());
+
+        drop(ledger);
+        let replacement = PersistentAuditLedger::open(&path).unwrap();
+        assert!(PersistentAuditLedger::open(&path).is_err());
+        drop(duplicate);
+        assert!(PersistentAuditLedger::open(&path).is_err());
+        drop(replacement);
         drop(PersistentAuditLedger::open(&path).unwrap());
         fs::remove_file(path).unwrap();
     }
