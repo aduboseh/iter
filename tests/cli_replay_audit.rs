@@ -4,7 +4,7 @@
 //! using the same replay contract and hashes as existing golden vector tests.
 //!
 //! Test structure:
-//! 1. Replay golden vector via CLI — exit 0, outcome VERIFIED
+//! 1. Replay golden vector via CLI — exit 0, outcome INTEGRITY_VERIFIED
 //! 2. Audit export + replay round-trip — export then replay, both succeed
 //! 3. Fail-closed on corrupt file — tampered checksum, exit 2, outcome MISMATCH
 //! 4. Fail-closed on policy version mismatch — wrong version, exit 2
@@ -24,6 +24,16 @@ const GV1_POLICY_HASH: &str = "b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b
 
 fn iter_cli_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_iter-cli"))
+}
+
+#[test]
+fn help_describes_integrity_verification_not_semantic_replay() {
+    let output = Command::new(iter_cli_bin()).arg("--help").output().unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stderr).unwrap();
+    assert!(help.contains("Success (INTEGRITY_VERIFIED / EXPORTED)"));
+    assert!(help.contains("not decision correctness"));
+    assert!(!help.contains("Success (VERIFIED / EXPORTED)"));
 }
 
 fn build_gv1_packet() -> DecisionPacket {
@@ -105,8 +115,11 @@ fn cli_replay_golden_vector_verified() {
     let result: serde_json::Value =
         serde_json::from_str(&stdout).expect("stdout must be valid JSON");
 
-    assert_eq!(result["outcome"], "VERIFIED");
+    assert_eq!(result["outcome"], "INTEGRITY_VERIFIED");
     assert_eq!(result["checksum_match"], true);
+    assert_eq!(result["semantic_replay"], false);
+    assert_eq!(result["authoritative_pdp"], false);
+    assert_eq!(result["verification"], "integrity_only");
     assert_eq!(result["decision"], "ALLOW");
 }
 
@@ -167,7 +180,7 @@ fn cli_audit_export_then_replay_roundtrip() {
     let replay_stdout = String::from_utf8_lossy(&replay_output.stdout);
     let replay_result: serde_json::Value =
         serde_json::from_str(&replay_stdout).expect("replay stdout must be valid JSON");
-    assert_eq!(replay_result["outcome"], "VERIFIED");
+    assert_eq!(replay_result["outcome"], "INTEGRITY_VERIFIED");
 }
 
 // ============================================================================

@@ -510,7 +510,7 @@ impl StubRuntime {
     /// - Verify computed hash matches proposal_hash
     ///
     /// If neither field is provided, falls back to legacy hash computation.
-    fn verify_proposal_hash(
+    pub(crate) fn verify_proposal_hash(
         &self,
         proposal: &GovernanceProposal,
     ) -> Result<String, GovernanceError> {
@@ -953,6 +953,9 @@ pub struct ReplayResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ReplayStatus {
+    /// Packet checksum verified only; no evaluation was re-executed.
+    #[serde(rename = "integrity_verified")]
+    IntegrityVerified,
     /// Checksum matches - state unchanged since recording
     Match,
     /// Checksum mismatch - structural mutation detected

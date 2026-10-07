@@ -7,7 +7,7 @@
 //! # Mode invariants
 //!
 //! - `authoritative_pdp = true`
-//! - `replay_sufficient = true` (for evaluate only; preview is false)
+//! - `replay_sufficient = false` (packet integrity is not semantic replay)
 //! - `packet = Some(DecisionPacket)` (for evaluate only)
 //! - Reason codes use `policy.*` namespace
 
@@ -179,6 +179,11 @@ impl GovernedRuntime {
     fn evaluate_state(
         &self,
     ) -> Result<(crate::policy::PolicyResult, SystemState), GovernanceRuntimeError> {
+        if let Some(ledger) = &self.audit_ledger {
+            ledger
+                .ensure_healthy()
+                .map_err(Self::map_ledger_append_error)?;
+        }
         let base_state =
             self.graph
                 .system_state()
@@ -213,10 +218,28 @@ impl GovernedRuntime {
 impl GovernanceRuntime for GovernedRuntime {
     fn evaluate(
         &mut self,
-        _proposal: &GovernanceProposal,
+        proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
+        self.graph.verify_proposal_hash(proposal).map_err(|err| {
+            GovernanceRuntimeError::ProposalInvalid {
+                reason: err.to_string(),
+            }
+        })?;
+        let proposal_json = serde_json_canonicalizer::to_string(proposal).map_err(|err| {
+            GovernanceRuntimeError::ProposalInvalid {
+                reason: err.to_string(),
+            }
+        })?;
         let (policy_result, governed_state) = self.evaluate_state()?;
-        let execution_trace = Self::execution_trace(&policy_result);
+        let mut execution_trace = Self::execution_trace(&policy_result);
+        // Bind the opaque request without claiming to interpret its domain semantics.
+        execution_trace.insert(
+            0,
+            format!(
+                "proposal.sha256:{}",
+                crate::canonical::hash_str_upper(&proposal_json)
+            ),
+        );
 
         let mut packet = DecisionPacket::new(
             env!("CARGO_PKG_VERSION").to_string(),
@@ -252,14 +275,19 @@ impl GovernanceRuntime for GovernedRuntime {
             packet: Some(packet),
             trace_available: true,
             authoritative_pdp: true,
-            replay_sufficient: true,
+            replay_sufficient: false,
         })
     }
 
     fn preview(
         &self,
-        _proposal: &GovernanceProposal,
+        proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
+        self.graph.verify_proposal_hash(proposal).map_err(|err| {
+            GovernanceRuntimeError::ProposalInvalid {
+                reason: err.to_string(),
+            }
+        })?;
         let (policy_result, _governed_state) = self.evaluate_state()?;
 
         let verdict = Self::map_policy_verdict(policy_result.decision);
@@ -278,6 +306,16 @@ impl GovernanceRuntime for GovernedRuntime {
             authoritative_pdp: true,
             replay_sufficient: false,
         })
+    }
+
+    fn history(
+        &mut self,
+        start_sequence: u64,
+        limit: usize,
+    ) -> Result<crate::audit::AuditHistoryPage, GovernanceRuntimeError> {
+        self.audit_ledger.as_mut().ok_or_else(|| GovernanceRuntimeError::ConfigMissing(
+            "durable audit history requires ITER_AUDIT_LEDGER_PATH; session history is not a substitute".to_string(),
+        ))?.history(start_sequence, limit).map_err(|err| GovernanceRuntimeError::ReplayIntegrityViolation(err.to_string()))
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
@@ -349,6 +387,96 @@ mod tests {
     }
 
     #[test]
+    fn governed_attestation_rejects_invalid_tuples_without_side_effects() {
+        for (bytes, hash) in [
+            (Some("e30="), None),
+            (None, Some("00")),
+            (Some("NOT-BASE64"), Some("00")),
+            (Some("e30="), Some("00")),
+        ] {
+            let mut runtime = make_governed();
+            let mut proposal = test_proposal();
+            proposal.proposal_c14n = bytes.map(str::to_string);
+            proposal.proposal_hash = hash.map(str::to_string);
+            let tick = runtime.graph().current_tick();
+            assert!(matches!(
+                runtime.preview(&proposal),
+                Err(GovernanceRuntimeError::ProposalInvalid { .. })
+            ));
+            assert!(matches!(
+                runtime.evaluate(&proposal),
+                Err(GovernanceRuntimeError::ProposalInvalid { .. })
+            ));
+            assert!(runtime.audit_log().is_empty());
+            assert_eq!(runtime.graph().current_tick(), tick);
+        }
+    }
+
+    #[test]
+    fn ledger_writer_poison_stops_governed_evaluate_and_preview() {
+        let (ledger, path) = crate::audit::tests::failed_append_ledger("governed-poison");
+        let mut runtime = make_governed();
+        runtime.audit_ledger = Some(ledger);
+        let tick = runtime.graph().current_tick();
+        let length = std::fs::metadata(&path).unwrap().len();
+        for outcome in [
+            runtime.preview(&test_proposal()),
+            runtime.evaluate(&test_proposal()),
+        ] {
+            assert!(
+                matches!(outcome, Err(GovernanceRuntimeError::ReplayIntegrityViolation(ref reason))
+                if reason.contains("poisoned"))
+            );
+        }
+        assert!(runtime.audit_log().is_empty());
+        assert_eq!(runtime.graph().current_tick(), tick);
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), length);
+        drop(runtime);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn governed_attestation_preserves_raw_byte_uppercase_contract() {
+        use base64::Engine as _;
+        let bytes = [0xff, 0xfe, 0x00, 0x01];
+        let mut proposal = test_proposal();
+        proposal.proposal_c14n = Some(base64::engine::general_purpose::STANDARD.encode(bytes));
+        proposal.proposal_hash = Some(crate::canonical::hash_bytes_upper(&bytes));
+        let mut runtime = make_governed();
+        assert!(runtime.preview(&proposal).is_ok());
+        assert!(runtime.evaluate(&proposal).is_ok());
+        proposal.proposal_hash = Some(proposal.proposal_hash.unwrap().to_lowercase());
+        assert!(matches!(
+            runtime.evaluate(&proposal),
+            Err(GovernanceRuntimeError::ProposalInvalid { .. })
+        ));
+        assert_eq!(runtime.audit_log().len(), 1);
+    }
+
+    #[test]
+    fn governed_receipt_binds_each_proposal_field() {
+        let original = test_proposal();
+        let baseline = make_governed().evaluate(&original).unwrap().packet.unwrap();
+        for field in ["id", "state", "action", "constraints", "attestation"] {
+            let mut proposal = original.clone();
+            match field {
+                "id" => proposal.proposal_id.push_str("-other"),
+                "state" => proposal.state_snapshot_hash = "b".repeat(64),
+                "action" => proposal.requested_action.push_str("-other"),
+                "constraints" => proposal.constraints = serde_json::json!({"scope":"other"}),
+                "attestation" => {
+                    proposal.proposal_c14n = Some("e30=".into());
+                    proposal.proposal_hash = Some(crate::canonical::hash_bytes_upper(b"{}"));
+                }
+                _ => unreachable!(),
+            }
+            let packet = make_governed().evaluate(&proposal).unwrap().packet.unwrap();
+            packet.verify_checksum().unwrap();
+            assert_ne!(baseline.checksum, packet.checksum, "unbound {field}");
+        }
+    }
+
+    #[test]
     fn governed_evaluate_returns_packet() {
         let mut rt = make_governed();
         let outcome = rt
@@ -357,7 +485,7 @@ mod tests {
 
         assert_eq!(outcome.mode, GovernanceMode::Governed);
         assert!(outcome.authoritative_pdp);
-        assert!(outcome.replay_sufficient);
+        assert!(!outcome.replay_sufficient);
         assert!(
             outcome.packet.is_some(),
             "governed evaluate must emit packet"
@@ -471,7 +599,7 @@ mod tests {
 
         assert_eq!(meta.mode, GovernanceMode::Governed);
         assert!(meta.authoritative_pdp);
-        assert!(meta.replay_sufficient);
+        assert!(!meta.replay_sufficient);
     }
 
     #[test]

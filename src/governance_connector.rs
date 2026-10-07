@@ -132,16 +132,21 @@ impl ScgRuntime {
         &mut self.graph
     }
 
-    /// Replay SCG-backed decisions from the persisted packet stream rather than local lineage.
+    /// Inspect checksums in the last 1,000 current-process packets only.
+    /// This legacy API is neither complete durable history nor semantic replay.
+    /// Use GovernanceRuntime::history for sequence-addressable durable evidence.
     pub fn replay_decisions(&self) -> Vec<ReplayResult> {
         self.replay_packets
             .iter()
             .map(|packet| match packet.verify_checksum() {
                 Ok(()) => ReplayResult {
                     decision_id: packet.checksum.clone(),
-                    replay_status: ReplayStatus::Match,
+                    replay_status: ReplayStatus::IntegrityVerified,
                     propagation_checksum: Some(packet.checksum.clone()),
-                    reason: None,
+                    reason: Some(
+                        "packet checksum only; session window, no semantic re-execution"
+                            .to_string(),
+                    ),
                 },
                 Err(err) => ReplayResult {
                     decision_id: packet.checksum.clone(),
@@ -266,7 +271,22 @@ impl ScgRuntime {
         &self,
         proposal: &GovernanceProposal,
     ) -> Result<ScgGovernanceOutcome, GovernanceRuntimeError> {
+        if let Some(ledger) = &self.audit_ledger {
+            ledger
+                .ensure_healthy()
+                .map_err(Self::map_ledger_append_error)?;
+        }
+        self.graph.verify_proposal_hash(proposal).map_err(|err| {
+            GovernanceRuntimeError::ProposalInvalid {
+                reason: err.to_string(),
+            }
+        })?;
         let request = Self::build_request(proposal)?;
+        let request_hash = serde_json::to_string(&request)
+            .and_then(|payload| governance_bridge::trace::payload_hash(&payload))
+            .map_err(|err| GovernanceRuntimeError::ProposalInvalid {
+                reason: format!("request canonicalization failed: {err}"),
+            })?;
         let url = format!("{}/governance/evaluate", self.endpoint);
         let mut request_builder = self.http_client.post(&url).json(&request);
         if let Some(token) = &self.auth_token {
@@ -300,6 +320,19 @@ impl ScgRuntime {
         outcome
             .verify_replay_id()
             .map_err(|e| GovernanceRuntimeError::ReplayIntegrityViolation(e.to_string()))?;
+
+        // Trace validation proves internal consistency; this binds it to this request.
+        if outcome
+            .execution_trace
+            .steps()
+            .first()
+            .map(|step| &step.input_hash)
+            != Some(&request_hash)
+        {
+            return Err(GovernanceRuntimeError::ReplayIntegrityViolation(
+                "SCG response does not bind the submitted governance request".to_string(),
+            ));
+        }
 
         if outcome.governance_hash != *self.boot_governance_hash {
             return Err(GovernanceRuntimeError::GovernanceHashMismatch(format!(
@@ -558,7 +591,6 @@ impl ScgRuntime {
     fn build_runtime_outcome(
         outcome: &ScgGovernanceOutcome,
         packet: Option<DecisionPacket>,
-        replay_sufficient: bool,
     ) -> GovernanceOutcome {
         GovernanceOutcome {
             verdict: Self::runtime_verdict(outcome.decision.clone()),
@@ -570,7 +602,7 @@ impl ScgRuntime {
             packet,
             trace_available: true,
             authoritative_pdp: true,
-            replay_sufficient,
+            replay_sufficient: false,
         }
     }
 }
@@ -587,7 +619,7 @@ impl GovernanceRuntime for ScgRuntime {
         Self::assert_governed_packet_integrity(&packet, "ScgBacked::evaluate")?;
         self.persist_decision(&packet)?;
         self.record_replay_packet(packet.clone());
-        Ok(Self::build_runtime_outcome(&outcome, Some(packet), true))
+        Ok(Self::build_runtime_outcome(&outcome, Some(packet)))
     }
 
     fn preview(
@@ -595,7 +627,17 @@ impl GovernanceRuntime for ScgRuntime {
         proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError> {
         let outcome = self.fetch_outcome(proposal)?;
-        Ok(Self::build_runtime_outcome(&outcome, None, false))
+        Ok(Self::build_runtime_outcome(&outcome, None))
+    }
+
+    fn history(
+        &mut self,
+        start_sequence: u64,
+        limit: usize,
+    ) -> Result<crate::audit::AuditHistoryPage, GovernanceRuntimeError> {
+        self.audit_ledger.as_mut().ok_or_else(|| GovernanceRuntimeError::ConfigMissing(
+            "durable audit history requires ITER_AUDIT_LEDGER_PATH; session history is not a substitute".to_string(),
+        ))?.history(start_sequence, limit).map_err(|err| GovernanceRuntimeError::ReplayIntegrityViolation(err.to_string()))
     }
 
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult {
@@ -705,6 +747,31 @@ mod tests {
     }
 
     #[test]
+    fn ledger_writer_poison_stops_scg_before_upstream_access() {
+        let (ledger, path) = crate::audit::tests::failed_append_ledger("scg-poison");
+        let mut runtime = ScgRuntime::connect("http://127.0.0.1:1".into(), "a".repeat(64)).unwrap();
+        runtime.audit_ledger = Some(ledger);
+        let proposal = GovernanceProposal {
+            proposal_id: "poisoned-runtime".into(),
+            state_snapshot_hash: "a".repeat(64),
+            constraints: serde_json::json!({}),
+            requested_action: "read".into(),
+            proposal_c14n: None,
+            proposal_hash: None,
+        };
+        for outcome in [runtime.preview(&proposal), runtime.evaluate(&proposal)] {
+            assert!(
+                matches!(outcome, Err(GovernanceRuntimeError::ReplayIntegrityViolation(ref reason))
+                if reason.contains("poisoned"))
+            );
+        }
+        assert!(runtime.audit_log.is_empty());
+        assert!(runtime.replay_packets.is_empty());
+        drop(runtime);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn connect_allows_loopback_http_endpoint() {
         let runtime = ScgRuntime::connect("http://127.0.0.1:18080".to_string(), "a".repeat(64))
             .expect("loopback http endpoint remains valid for local seam tests");
@@ -725,6 +792,9 @@ mod tests {
 
         let results = runtime.replay_decisions();
         assert_eq!(results.len(), ScgRuntime::REPLAY_PACKET_LIMIT);
+        assert!(results
+            .iter()
+            .all(|result| result.replay_status == ReplayStatus::IntegrityVerified));
         assert_eq!(
             results.first().expect("bounded replay result").decision_id,
             make_packet(
@@ -732,6 +802,11 @@ mod tests {
                 &format!("{:064x}", first_retained_tick + 1)
             )
             .checksum
+        );
+        runtime.replay_packets.back_mut().unwrap().checksum = "0".repeat(64);
+        assert_eq!(
+            runtime.replay_decisions().last().unwrap().replay_status,
+            ReplayStatus::Blocked
         );
     }
 

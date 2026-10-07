@@ -8,7 +8,7 @@
 //!   iter-cli audit export --decision-file <PATH> --output <PATH>
 //!
 //! Exit codes:
-//!   0 - Success (VERIFIED / EXPORTED)
+//!   0 - Success (INTEGRITY_VERIFIED / EXPORTED); never semantic replay certification
 //!   1 - Input error (missing file, malformed JSON, missing required flags)
 //!   2 - Replay/contract mismatch or integrity failure
 //!   3 - Internal error
@@ -61,7 +61,7 @@ USAGE:
     iter-cli <COMMAND> [OPTIONS]
 
 COMMANDS:
-    replay                     Replay a DecisionPacket and verify correctness
+    replay                     Inspect packet checksum/versions, not decision correctness
     audit export               Export and validate a DecisionPacket file
 
 REPLAY OPTIONS:
@@ -78,7 +78,7 @@ GENERAL OPTIONS:
     -h, --help                 Print help
 
 EXIT CODES:
-    0    Success (VERIFIED / EXPORTED)
+    0    Success (INTEGRITY_VERIFIED / EXPORTED)
     1    Input error (file missing, malformed JSON, missing flags)
     2    Replay mismatch or integrity failure
     3    Internal error"#,
@@ -147,7 +147,10 @@ fn cmd_replay(args: &[String]) -> ExitCode {
     match iter_mcp_server::runtime::replay_decision(&packet, &policy_version, &schema_version) {
         Ok(outcome) => {
             let output = serde_json::json!({
-                "outcome": "VERIFIED",
+                "outcome": "INTEGRITY_VERIFIED",
+                "verification": "integrity_only",
+                "semantic_replay": false,
+                "authoritative_pdp": outcome.authoritative_pdp,
                 "decision": outcome.verdict,
                 "checksum_match": true,
                 "policy_version": policy_version,

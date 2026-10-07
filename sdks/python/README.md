@@ -80,6 +80,23 @@ async def main() -> None:
     print("Client closed successfully")
 ```
 
+## Durable Audit History
+
+For a governed-mode connection with a configured durable ledger:
+
+```python
+page = await client.audit_history(start_sequence=0, limit=100)
+assert page["verification"] == "integrity_only"
+if page["next_sequence"] is not None:
+    next_page = await client.audit_history(start_sequence=page["next_sequence"])
+```
+
+This verifies stored ledger integrity, not semantic replay or decision correctness.
+The server checks the complete chain on each page; limits are 1..100 records.
+Unavailable or corrupt history raises `RequestError` with code `5002`.
+`audit_replay()` remains a demo-lineage API; governed modes return code `5003`.
+Neither method silently falls back to the other. See [history contract](../../docs/AUDIT_HISTORY.md).
+
 ## Version Compatibility
 
 This SDK supports protocol versions 1.0.0 through 1.x.x. Incompatible versions will fail fast at connection time.

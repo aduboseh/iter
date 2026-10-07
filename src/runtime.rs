@@ -7,11 +7,11 @@
 //! # Modes
 //!
 //! - `Demo`: Threshold-based, non-authoritative, no DecisionPacket.
-//! - `Governed`: PolicyEvaluator-based, authoritative, replay-sufficient.
+//! - `Governed`: PolicyEvaluator-based, with integrity-verifiable decision summaries.
 
 use serde::{Deserialize, Serialize};
 
-use crate::audit::DecisionPacket;
+use crate::audit::{AuditHistoryPage, DecisionPacket};
 use crate::substrate::stub::{AuditSearchFilter, AuditSearchResult, GovernanceProposal};
 
 /// Runtime governance mode.
@@ -23,7 +23,7 @@ use crate::substrate::stub::{AuditSearchFilter, AuditSearchResult, GovernancePro
 pub enum GovernanceMode {
     /// Threshold-based, non-authoritative, no DecisionPacket at edge.
     Demo,
-    /// PolicyEvaluator-based, authoritative PDP, replay-sufficient.
+    /// PolicyEvaluator-based, authoritative PDP; packets do not capture all replay inputs.
     Governed,
 }
 
@@ -106,12 +106,12 @@ impl GovernanceRuntimeMeta {
         }
     }
 
-    /// Governed mode metadata (authoritative, replay-sufficient).
+    /// Governed mode metadata (authoritative evaluations, no semantic replay guarantee).
     pub fn governed() -> Self {
         Self {
             mode: GovernanceMode::Governed,
             authoritative_pdp: true,
-            replay_sufficient: true,
+            replay_sufficient: false,
         }
     }
 }
@@ -184,10 +184,12 @@ pub enum GovernanceRuntimeError {
     ConfigMissing(String),
 }
 
-/// Replay a DecisionPacket and verify it is still valid.
+/// Inspect a stored DecisionPacket's integrity and expected versions.
 ///
 /// Fail-closed: rejects on checksum mismatch, policy_version mismatch,
-/// or schema_version mismatch.
+/// or schema_version mismatch. The legacy name is retained for compatibility.
+/// This returns the recorded verdict; it does not re-run policy evaluation and
+/// cannot establish that a self-consistent packet contains a correct decision.
 pub fn replay_decision(
     packet: &crate::audit::DecisionPacket,
     expected_policy_version: &str,
@@ -247,8 +249,8 @@ pub fn replay_decision(
         schema_version: "decision_packet:v1".to_string(),
         packet: Some(packet.clone()),
         trace_available: true,
-        authoritative_pdp: true,
-        replay_sufficient: true,
+        authoritative_pdp: false,
+        replay_sufficient: false,
     })
 }
 
@@ -270,8 +272,19 @@ pub trait GovernanceRuntime {
         proposal: &GovernanceProposal,
     ) -> Result<GovernanceOutcome, GovernanceRuntimeError>;
 
-    /// Search governance decision history.
+    /// Search current-process decision history, not the durable archive.
     fn search_decisions(&self, filter: &AuditSearchFilter) -> AuditSearchResult;
+
+    /// Read verified durable evidence by sequence, without re-running evaluation.
+    fn history(
+        &mut self,
+        _start_sequence: u64,
+        _limit: usize,
+    ) -> Result<AuditHistoryPage, GovernanceRuntimeError> {
+        Err(GovernanceRuntimeError::ModeError {
+            reason: "durable audit history is unavailable in this runtime".to_string(),
+        })
+    }
 
     /// Current governance mode.
     fn mode(&self) -> GovernanceMode;

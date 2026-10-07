@@ -70,6 +70,24 @@ async function main() {
 main().catch(console.error);
 ```
 
+## Durable Audit History
+
+For a governed-mode connection with a configured durable ledger:
+
+```typescript
+const page = await client.auditHistory({ start_sequence: 0, limit: 100 });
+console.log(page); // verification: "integrity_only", records, next_sequence
+```
+
+This verifies stored ledger integrity, not semantic replay or decision correctness.
+The server checks the complete chain on each page; limits are 1..100 records.
+Continue with the returned `next_sequence` until it is null. JavaScript supports
+only safe-integer cursors (up to `Number.MAX_SAFE_INTEGER`); larger ledgers require
+a client with exact integer support, such as the Rust or Python SDK.
+Unavailable or corrupt history throws `RequestError` with code `5002`.
+`auditReplay()` remains a demo-lineage API; governed modes return code `5003`.
+Neither method silently falls back to the other. See [history contract](../../docs/AUDIT_HISTORY.md).
+
 ## Version Compatibility
 
 This SDK supports protocol versions 1.0.0 through 1.x.x. Incompatible versions will fail fast at connection time.

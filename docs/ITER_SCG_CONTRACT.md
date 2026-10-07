@@ -2,7 +2,7 @@
 
 Status: canonical for the vendored `scg.v1` governance bridge.
 
-Iter vendors a small SCG bridge crate so the product-facing runtime can emit replayable proof packets without making SCG a direct runtime build dependency. SCG remains the authoritative governance substrate. Iter remains the product and MCP control plane.
+Iter vendors a small SCG bridge crate so the product-facing runtime can emit integrity-verifiable decision packets without making SCG a direct runtime build dependency. SCG remains the authoritative governance substrate. Iter remains the product and MCP control plane. Packet integrity does not establish semantic replay; see [durable history and verification scope](AUDIT_HISTORY.md).
 
 ## Contract-Critical Artifacts
 
@@ -37,6 +37,53 @@ Required `provenance_source` block:
   "vector_digest_casing": "raw_text_validation"
 }
 ```
+
+## Request Binding and Rollout
+
+For live `scg-backed` decisions, the first `HashVerify` trace input must contain
+the complete serialized `GovernanceRequest`: proposal ID, requested action,
+requested snapshot hash, and the string-valued constraints map. Its input hash
+is the existing sorted-key JSON SHA-256 digest in uppercase. Iter validates the
+trace and replay ID, then compares this hash with the exact request it sent,
+before publishing a decision or appending audit evidence. A self-consistent
+response for a different request is rejected with `ReplayIntegrityViolation`.
+
+The shared request type rejects unknown top-level members and duplicate
+constraint keys instead of dropping transmitted values before hashing. The
+gateway returns HTTP 422 for this invalid shape.
+Opaque string-valued constraints remain supported; the four declared fields
+and their canonical encoding do not change.
+
+The requested snapshot and live snapshot are different concepts. A correctly
+bound response may escalate because the live snapshot has changed; request
+binding must not turn this legitimate review result into a transport failure.
+
+Deploy the updated SCG gateway before the updated Iter consumer. The JSON
+response shape and `scg.v1`/`trace.v1` versions are unchanged, but old gateway
+traces omit complete request binding and are deliberately rejected by the new
+consumer. Do not enable a fallback. Rolling SCG back first will therefore fail
+closed; rolling Iter back removes the protection. Historical packets remain
+readable but must not be presented as request-bound under this rule.
+
+Both governed runtime paths validate optional `proposal_c14n`/`proposal_hash`
+tuples before evaluation or upstream access. Both absent preserves the legacy
+input path; a partial tuple, malformed base64, wrong hash, or lowercase claimed
+digest is rejected. The existing raw-byte hash contract is unchanged: Iter does
+not normalize, repair, or infer the meaning of the decoded bytes.
+The MCP parser rejects non-string, non-null attestation fields instead of
+silently treating malformed types as missing evidence.
+
+Governed-local receipts add `proposal.sha256:<UPPERCASE_SHA256>` to their ordered
+trace. This binds JCS serialization of the complete local proposal, including
+optional attestation fields, without adding a packet field. It does not assert
+that opaque canonical bytes encode the supplied action, that constraints were
+interpreted, or that a checksum check re-executed policy. SCG binds the four
+fields of its transmitted request; optional local attestation is validated by
+Iter, not added to the SCG wire schema.
+
+SCG trace payloads now include constraint values. Treat traces and decision
+packets as sensitive application data; do not put credentials in constraints.
+This patch supplies neither encryption nor a retention policy.
 
 ## Canonical Vector Validation
 
@@ -90,8 +137,8 @@ determinism_scope=same_binary_only
 platform=<target_triple>
 rustc_version=<version>
 cross_platform_replay_claimed=false
-scg_source_commit=0306feb600e12c627dc4b10963fc8f7781dc0e18
-scg_vendor_master_head=b6c9a3b641291631358fcf9f8deace74d71e7615
+scg_source_commit=93ea46e2c206a06588b8fecf4531ed5bb70551f9
+scg_vendor_master_head=93ea46e2c206a06588b8fecf4531ed5bb70551f9
 build_rerun_triggers=verified
 rustc_env_exports=verified
 bridge_integrity=verified
