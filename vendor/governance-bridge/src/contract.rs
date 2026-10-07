@@ -19,11 +19,44 @@ const TRACE_V1_REQUIRED_SEQUENCE: [OperationType; 5] = [
 ];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GovernanceRequest {
     pub proposal_id: String,
     pub state_snapshot_hash: String,
     pub requested_action: String,
+    #[serde(deserialize_with = "deserialize_constraints")]
     pub constraints: BTreeMap<String, String>,
+}
+
+// Reject ambiguous input before a map can discard a transmitted value.
+fn deserialize_constraints<'de, D>(deserializer: D) -> Result<BTreeMap<String, String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct ConstraintsVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for ConstraintsVisitor {
+        type Value = BTreeMap<String, String>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("string-valued constraints with unique keys")
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let mut constraints = BTreeMap::new();
+            while let Some((key, value)) = map.next_entry::<String, String>()? {
+                if constraints.insert(key, value).is_some() {
+                    return Err(serde::de::Error::custom("duplicate constraint key"));
+                }
+            }
+            Ok(constraints)
+        }
+    }
+
+    deserializer.deserialize_map(ConstraintsVisitor)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

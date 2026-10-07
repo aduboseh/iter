@@ -20,6 +20,79 @@ fn req(id: &str) -> GovernanceRequest {
     }
 }
 
+#[test]
+fn request_rejects_unknown_top_level_members() {
+    for unexpected in [
+        serde_json::json!("opaque"),
+        serde_json::json!({"nested": true}),
+        serde_json::Value::Null,
+    ] {
+        let mut raw = serde_json::to_value(req("proposal-001")).unwrap();
+        raw["unexpected_member"] = unexpected;
+        let error = serde_json::from_value::<GovernanceRequest>(raw).unwrap_err();
+        assert!(error.to_string().contains("unknown field"));
+    }
+}
+
+#[test]
+fn request_preserves_opaque_string_constraints() {
+    let mut request = req("proposal-001");
+    request
+        .constraints
+        .insert("custom-policy".into(), "opaque value".into());
+    let raw = serde_json::to_value(&request).unwrap();
+    let decoded: GovernanceRequest = serde_json::from_value(raw.clone()).unwrap();
+    assert_eq!(decoded, request);
+    assert_eq!(serde_json::to_value(decoded).unwrap(), raw);
+}
+
+#[test]
+fn request_rejects_duplicate_constraint_keys() {
+    for constraints in [
+        r#"{"scope":"a","scope":"b"}"#,
+        r#"{"scope":"a","\u0073cope":"a"}"#,
+    ] {
+        let raw = format!(
+            r#"{{"proposal_id":"proposal-001","state_snapshot_hash":"abc123def456","requested_action":"approve","constraints":{constraints}}}"#
+        );
+        let error = serde_json::from_str::<GovernanceRequest>(&raw).unwrap_err();
+        assert!(error.to_string().contains("duplicate constraint key"));
+    }
+}
+
+#[test]
+fn request_rejects_duplicate_declared_fields() {
+    let raw = r#"{"proposal_id":"first","proposal_id":"second","state_snapshot_hash":"abc123def456","requested_action":"approve","constraints":{}}"#;
+    let error = serde_json::from_str::<GovernanceRequest>(raw).unwrap_err();
+    assert!(error.to_string().contains("duplicate field"));
+}
+
+#[test]
+fn stub_trace_binds_complete_request() {
+    let mut request = req("proposal-bound");
+    request.constraints.insert("scope".into(), "first".into());
+    let outcome = bridge().evaluate(request.clone()).unwrap();
+    let input = &outcome.execution_trace.steps()[0];
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&input.input_payload).unwrap(),
+        serde_json::to_value(&request).unwrap()
+    );
+    assert_eq!(
+        input.input_hash,
+        scg_governance_bridge::trace::payload_hash(&serde_json::to_string(&request).unwrap())
+            .unwrap()
+    );
+    outcome.verify_replay_id().unwrap();
+
+    request.constraints.insert("scope".into(), "second".into());
+    let changed = bridge().evaluate(request).unwrap();
+    assert_ne!(
+        input.input_hash,
+        changed.execution_trace.steps()[0].input_hash
+    );
+    assert_ne!(outcome.replay_id, changed.replay_id);
+}
+
 fn bridge() -> StubBridge {
     StubBridge {
         governance_hash: "canonical-sha256-hash-scg-v1".into(),
