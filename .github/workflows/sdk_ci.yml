@@ -121,12 +121,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Lint-only gate. No semantic/runtime tests.
       - name: Install ruff
         run: python -m pip install ruff==0.4.10
 
       - name: Ruff check
         run: ruff check .
+
+      - name: Transport EOF regressions
+        run: python -m unittest discover -s tests -p test_transport_eof.py -v
 
   sdk-contract:
     name: SDK Contract Gate

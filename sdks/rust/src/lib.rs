@@ -164,6 +164,8 @@ pub enum SdkError {
 /// SDK-local result type.
 pub type Result<T> = std::result::Result<T, SdkError>;
 
+type PendingResponses = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<RpcResponse>>>>>;
+
 // ==============================
 // Response Types (MCP-aligned)
 // ==============================
@@ -229,7 +231,7 @@ pub struct IterClient {
     stdin: Arc<Mutex<ChildStdin>>,
     state: Arc<Mutex<State>>,
     request_id: AtomicU64,
-    response_queue: Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
+    response_queue: PendingResponses,
     max_inflight: usize,
 
     #[allow(dead_code)]
@@ -281,9 +283,10 @@ impl IterClient {
         let process = Arc::new(Mutex::new(child));
         let stdin = Arc::new(Mutex::new(stdin));
         let state = Arc::new(Mutex::new(State::Open));
-        let response_queue = Arc::new(Mutex::new(
-            HashMap::<u64, oneshot::Sender<RpcResponse>>::new(),
-        ));
+        let response_queue = Arc::new(Mutex::new(HashMap::<
+            u64,
+            oneshot::Sender<Result<RpcResponse>>,
+        >::new()));
         let stderr_ring = Arc::new(Mutex::new(Vec::with_capacity(STDERR_RING_MAX_BYTES)));
         let trace_context = Arc::new(Mutex::new(None));
         let close_lock = Arc::new(Mutex::new(()));
@@ -355,7 +358,7 @@ impl IterClient {
 
                                 let mut q = queue_c.lock().await;
                                 if let Some(tx) = q.remove(&id) {
-                                    let _ = tx.send(resp);
+                                    let _ = tx.send(Ok(resp));
                                 }
                             }
                             Err(_) => {
@@ -373,8 +376,19 @@ impl IterClient {
                                 }
                             }
                         },
-                        Ok(None) => break,
-                        Err(_) => break,
+                        Ok(None) => {
+                            fail_transport("Server stdout closed", &state_c, &queue_c).await;
+                            break;
+                        }
+                        Err(error) => {
+                            fail_transport(
+                                &format!("Server stdout read failed: {error}"),
+                                &state_c,
+                                &queue_c,
+                            )
+                            .await;
+                            break;
+                        }
                     }
                 }
             });
@@ -437,29 +451,25 @@ impl IterClient {
         params: Option<serde_json::Value>,
         timeout_ms: u64,
     ) -> Result<RpcResponse> {
-        // send() only allowed in OPEN
-        {
-            let st = *self.state.lock().await;
-            if st != State::Open {
-                let pending = self.response_queue.lock().await.len();
+        let method_s = method.into();
+        // Admission and registration share the same lock order as terminal drain.
+        let (id, mut rx) = {
+            let state = self.state.lock().await;
+            let mut queue = self.response_queue.lock().await;
+            if *state != State::Open {
                 return Err(SdkError::ConnectionClosed {
                     message: "Client is closing or closed, cannot send request".into(),
-                    pending_count_at_close: Some(pending),
+                    pending_count_at_close: Some(queue.len()),
                 });
             }
-        }
-
-        // backpressure
-        {
-            let qlen = self.response_queue.lock().await.len();
-            if qlen >= self.max_inflight {
+            if queue.len() >= self.max_inflight {
                 return Err(SdkError::Backpressure(self.max_inflight));
             }
-        }
-
-        let id = self.request_id.fetch_add(1, Ordering::SeqCst) + 1;
-        let method_s = method.into();
-
+            let id = self.request_id.fetch_add(1, Ordering::SeqCst) + 1;
+            let (tx, rx) = oneshot::channel();
+            queue.insert(id, tx);
+            (id, rx)
+        };
         let req = RpcRequest {
             jsonrpc: "2.0".into(),
             method: method_s.clone(),
@@ -467,34 +477,30 @@ impl IterClient {
             id: serde_json::json!(id),
         };
 
-        let (tx, rx) = oneshot::channel();
-
-        {
-            let mut q = self.response_queue.lock().await;
-            q.insert(id, tx);
-        }
-
-        // write request (stdin is shared)
-        {
-            let mut stdin = self.stdin.lock().await;
-            stdin
-                .write_all(serde_json::to_string(&req)?.as_bytes())
-                .await?;
-            stdin.write_all(b"\n").await?;
-            stdin.flush().await?;
-        }
-
-        // wait for response or timeout
-        match timeout(Duration::from_millis(timeout_ms), rx).await {
-            Ok(Ok(resp)) => Ok(resp),
-            Ok(Err(_)) => Err(SdkError::ConnectionFailed(
-                "Connection closed (fail-closed)".into(),
-            )),
-            Err(_) => Err(SdkError::RequestTimeout {
-                method: method_s,
-                timeout_ms,
+        // A terminal reader error must interrupt even a blocked stdin write.
+        let result = tokio::select! {
+            response = &mut rx => response.unwrap_or_else(|_| {
+                Err(SdkError::ConnectionFailed("Connection closed (fail-closed)".into()))
             }),
-        }
+            written = async {
+                let mut stdin = self.stdin.lock().await;
+                stdin.write_all(serde_json::to_string(&req)?.as_bytes()).await?;
+                stdin.write_all(b"\n").await?;
+                stdin.flush().await?;
+                Ok::<(), SdkError>(())
+            } => match written {
+                Err(error) => Err(error),
+                Ok(()) => match timeout(Duration::from_millis(timeout_ms), rx).await {
+                    Ok(Ok(response)) => response,
+                    Ok(Err(_)) => Err(SdkError::ConnectionFailed(
+                        "Connection closed (fail-closed)".into(),
+                    )),
+                    Err(_) => Err(SdkError::RequestTimeout { method: method_s, timeout_ms }),
+                },
+            },
+        };
+        self.response_queue.lock().await.remove(&id);
+        result
     }
 
     /// List MCP tools exposed by the connected Iter server.
@@ -831,10 +837,7 @@ fn append_ring(ring: &mut Vec<u8>, chunk: &[u8]) {
     }
 }
 
-async fn wait_for_drain(
-    queue: &Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
-    timeout_ms: u64,
-) {
+async fn wait_for_drain(queue: &PendingResponses, timeout_ms: u64) {
     let step = 25u64;
     let max = timeout_ms / step;
     for _ in 0..max {
@@ -845,10 +848,21 @@ async fn wait_for_drain(
     }
 }
 
+async fn fail_transport(reason: &str, state: &Arc<Mutex<State>>, queue: &PendingResponses) {
+    let mut state = state.lock().await;
+    // Keep child ownership until close() verifies termination.
+    if *state != State::Closed {
+        *state = State::Closing;
+    }
+    for (_, sender) in queue.lock().await.drain() {
+        let _ = sender.send(Err(SdkError::ConnectionFailed(reason.to_owned())));
+    }
+}
+
 async fn trip_breaker_if_needed(
     reason: &str,
     state: &Arc<Mutex<State>>,
-    queue: &Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
+    queue: &PendingResponses,
     process: &Arc<Mutex<Child>>,
     violation_count: &Arc<AtomicUsize>,
     breaker: &Arc<AtomicBool>,
@@ -894,10 +908,7 @@ async fn trip_breaker_if_needed(
     true
 }
 
-async fn fail_closed_reject_pending(
-    reason: &str,
-    queue: &Arc<Mutex<HashMap<u64, oneshot::Sender<RpcResponse>>>>,
-) {
+async fn fail_closed_reject_pending(reason: &str, queue: &PendingResponses) {
     let mut q = queue.lock().await;
     for (id, tx) in q.drain() {
         let resp = RpcResponse {
@@ -909,7 +920,7 @@ async fn fail_closed_reject_pending(
             }),
             id: serde_json::json!(id),
         };
-        let _ = tx.send(resp);
+        let _ = tx.send(Ok(resp));
     }
 }
 
@@ -1081,3 +1092,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod transport_eof;
