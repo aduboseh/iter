@@ -135,10 +135,15 @@ class IterClient:
         future: asyncio.Future = asyncio.Future()
         self._response_queue[request_id] = future
 
-        self.stdin.write((json.dumps(asdict(request)) + "\n").encode("utf-8"))
-        await self.stdin.drain()
-
+        drain = None
         try:
+            self.stdin.write((json.dumps(asdict(request)) + "\n").encode("utf-8"))
+            drain = asyncio.create_task(self.stdin.drain())
+            # EOF must also release a send whose stdin write is backpressured.
+            done, _ = await asyncio.wait((drain, future), return_when=asyncio.FIRST_COMPLETED)
+            if future in done:
+                return future.result()
+            await drain
             response = await asyncio.wait_for(future, timeout=timeout_ms / 1000)
             return response
         except asyncio.TimeoutError:
@@ -146,6 +151,13 @@ class IterClient:
             raise RequestTimeoutError(method, timeout_ms)
         finally:
             self._response_queue.pop(request_id, None)
+            if not future.done():
+                future.cancel()
+            elif not future.cancelled():
+                future.exception()
+            if drain is not None:
+                drain.cancel()
+                await asyncio.gather(drain, return_exceptions=True)
 
     async def tools_list(self) -> list[ToolInfo]:
         """List available tools."""
@@ -428,14 +440,25 @@ class IterClient:
             try:
                 line_bytes = await self.stdout.readline() if self.stdout else None
                 if not line_bytes:
+                    self._fail_transport("Server stdout closed")
                     break
 
                 line = line_bytes.decode("utf-8").strip()
                 if line:
                     self._handle_stdout_line(line)
-            except Exception:
-                if self._state == State.CLOSED:
-                    break
+            except Exception as error:
+                self._fail_transport(f"Server stdout read failed: {error}")
+                break
+
+    def _fail_transport(self, reason: str) -> None:
+        if self._state == State.CLOSED:
+            return
+        # Transport loss does not prove child exit; close() still owns reaping.
+        self._state = State.CLOSING
+        for pending in self._response_queue.values():
+            if not pending.done():
+                pending.set_exception(ConnectionError(reason))
+        self._response_queue.clear()
 
     async def _read_stderr(self) -> None:
         """Read stderr into ring buffer."""

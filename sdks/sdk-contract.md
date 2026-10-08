@@ -59,7 +59,7 @@ OPEN ──(close())──> CLOSING ──(drain complete OR timeout)──> CLO
 - None (can be called from any state)
 
 **Behavior:**
-1. If state is `CLOSING` or `CLOSED`, return existing close promise
+1. Reuse an existing close operation; if none exists, `CLOSING` still requires cleanup
 2. Set state to `CLOSING`
 3. Await `waitForDrain()` (bounded timeout, e.g., 5000ms)
 4. Kill subprocess (SIGTERM → wait → SIGKILL if needed)
@@ -72,6 +72,19 @@ OPEN ──(close())──> CLOSING ──(drain complete OR timeout)──> CLO
 
 **Errors:**
 - `ConnectionError` if process becomes zombie after SIGKILL
+
+### Terminal STDIO Failure (Python and Rust)
+
+Stdout EOF or read failure moves the client to CLOSING and fails pending
+requests with a local connection error, including sends blocked writing stdin.
+Complete responses already read before EOF remain valid. Later sends are
+rejected. Transport loss is not a JSON-RPC response or proof of child exit:
+call close() to terminate and reap a child that remains alive. CLOSING after
+transport loss need not have a close operation in progress; close() must still
+perform cleanup. Captured stderr remains bounded by the existing ring limit.
+
+Rust request admission and registration must be atomic relative to terminal
+drain. These requirements do not introduce retries or change timeout values.
 
 ## Error Taxonomy
 
