@@ -4,8 +4,8 @@ use std::io::Read;
 use std::process::Command;
 
 const ITER_SCG_CONTRACT_VERSION: &str = "scg.v1";
-const ITER_SCG_SOURCE_COMMIT: &str = "0306feb600e12c627dc4b10963fc8f7781dc0e18";
-const ITER_SCG_VENDOR_MASTER_HEAD: &str = "b6c9a3b641291631358fcf9f8deace74d71e7615";
+const ITER_SCG_SOURCE_COMMIT: &str = "93ea46e2c206a06588b8fecf4531ed5bb70551f9";
+const ITER_SCG_VENDOR_MASTER_HEAD: &str = "93ea46e2c206a06588b8fecf4531ed5bb70551f9";
 const ITER_CANONICALIZATION_RULE: &str = "sorted-key-json+utf8-nfc+sha256";
 
 struct GovernanceArtifact {
@@ -100,7 +100,7 @@ fn main() {
         GovernanceArtifact {
             path: "vendor/governance-bridge/src/contract.rs",
             env_name: "ITER_BRIDGE_CONTRACT_RS_SHA256",
-            expected_sha256: "82800952f5e03851422fe4469fd159738b927e93b6a284c79f2703070516b3db",
+            expected_sha256: "5c436aa7dbfd166198a97134ca0c9567f4e963fa90a4f52cbdb63542096d39f1",
             mismatch_code: "BRIDGE_INTEGRITY_MISMATCH",
         },
         GovernanceArtifact {
@@ -118,7 +118,7 @@ fn main() {
         GovernanceArtifact {
             path: "vendor/governance-bridge/src/lib.rs",
             env_name: "ITER_BRIDGE_LIB_RS_SHA256",
-            expected_sha256: "3681052fa2346599a9c8e1068a219994c7ffb6c33515e251d2dc13bebf8b0a05",
+            expected_sha256: "95093940e309b446aa2df4fbc9be899862ffa7409d1620e579702904abe4923d",
             mismatch_code: "BRIDGE_INTEGRITY_MISMATCH",
         },
         GovernanceArtifact {

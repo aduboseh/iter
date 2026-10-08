@@ -48,6 +48,12 @@ trace and replay ID, then compares this hash with the exact request it sent,
 before publishing a decision or appending audit evidence. A self-consistent
 response for a different request is rejected with `ReplayIntegrityViolation`.
 
+The shared request type rejects unknown top-level members and duplicate
+constraint keys instead of dropping transmitted values before hashing. The
+gateway returns HTTP 422 for this invalid shape.
+Opaque string-valued constraints remain supported; the four declared fields
+and their canonical encoding do not change.
+
 The requested snapshot and live snapshot are different concepts. A correctly
 bound response may escalate because the live snapshot has changed; request
 binding must not turn this legitimate review result into a transport failure.
@@ -131,8 +137,8 @@ determinism_scope=same_binary_only
 platform=<target_triple>
 rustc_version=<version>
 cross_platform_replay_claimed=false
-scg_source_commit=0306feb600e12c627dc4b10963fc8f7781dc0e18
-scg_vendor_master_head=b6c9a3b641291631358fcf9f8deace74d71e7615
+scg_source_commit=93ea46e2c206a06588b8fecf4531ed5bb70551f9
+scg_vendor_master_head=93ea46e2c206a06588b8fecf4531ed5bb70551f9
 build_rerun_triggers=verified
 rustc_env_exports=verified
 bridge_integrity=verified

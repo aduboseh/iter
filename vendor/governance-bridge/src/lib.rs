@@ -66,11 +66,9 @@ impl GovernanceBridge for StubBridge {
         let decision = Decision::Allow;
 
         let mut trace = ExecutionTrace::new();
-        let hash_input = (
-            request.proposal_id.clone(),
-            request.state_snapshot_hash.clone(),
-            request.requested_action.clone(),
-        );
+        let hash_input = trace::canonicalize(&serde_json::to_value(&request).map_err(|error| {
+            BridgeError::TraceDeterminismViolation(format!("request serialization failed: {error}"))
+        })?);
         let hash_output = (request.state_snapshot_hash.clone(), true);
         trace.push(stub_trace_step(
             "stub",

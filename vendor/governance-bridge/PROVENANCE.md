@@ -4,14 +4,14 @@
 |---|---|
 | Source | https://github.com/aduboseh/SCG |
 | Crate path | crates/scg-governance-bridge |
-| SCG source commit | `0306feb600e12c627dc4b10963fc8f7781dc0e18` (state-envelope seam head) |
-| SCG merged main/master head at vendor time | `b6c9a3b641291631358fcf9f8deace74d71e7615` |
-| Vendored | 2026-05-23 |
+| SCG source commit | `93ea46e2c206a06588b8fecf4531ed5bb70551f9` (strict request-shape closure) |
+| SCG merged main/master head at vendor time | `93ea46e2c206a06588b8fecf4531ed5bb70551f9` |
+| Vendored | 2026-10-07 |
 | CONTRACT_VERSION_STR | `scg.v1` |
-| `contract.rs` SHA256 | `82800952f5e03851422fe4469fd159738b927e93b6a284c79f2703070516b3db` |
-| `trace.rs` SHA256 | `620892e1986dc22a2a5c17f60ec650e6da70dbe90b847a2862e13c1bf14bce20` |
+| `contract.rs` SHA256 | `5c436aa7dbfd166198a97134ca0c9567f4e963fa90a4f52cbdb63542096d39f1` |
+| `trace.rs` SHA256 | `bf9fcb710f709fa73cfa53d51753e21ebbbf0fe68f9d0877b39ef7e1b6dd74dc` |
 | `errors.rs` SHA256 | `d1459d2ebfd73dfed7d1bc78990a250b72ec701e7260624e320d824c2397d0af` |
-| `lib.rs` SHA256 | `52b4e25270e9b4b001175f9beba8bb020b6d64f9140fbc47b67789e9fa1badd8` |
+| `lib.rs` SHA256 | `95093940e309b446aa2df4fbc9be899862ffa7409d1620e579702904abe4923d` |
 
 ## Update Protocol
 
@@ -94,3 +94,12 @@ integrity pin.
     3. build.rs hash updated to new value
     4. All language bindings must re-validate against new vectors
   Upgrading schema_version without this process = governance violation.
+
+## Strict request shape - 2026-10-07
+
+Unknown top-level request members and duplicate constraint keys are rejected
+before request binding. Declared fields, valid string constraints, canonical
+hashing, NFC validation, and response schemas are unchanged. All four source
+files above were compared byte-for-byte with the accepted SCG master commit.
+The test fixture also binds the complete request, including constraints.
+Canonical vectors retain their separately recorded historical provenance.
