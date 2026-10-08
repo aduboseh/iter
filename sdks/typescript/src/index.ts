@@ -577,25 +577,26 @@ export class IterClient {
   }
 
   private async waitForExit(timeoutMs: number): Promise<boolean> {
-    if (!this.process) return true;
+    const proc = this.process;
+    if (!proc || proc.exitCode !== null || proc.signalCode !== null) return true;
 
     return new Promise<boolean>((resolve) => {
-      const proc = this.process!;
       let done = false;
 
       const finish = (exitObserved: boolean) => {
         if (done) return;
         done = true;
+        clearTimeout(timer);
         proc.removeListener("exit", onExit);
         proc.removeListener("close", onExit);
         resolve(exitObserved);
       };
 
       const onExit = () => finish(true);
+      const timer = setTimeout(() => finish(false), timeoutMs);
 
       proc.once("exit", onExit);
       proc.once("close", onExit);
-      setTimeout(() => finish(false), timeoutMs);
     });
   }
 
@@ -621,12 +622,13 @@ export class IterClient {
       this.lineReader = null;
     }
 
-    if (this.process && !this.process.killed) {
+    // `killed` means a signal was sent, not that the child terminated.
+    if (this.process && this.process.exitCode === null && this.process.signalCode === null) {
       this.process.kill("SIGTERM");
 
       const exitedAfterSigterm = await this.waitForExit(2000);
 
-      if (!exitedAfterSigterm && this.process && !this.process.killed) {
+      if (!exitedAfterSigterm) {
         this.process.kill("SIGKILL");
 
         const exitedAfterSigkill = await this.waitForExit(1000);
@@ -729,7 +731,7 @@ export class IterClient {
   }
 
   private handleStdoutLine(line: string) {
-    if (this._state !== "open") return;
+    if (this._state === "closed") return;
 
     let parsed: unknown;
     try {

@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import {
   SDK_PROTOCOL_VERSION,
   MIN_SERVER_VERSION,
@@ -379,6 +381,8 @@ describe("CT4.1: Graceful Shutdown", () => {
   class FakeChildProcess {
     public pid = 12345;
     public killed = false;
+    public exitCode: number | null = null;
+    public signalCode: string | null = null;
     private exitHandlers: Array<() => void> = [];
     private closeHandlers: Array<() => void> = [];
     private _shouldExitOnSigterm = true;
@@ -404,9 +408,12 @@ describe("CT4.1: Graceful Shutdown", () => {
     }
 
     kill(signal?: string): boolean {
+      if (this.exitCode !== null || this.signalCode !== null) return false;
+      // Node records signal delivery, not process termination, in `killed`.
+      this.killed = true;
       if (signal === "SIGTERM" && this._shouldExitOnSigterm) {
         Promise.resolve().then(() => {
-          this.killed = true;
+          this.signalCode = signal;
           this.emitExit();
         });
         return true;
@@ -414,13 +421,13 @@ describe("CT4.1: Graceful Shutdown", () => {
 
       if (signal === "SIGKILL" && this._shouldExitOnSigkill) {
         Promise.resolve().then(() => {
-          this.killed = true;
+          this.signalCode = signal;
           this.emitExit();
         });
         return true;
       }
 
-      // Signal sent but process doesn't respond — killed stays false
+      // Signal delivery can succeed while the process stays alive.
       return true;
     }
 
@@ -441,6 +448,46 @@ describe("CT4.1: Graceful Shutdown", () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  test.each(["exitCode", "signalCode"])("close observes existing %s without another signal", async (field) => {
+    const client = new (IterClient as any)(1);
+    const proc = new FakeChildProcess();
+    if (field === "exitCode") proc.exitCode = 7;
+    else proc.signalCode = "SIGTERM";
+    const kill = jest.spyOn(proc, "kill");
+    client.process = proc;
+    const result = client.close().then(() => "closed", (error: Error) => error);
+    await jest.runAllTimersAsync();
+    expect(await result).toBe("closed");
+    expect(kill).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test("observed exit clears the wait timer and listeners", async () => {
+    const client = new (IterClient as any)(1);
+    const proc = new FakeChildProcess();
+    client.process = proc;
+    const wait = client.waitForExit(2000);
+    proc.kill("SIGTERM");
+    expect(await wait).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+    expect(proc["exitHandlers"]).toHaveLength(0);
+    expect(proc["closeHandlers"]).toHaveLength(0);
+  });
+
+  test("the actual response handler completes an in-flight request during drain", async () => {
+    const client = new (IterClient as any)(1);
+    client.process = new FakeChildProcess();
+    client.stdin = { write: jest.fn() };
+    const response = client.send("test", {}).then((value: unknown) => value, (error: Error) => error);
+    const closed = client.close();
+    setTimeout(() => client.handleStdoutLine('{"jsonrpc":"2.0","id":1,"result":{}}'), 10);
+    await jest.runAllTimersAsync();
+    await expect(response).resolves.toEqual({ jsonrpc: "2.0", id: 1, result: {} });
+    await closed;
+    expect(client.responseQueue.size).toBe(0);
+    expect(client._state).toBe("closed");
   });
 
   test("CT4.1-A: drains pending requests within 5s", async () => {
@@ -643,6 +690,40 @@ describe("CT4.1: Graceful Shutdown", () => {
 
     expect(client["_state"]).toBe("closed");
   });
+});
+
+describe("Real child process shutdown", () => {
+  test("close does not report a zombie after an observed startup exit", async () => {
+    const proc = spawn(process.execPath, ["-e", "process.exit(7)"], { stdio: "ignore" });
+    await once(proc, "exit");
+    const client = new (IterClient as any)(1);
+    client.process = proc;
+    await expect(client.close()).resolves.toBeUndefined();
+    await expect(client.close()).resolves.toBeUndefined();
+    expect(client._state).toBe("closed");
+  });
+
+  test("close waits for real termination, escalating an ignored SIGTERM on Unix", async () => {
+    const proc = spawn(process.execPath, ["-e",
+      "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000); console.log('ready');"],
+    { stdio: ["ignore", "pipe", "ignore"] });
+    const kill = jest.spyOn(proc, "kill");
+    try {
+      await once(proc.stdout!, "data");
+      const client = new (IterClient as any)(1);
+      client.process = proc;
+      await client.close();
+      expect(proc.exitCode !== null || proc.signalCode !== null).toBe(true);
+      expect(kill).toHaveBeenCalledWith("SIGTERM");
+      if (process.platform !== "win32") expect(kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      if (proc.exitCode === null && proc.signalCode === null) {
+        const exited = once(proc, "exit");
+        proc.kill("SIGKILL");
+        await exited;
+      }
+    }
+  }, 10000);
 });
 
 describe("Governance Helper Methods", () => {
