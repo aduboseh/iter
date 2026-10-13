@@ -238,6 +238,7 @@ export interface AuditSearchResult {
 export class IterClient {
   private static readonly STDERR_RING_MAX_BYTES = 10 * 1024;
   private static readonly MAX_PROTOCOL_VIOLATIONS = 3;
+  private static readonly DRAIN_TIMEOUT_MS = 5000;
 
   private process: ChildProcess | null = null;
   private stdin: Writable | null = null;
@@ -252,6 +253,8 @@ export class IterClient {
   private readonly maxInflight: number;
   private _state: "open" | "closing" | "closed" = "open";
   private _closePromise: Promise<void> | null = null;
+  private _exitDrainTimer: ReturnType<typeof setTimeout> | undefined;
+  private _exitMessage: string | undefined;
 
   private _stderrBytes: Buffer = Buffer.alloc(0);
   private _protocolViolationCount = 0;
@@ -303,6 +306,8 @@ export class IterClient {
     client.lineReader.on("line", (line) => {
       client.handleStdoutLine(line);
     });
+    client.lineReader.on("close", () => client.failTransport("Stdout closed"));
+    client.lineReader.on("error", (err) => client.failTransport(`Stdout error: ${err.message}`));
 
     return client;
   }
@@ -313,7 +318,11 @@ export class IterClient {
     return this;
   }
 
-  /** Send a raw JSON-RPC request */
+  /**
+   * Send a raw JSON-RPC request. Terminal transport loss rejects pending requests
+   * with ConnectionError and prevents later sends. Call close() to reap the child;
+   * do not automatically retry mutations that may already have reached the server.
+   */
   async send(
     method: string,
     params?: unknown,
@@ -603,14 +612,14 @@ export class IterClient {
   private async performClose(): Promise<void> {
     this._state = "closing";
 
-    await this.waitForDrain(5000);
+    await this.waitForDrain(IterClient.DRAIN_TIMEOUT_MS);
 
     const pendingCount = this.responseQueue.size;
     if (pendingCount > 0) {
-      const error = new ConnectionClosedError(
-        "Client closed during drain, request did not complete in time",
-        pendingCount
-      );
+      const message = "Client closed during drain, request did not complete in time";
+      const error = this._exitMessage
+        ? this.makeConnectionErrorWithStderr(`${this._exitMessage}: ${message}`)
+        : new ConnectionClosedError(message, pendingCount);
       for (const pending of this.responseQueue.values()) {
         pending.reject(error);
       }
@@ -641,6 +650,12 @@ export class IterClient {
       }
     }
 
+    clearTimeout(this._exitDrainTimer);
+    this._exitDrainTimer = undefined;
+    // A descendant may still hold the other ends after the direct child exits.
+    this.process?.stdin?.destroy();
+    this.process?.stdout?.destroy();
+    this.process?.stderr?.destroy();
     this.process = null;
     this.stdin = null;
     this.stdout = null;
@@ -682,6 +697,21 @@ export class IterClient {
     return new ConnectionError(`${message}\nstderr:\n${stderr}`);
   }
 
+  private failTransport(message: string): void {
+    clearTimeout(this._exitDrainTimer);
+    this._exitDrainTimer = undefined;
+    if (this._state === "closed") return;
+    this._state = "closing";
+    const error = this.makeConnectionErrorWithStderr(
+      this._exitMessage && this._exitMessage !== message
+        ? `${this._exitMessage}: ${message}` : message
+    );
+    for (const pending of this.responseQueue.values()) {
+      pending.reject(error);
+    }
+    this.responseQueue.clear();
+  }
+
   private attachProcessHandlers(proc: ChildProcess) {
     if (proc.stderr) {
       proc.stderr.on("data", (chunk: Buffer) => {
@@ -691,27 +721,33 @@ export class IterClient {
     }
 
     proc.on("error", (err) => {
-      const error = this.makeConnectionErrorWithStderr(err.message);
-      for (const pending of this.responseQueue.values()) {
-        pending.reject(error);
-      }
-      this.responseQueue.clear();
+      this.failTransport(err.message);
     });
 
-    proc.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+    proc.stdin?.on("error", (err) => this.failTransport(`Stdin error: ${err.message}`));
+    proc.stdout?.on("close", () => this.failTransport("Stdout closed"));
+
+    const exitMessage = (code: number | null, signal: NodeJS.Signals | null): string => {
       const nonZeroExit = typeof code === "number" && code !== 0;
-      const msg = nonZeroExit
+      return nonZeroExit
         ? `Process exited with code ${code}${signal ? ` signal ${signal}` : ""}`
         : `Process exited${signal ? ` signal ${signal}` : ""}`;
+    };
 
-      const error = nonZeroExit
-        ? this.makeConnectionErrorWithStderr(msg)
-        : new ConnectionError(msg);
-
-      for (const pending of this.responseQueue.values()) {
-        pending.reject(error);
+    proc.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (this._state === "closed") return;
+      this._exitMessage = exitMessage(code, signal);
+      this._state = "closing";
+      // Preserve buffered replies, but do not wait indefinitely on inherited pipes.
+      if (this.responseQueue.size > 0 && this._exitDrainTimer === undefined) {
+        this._exitDrainTimer = setTimeout(
+          () => this.failTransport("Stdout drain timed out"), IterClient.DRAIN_TIMEOUT_MS
+        );
       }
-      this.responseQueue.clear();
+    });
+
+    proc.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+      this.failTransport(exitMessage(code, signal));
     });
   }
 
