@@ -303,6 +303,8 @@ export class IterClient {
     client.lineReader.on("line", (line) => {
       client.handleStdoutLine(line);
     });
+    client.lineReader.on("close", () => client.failTransport("Stdout closed"));
+    client.lineReader.on("error", (err) => client.failTransport(`Stdout error: ${err.message}`));
 
     return client;
   }
@@ -313,7 +315,11 @@ export class IterClient {
     return this;
   }
 
-  /** Send a raw JSON-RPC request */
+  /**
+   * Send a raw JSON-RPC request. Terminal transport loss rejects pending requests
+   * with ConnectionError and prevents later sends. Call close() to reap the child;
+   * do not automatically retry mutations that may already have reached the server.
+   */
   async send(
     method: string,
     params?: unknown,
@@ -682,6 +688,16 @@ export class IterClient {
     return new ConnectionError(`${message}\nstderr:\n${stderr}`);
   }
 
+  private failTransport(message: string): void {
+    if (this._state === "closed") return;
+    this._state = "closing";
+    const error = this.makeConnectionErrorWithStderr(message);
+    for (const pending of this.responseQueue.values()) {
+      pending.reject(error);
+    }
+    this.responseQueue.clear();
+  }
+
   private attachProcessHandlers(proc: ChildProcess) {
     if (proc.stderr) {
       proc.stderr.on("data", (chunk: Buffer) => {
@@ -691,27 +707,24 @@ export class IterClient {
     }
 
     proc.on("error", (err) => {
-      const error = this.makeConnectionErrorWithStderr(err.message);
-      for (const pending of this.responseQueue.values()) {
-        pending.reject(error);
-      }
-      this.responseQueue.clear();
+      this.failTransport(err.message);
     });
 
-    proc.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+    proc.stdin?.on("error", (err) => this.failTransport(`Stdin error: ${err.message}`));
+    proc.stdout?.on("close", () => this.failTransport("Stdout closed"));
+
+    proc.on("exit", () => {
+      // Exit precedes stdio closure: stop admission but let buffered replies drain.
+      if (this._state !== "closed") this._state = "closing";
+    });
+
+    proc.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
       const nonZeroExit = typeof code === "number" && code !== 0;
       const msg = nonZeroExit
         ? `Process exited with code ${code}${signal ? ` signal ${signal}` : ""}`
         : `Process exited${signal ? ` signal ${signal}` : ""}`;
 
-      const error = nonZeroExit
-        ? this.makeConnectionErrorWithStderr(msg)
-        : new ConnectionError(msg);
-
-      for (const pending of this.responseQueue.values()) {
-        pending.reject(error);
-      }
-      this.responseQueue.clear();
+      this.failTransport(msg);
     });
   }
 
