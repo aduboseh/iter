@@ -62,6 +62,41 @@ function outcome(client: IterClient, method = "test", params?: unknown): Promise
 }
 
 describe("Terminal transport event ordering", () => {
+  test.each([
+    [7, null, "code 7"],
+    [null, "SIGTERM", "signal SIGTERM"],
+  ] as const)("close-before-exit preserves status %s/%s at the original deadline", async (code, signal, diagnostic) => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const proc = new TransportChild();
+      await withClient(proc, async client => {
+        proc.stderr.write("close diagnostic\n");
+        const answered = outcome(client);
+        const unanswered = outcome(client);
+        const closed = client.close();
+        await jest.advanceTimersByTimeAsync(1000);
+        proc.exitCode = code;
+        proc.signalCode = signal;
+        proc.emit("exit", code, signal);
+        proc.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: 1, result: "buffered" }) + "\n");
+        expect(await answered).toMatchObject({ result: "buffered" });
+        await jest.advanceTimersByTimeAsync(3999);
+        expect((client as any).responseQueue.size).toBe(1);
+        await jest.advanceTimersByTimeAsync(1);
+        await closed;
+        const error = await unanswered;
+        expect(error).toBeInstanceOf(ConnectionError);
+        expect((error as Error).message).toContain(diagnostic);
+        expect((error as Error).message).toContain("close diagnostic");
+        expect((client as any)._state).toBe("closed");
+        expect((client as any).responseQueue.size).toBe(0);
+        expect(jest.getTimerCount()).toBe(0);
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test.each(["EOF", "close"])("%s cancels the exit drain timer after buffered replies", async terminal => {
     jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
     try {

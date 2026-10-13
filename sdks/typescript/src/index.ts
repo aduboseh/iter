@@ -616,10 +616,10 @@ export class IterClient {
 
     const pendingCount = this.responseQueue.size;
     if (pendingCount > 0) {
-      const error = new ConnectionClosedError(
-        "Client closed during drain, request did not complete in time",
-        pendingCount
-      );
+      const message = "Client closed during drain, request did not complete in time";
+      const error = this._exitMessage
+        ? this.makeConnectionErrorWithStderr(`${this._exitMessage}: ${message}`)
+        : new ConnectionClosedError(message, pendingCount);
       for (const pending of this.responseQueue.values()) {
         pending.reject(error);
       }
