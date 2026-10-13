@@ -238,6 +238,7 @@ export interface AuditSearchResult {
 export class IterClient {
   private static readonly STDERR_RING_MAX_BYTES = 10 * 1024;
   private static readonly MAX_PROTOCOL_VIOLATIONS = 3;
+  private static readonly DRAIN_TIMEOUT_MS = 5000;
 
   private process: ChildProcess | null = null;
   private stdin: Writable | null = null;
@@ -252,6 +253,8 @@ export class IterClient {
   private readonly maxInflight: number;
   private _state: "open" | "closing" | "closed" = "open";
   private _closePromise: Promise<void> | null = null;
+  private _exitDrainTimer: ReturnType<typeof setTimeout> | undefined;
+  private _exitMessage: string | undefined;
 
   private _stderrBytes: Buffer = Buffer.alloc(0);
   private _protocolViolationCount = 0;
@@ -609,7 +612,7 @@ export class IterClient {
   private async performClose(): Promise<void> {
     this._state = "closing";
 
-    await this.waitForDrain(5000);
+    await this.waitForDrain(IterClient.DRAIN_TIMEOUT_MS);
 
     const pendingCount = this.responseQueue.size;
     if (pendingCount > 0) {
@@ -647,6 +650,12 @@ export class IterClient {
       }
     }
 
+    clearTimeout(this._exitDrainTimer);
+    this._exitDrainTimer = undefined;
+    // A descendant may still hold the other ends after the direct child exits.
+    this.process?.stdin?.destroy();
+    this.process?.stdout?.destroy();
+    this.process?.stderr?.destroy();
     this.process = null;
     this.stdin = null;
     this.stdout = null;
@@ -689,9 +698,14 @@ export class IterClient {
   }
 
   private failTransport(message: string): void {
+    clearTimeout(this._exitDrainTimer);
+    this._exitDrainTimer = undefined;
     if (this._state === "closed") return;
     this._state = "closing";
-    const error = this.makeConnectionErrorWithStderr(message);
+    const error = this.makeConnectionErrorWithStderr(
+      this._exitMessage && this._exitMessage !== message
+        ? `${this._exitMessage}: ${message}` : message
+    );
     for (const pending of this.responseQueue.values()) {
       pending.reject(error);
     }
@@ -713,18 +727,27 @@ export class IterClient {
     proc.stdin?.on("error", (err) => this.failTransport(`Stdin error: ${err.message}`));
     proc.stdout?.on("close", () => this.failTransport("Stdout closed"));
 
-    proc.on("exit", () => {
-      // Exit precedes stdio closure: stop admission but let buffered replies drain.
-      if (this._state !== "closed") this._state = "closing";
+    const exitMessage = (code: number | null, signal: NodeJS.Signals | null): string => {
+      const nonZeroExit = typeof code === "number" && code !== 0;
+      return nonZeroExit
+        ? `Process exited with code ${code}${signal ? ` signal ${signal}` : ""}`
+        : `Process exited${signal ? ` signal ${signal}` : ""}`;
+    };
+
+    proc.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (this._state === "closed") return;
+      this._exitMessage = exitMessage(code, signal);
+      this._state = "closing";
+      // Preserve buffered replies, but do not wait indefinitely on inherited pipes.
+      if (this.responseQueue.size > 0 && this._exitDrainTimer === undefined) {
+        this._exitDrainTimer = setTimeout(
+          () => this.failTransport("Stdout drain timed out"), IterClient.DRAIN_TIMEOUT_MS
+        );
+      }
     });
 
     proc.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
-      const nonZeroExit = typeof code === "number" && code !== 0;
-      const msg = nonZeroExit
-        ? `Process exited with code ${code}${signal ? ` signal ${signal}` : ""}`
-        : `Process exited${signal ? ` signal ${signal}` : ""}`;
-
-      this.failTransport(msg);
+      this.failTransport(exitMessage(code, signal));
     });
   }
 

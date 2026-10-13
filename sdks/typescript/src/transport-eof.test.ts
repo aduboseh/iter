@@ -62,6 +62,81 @@ function outcome(client: IterClient, method = "test", params?: unknown): Promise
 }
 
 describe("Terminal transport event ordering", () => {
+  test.each(["EOF", "close"])("%s cancels the exit drain timer after buffered replies", async terminal => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const proc = new TransportChild();
+      await withClient(proc, async client => {
+        const request = outcome(client);
+        proc.exitCode = 0;
+        proc.emit("exit", 0, null);
+        proc.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: 1, result: "buffered" }) + "\n");
+        expect(await request).toMatchObject({ result: "buffered" });
+        expect(jest.getTimerCount()).toBe(1);
+        if (terminal === "EOF") {
+          const ended = once((client as any).lineReader, "close");
+          proc.stdout.end();
+          await ended;
+        } else await client.close();
+        expect(jest.getTimerCount()).toBe(0);
+        await client.close();
+        await jest.advanceTimersByTimeAsync(6000);
+        expect((client as any)._state).toBe("closed");
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test("exit bounds unanswered requests even when stdout and process close never arrive", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    try {
+      const proc = new TransportChild();
+      await withClient(proc, async client => {
+        const answered = outcome(client);
+        const unanswered = outcome(client);
+        proc.exitCode = 7;
+        proc.emit("exit", 7, null);
+        const response = { jsonrpc: "2.0", id: 1, result: "buffered" };
+        proc.stdout.write(JSON.stringify(response) + "\n");
+        expect(await answered).toEqual(response);
+        await jest.advanceTimersByTimeAsync(4999);
+        expect((client as any).responseQueue.size).toBe(1);
+        await jest.advanceTimersByTimeAsync(1);
+        expect((client as any).responseQueue.size).toBe(0);
+        const error = await unanswered;
+        expect(error).toBeInstanceOf(ConnectionError);
+        expect((error as Error).message).toContain("code 7");
+        await client.close();
+        expect(jest.getTimerCount()).toBe(0);
+        expect(proc.stdin.destroyed).toBe(true);
+        expect(proc.stdout.destroyed).toBe(true);
+        expect(proc.stderr.destroyed).toBe(true);
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test.each([
+    [7, null, "code 7"],
+    [null, "SIGTERM", "signal SIGTERM"],
+  ] as const)("EOF preserves observed exit status %s/%s", async (code, signal, diagnostic) => {
+    const proc = new TransportChild();
+    await withClient(proc, async client => {
+      proc.stderr.write("exit diagnostic\n");
+      const request = outcome(client);
+      proc.exitCode = code;
+      proc.signalCode = signal;
+      proc.emit("exit", code, signal);
+      proc.stdout.end();
+      const error = await bounded(request);
+      expect(error).toBeInstanceOf(ConnectionError);
+      expect((error as Error).message).toContain(diagnostic);
+      expect((error as Error).message).toContain("exit diagnostic");
+    });
+  });
+
   test("stdout EOF fails all pending requests, retains stderr, and blocks admission", async () => {
     const proc = new TransportChild();
     await withClient(proc, async client => {
@@ -156,7 +231,15 @@ describe("Terminal transport event ordering", () => {
 });
 
 describe("Real subprocess transport loss", () => {
-  function start(mode: "exit" | "eof" | "response"): ChildProcess {
+  // Windows pipe lifetime differs for both remote EOF and descendant inheritance.
+  const unixTest = process.platform === "win32" ? test.skip : test;
+
+  function stopHolder(pid: number): void {
+    try { process.kill(pid, "SIGKILL"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
+  }
+
+  function start(mode: "exit" | "eof" | "response" | "held"): ChildProcess {
     return childProcess.spawn(process.execPath, ["-e", `
       setInterval(() => {}, 1000);
       process.stdin.once('data', () => {
@@ -165,10 +248,39 @@ describe("Real subprocess transport loss", () => {
         else if (${JSON.stringify(mode)} === 'response') {
           process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:1,result:'complete'})+'\\n',
             () => process.exit(0));
+        } else if (${JSON.stringify(mode)} === 'held') {
+          const holder = require('child_process').spawn(process.execPath,
+            ['-e', 'setTimeout(() => {}, 20000)'], {stdio:['ignore',1,2]});
+          holder.once('spawn', () => process.send({holderPid:holder.pid}, () => process.exit(7)));
         } else require('fs').closeSync(1);
       });
-    `], { stdio: ["pipe", "pipe", "pipe"] });
+    `], { stdio: ["pipe", "pipe", "pipe", "ipc"] });
   }
+
+  unixTest("descendant-held pipes do not defer failure to the request timeout", async () => {
+    const proc = start("held");
+    let holderPid: number | undefined;
+    proc.once("message", (message: { holderPid: number }) => { holderPid = message.holderPid; });
+    try {
+      await withClient(proc, async client => {
+        const request = outcome(client);
+        await bounded(once(proc, "exit"));
+        expect(holderPid).toBeDefined();
+        expect(proc.stdout!.readableEnded).toBe(false);
+        // The existing close drain budget is 5s, independent of the 30s request timeout.
+        await new Promise(resolve => setTimeout(resolve, 5500));
+        expect((client as any).responseQueue.size).toBe(0);
+        const error = await bounded(request);
+        expect(error).toBeInstanceOf(ConnectionError);
+        expect((error as Error).message).toContain("code 7");
+        await client.close();
+        expect(proc.stdout!.destroyed).toBe(true);
+        expect(proc.stderr!.destroyed).toBe(true);
+      });
+    } finally {
+      if (holderPid !== undefined) stopHolder(holderPid);
+    }
+  }, 10000);
 
   test("unexpected exit rejects the pending request and every later send", async () => {
     const proc = start("exit");
@@ -181,7 +293,6 @@ describe("Real subprocess transport loss", () => {
   });
 
   // Node retains Windows stdout handles after closeSync(1); Unix exercises remote EOF.
-  const unixTest = process.platform === "win32" ? test.skip : test;
   unixTest("child-alive remote EOF releases a backpressured send and close reaps it", async () => {
     const proc = start("eof");
     await withClient(proc, async client => {
