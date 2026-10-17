@@ -9,6 +9,7 @@ on:
       - productization/SCG_RELEASE_REF
       - productization/evidence/**
       - scripts/verify_productization_matrix.py
+      - tests/test_productization_matrix.py
       - .github/workflows/apex_productization.yml
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - productization/SCG_RELEASE_REF
       - productization/evidence/**
       - scripts/verify_productization_matrix.py
+      - tests/test_productization_matrix.py
       - .github/workflows/apex_productization.yml
   workflow_dispatch:
     inputs:
@@ -34,9 +36,6 @@ on:
 permissions:
   contents: read
   actions: read
-
-env:
-  TRUSTED_EVIDENCE_WORKFLOW: .github/workflows/apex_productization_evidence.yml
 
 jobs:
   matrix-definition:
@@ -57,6 +56,22 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
+      - name: Reject non-main certification dispatch
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          if os.environ.get("DISPATCH_REF") != "refs/heads/main":
+              raise SystemExit("::error::Certification dispatch must originate on main")
+          PY
+      - name: Check out verifier authority
+        uses: actions/checkout@v4
+        with:
+          repository: aduboseh/iter
+          ref: refs/heads/main
+          path: authority
+          persist-credentials: false
       - name: Check out iter
         uses: actions/checkout@v4
         with:
@@ -91,27 +106,10 @@ jobs:
             echo "::error::evidence_run_id must be a positive GitHub Actions run ID"
             exit 1
           fi
-          EVIDENCE_RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}")"
-          EVIDENCE_HEAD="$(jq -r '.head_sha' <<< "$EVIDENCE_RUN")"
-          EVIDENCE_WORKFLOW="$(jq -r '.path' <<< "$EVIDENCE_RUN")"
-          EVIDENCE_CONCLUSION="$(jq -r '.conclusion' <<< "$EVIDENCE_RUN")"
-          EVIDENCE_EVENT="$(jq -r '.event' <<< "$EVIDENCE_RUN")"
-          if [[ "$EVIDENCE_HEAD" != "$GITHUB_SHA" ]]; then
-            echo "::error::Evidence run head ${EVIDENCE_HEAD} does not match iter subject ${GITHUB_SHA}"
-            exit 1
-          fi
-          if [[ "$EVIDENCE_WORKFLOW" != "$TRUSTED_EVIDENCE_WORKFLOW" ]]; then
-            echo "::error::Evidence run workflow ${EVIDENCE_WORKFLOW} is not trusted"
-            exit 1
-          fi
-          if [[ "$EVIDENCE_CONCLUSION" != "success" ]]; then
-            echo "::error::Evidence run conclusion must be success, got ${EVIDENCE_CONCLUSION}"
-            exit 1
-          fi
-          if [[ "$EVIDENCE_EVENT" != "workflow_dispatch" ]]; then
-            echo "::error::Evidence run must be independently dispatched, got ${EVIDENCE_EVENT}"
-            exit 1
-          fi
+          echo "Verifier authority: $(git -C authority rev-parse HEAD)"
+          python3 -I -B authority/scripts/verify_productization_matrix.py \
+            --iter-root iter \
+            --verify-evidence-run --evidence-run-id "$EVIDENCE_RUN_ID"
           echo "run-id=$EVIDENCE_RUN_ID" >> "$GITHUB_OUTPUT"
       - name: Check out exact SCG subject
         uses: actions/checkout@v4
@@ -141,8 +139,10 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --version 0.22.1 --locked
       - name: Execute all release controls
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python3 iter/scripts/verify_productization_matrix.py \
+          python3 -I -B authority/scripts/verify_productization_matrix.py \
             --iter-root iter \
             --scg-root SCG \
             --evidence-dir apex-evidence \
