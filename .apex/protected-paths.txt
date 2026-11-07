@@ -1,0 +1,20 @@
+# APEX v1.2 — iter protected-path review triggers
+# Shell glob patterns interpreted by .apex/apex-guard-v1.2.sh.
+# A finding requires separate independent approval; editing this file never authorizes bypass.
+governance/**
+vendor/governance-bridge/**
+schemas/**
+spec/**
+productization/**
+tests/golden/**
+tests/fixtures/**
+build.rs
+scripts/golden_path.ps1
+docs/CLAIM_BOUNDARY.md
+docs/SECURITY.md
+APEX_PRODUCTIZATION_*
+RELEASE.md
+CODEOWNERS
+AGENTS.md
+.github/**
+.apex/**
