@@ -1,0 +1,52 @@
+# APEX installation/guard check. Bootstrap is NOT enforcement.
+# During first installation no trusted guard exists on the base branch.
+# Never execute an untrusted PR-authored guard to bootstrap its own approval.
+name: APEX Installation and Guard
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: APEX Installation / Guard Status
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bootstrap or enforce with trusted base guard
+        shell: bash
+        env:
+          APEX_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          APEX_GLOBAL_BYTES: '0'
+        run: |
+          set -euo pipefail
+          git cat-file -e "$APEX_BASE_SHA^{commit}"
+          if ! git cat-file -e "$APEX_BASE_SHA:.apex/apex-guard-v1.2.sh" 2>/dev/null; then
+            # A passing bootstrap inspection is NEVER a policy-enforcement pass.
+            test -s AGENTS.md
+            test -s .apex/protected-paths.txt
+            test -s .apex/apex-guard-v1.2.sh
+            test -s .apex/test_apex_guard_v1.2.py
+            bash -n .apex/apex-guard-v1.2.sh
+            python3 -m py_compile .apex/test_apex_guard_v1.2.py
+            echo "::warning title=APEX BOOTSTRAP NOT ENFORCED::No trusted guard on base. This check only validates required files and syntax. Independent human review is mandatory. Do not interpret success as guard enforcement."
+            {
+              echo "### APEX BOOTSTRAP — NOT ENFORCED"
+              echo "The default branch has no prior trusted guard. Confirm CODEOWNER approval and repository rulesets before accepting this installation."
+              echo "No candidate guard was executed as an approval authority."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git show "$APEX_BASE_SHA:.apex/apex-guard-v1.2.sh" > "$RUNNER_TEMP/apex-guard.sh"
+          bash -n "$RUNNER_TEMP/apex-guard.sh"
+          bash "$RUNNER_TEMP/apex-guard.sh" "$APEX_BASE_SHA"
