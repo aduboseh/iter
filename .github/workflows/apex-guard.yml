@@ -1,0 +1,46 @@
+# APEX heuristic policy guard. A PASS is not approval or evidence of security.
+# Configure a REQUIRED status check and CODEOWNERS review in GitHub Rulesets.
+# This check intentionally FAILS when protected paths change; only an independently
+# authorized governance exception/approved review process can permit such changes.
+# First installation PR necessarily fails: the base branch has no trusted guard yet.
+name: APEX Governance Guard
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: APEX Heuristic Guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout proposed commit without credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run trusted base-branch guard over proposal
+        shell: bash
+        env:
+          APEX_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          APEX_GLOBAL_BYTES: '0'
+        run: |
+          set -euo pipefail
+          git cat-file -e "$APEX_BASE_SHA^{commit}"
+          if ! git cat-file -e "$APEX_BASE_SHA:.apex/apex-guard-v1.2.sh" 2>/dev/null; then
+            echo "::error::APEX bootstrap: no trusted guard on base branch. Review and install via explicit human-governed exception; never execute a PR-authored substitute."
+            exit 1
+          fi
+          git show "$APEX_BASE_SHA:.apex/apex-guard-v1.2.sh" > "$RUNNER_TEMP/apex-guard.sh"
+          bash -n "$RUNNER_TEMP/apex-guard.sh"
+          bash "$RUNNER_TEMP/apex-guard.sh" "$APEX_BASE_SHA"
+
+  # This workflow intentionally does not self-approve policy changes.
+  # Human review, branch protection, environment permissions and secret scanning
+  # must be enforced outside this repository-supplied script.
